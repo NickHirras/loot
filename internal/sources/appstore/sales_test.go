@@ -284,3 +284,21 @@ func TestBuildSalesEventsReordersColumnsSafely(t *testing.T) {
 		t.Errorf("row = %v %s x%d", events[0].Amount, events[0].Currency, events[0].Quantity)
 	}
 }
+
+func TestUpdatesOnlyDayMintsNoSummary(t *testing.T) {
+	// Seen on first real contact: a day whose only row was an update (7F)
+	// produced a "0 sales · 0.00" chest drop. Updates carry no money and no
+	// new customer, so the day should stay silent.
+	report := "Units\tProduct Type Identifier\tCountry Code\tCurrency of Proceeds\tDeveloper Proceeds (per unit)\tApple Identifier\tSKU\tTitle\n" +
+		"1\t7F\tUS\tUSD\t0\t6763687102\tmacro\tMacro Trainer\n"
+
+	events, err := appstore.BuildSalesEvents([]byte(report), fixtureDay, nil, fixtureObserved)
+	if err != nil {
+		t.Fatalf("build: %v", err)
+	}
+	for _, ev := range events {
+		if ev.Kind == appstore.KindSalesDay {
+			t.Fatalf("updates-only day produced a sales_day summary: %+v", ev)
+		}
+	}
+}

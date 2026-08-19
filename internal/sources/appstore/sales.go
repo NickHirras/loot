@@ -358,6 +358,12 @@ func BuildSalesEvents(report []byte, date string, apps []string, observed time.T
 
 	for _, appleID := range order {
 		agg := aggregates[appleID]
+		// A day that only saw updates (or redownloads) has nothing to put in
+		// a chest: no sale, no download, no refund. Skip the summary rather
+		// than mint a "0 sales" drop.
+		if agg.units == 0 && agg.downloads == 0 && agg.refunds == 0 {
+			continue
+		}
 		summary, err := agg.summaryEvent(date, day, observed)
 		if err != nil {
 			return nil, err

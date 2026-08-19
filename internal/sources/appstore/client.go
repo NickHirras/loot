@@ -161,6 +161,12 @@ func (s *Source) fetchReport(ctx context.Context, spec reportSpec, date string) 
 			errCredentials, parseAPIError(resp.StatusCode, body).Error(), s.VendorNumber)
 	case resp.StatusCode == http.StatusTooManyRequests:
 		return nil, fmt.Errorf("appstore: rate limited by app store connect (%s %s)", spec, date)
+	case resp.StatusCode == http.StatusBadRequest && spec.Type != "SALES" && strings.Contains(string(body), "Invalid vendor number"):
+		// Seen in the wild: the SALES report accepts the vendor number but the
+		// SUBSCRIPTION report answers 400 "Invalid vendor number specified"
+		// for a vendor with no subscription data. Treat it like the 404
+		// Apple uses for the same situation elsewhere.
+		return nil, fmt.Errorf("%w (%s %s: %s)", errNotReady, spec, date, parseAPIError(resp.StatusCode, body).Error())
 	default:
 		return nil, fmt.Errorf("appstore: %s for %s: %s", spec, date, parseAPIError(resp.StatusCode, body).Error())
 	}
