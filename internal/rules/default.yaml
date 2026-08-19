@@ -188,6 +188,55 @@ rules:
       subtitle: "{{.App}}"
       xp: 10
 
+
+  # -------------------------------------------------------------------- GitHub
+  - name: github-release
+    match: {source: github, kind: release}
+    then: {rarity: rare, title: "Release shipped: {{.Payload.tag}}", subtitle: "{{.App}}", xp: 150}
+  - name: github-star-milestone
+    match: {source: github, kind: stars_milestone}
+    then: {rarity: epic, title: "{{.QuantityFmt}} stars on {{.App}}", subtitle: "milestone", xp: 400}
+  - name: github-star
+    match: {source: github, kind: star}
+    then: {rarity: common, title: "New stargazer", subtitle: "{{.App}}{{if .Payload.user}} · {{.Payload.user}}{{end}}", xp: 5}
+  - name: github-fork
+    match: {source: github, kind: fork}
+    then: {rarity: common, title: "Forked", subtitle: "{{.App}}", xp: 5}
+  - name: github-issue-opened
+    match: {source: github, kind: issue_opened}
+    then: {rarity: uncommon, title: "A quest appears: #{{.Payload.number}}", subtitle: "{{.Payload.title}}", xp: 15}
+  - name: github-issue-closed
+    match: {source: github, kind: issue_closed}
+    then: {rarity: uncommon, title: "Issue slain: #{{.Payload.number}}", subtitle: "{{.Payload.title}}", xp: 30}
+  - name: github-pr-merged
+    match: {source: github, kind: pr_merged}
+    then: {rarity: rare, title: "PR merged: #{{.Payload.number}}", subtitle: "{{.Payload.title}}", xp: 60}
+  - name: github-pr-opened
+    match: {source: github, kind: pr_opened}
+    then: {rarity: uncommon, title: "PR opened: #{{.Payload.number}}", subtitle: "{{.Payload.title}}", xp: 20}
+
+  # ----------------------------------------------------------- Generic webhook
+  # POST /hooks/webhook may name its own rarity in the payload; otherwise it
+  # falls through to the kind-based and fallback rules like any other source.
+  - name: webhook-legendary
+    match: {source: webhook, payload_match: {rarity: legendary}}
+    then: {rarity: legendary, title: "{{.Payload.title}}", subtitle: "{{.Payload.subtitle}}", xp: 1000}
+  - name: webhook-epic
+    match: {source: webhook, payload_match: {rarity: epic}}
+    then: {rarity: epic, title: "{{.Payload.title}}", subtitle: "{{.Payload.subtitle}}", xp: 300}
+  - name: webhook-rare
+    match: {source: webhook, payload_match: {rarity: rare}}
+    then: {rarity: rare, title: "{{.Payload.title}}", subtitle: "{{.Payload.subtitle}}", xp: 100}
+  - name: webhook-uncommon
+    match: {source: webhook, payload_match: {rarity: uncommon}}
+    then: {rarity: uncommon, title: "{{.Payload.title}}", subtitle: "{{.Payload.subtitle}}", xp: 25}
+  - name: webhook-cursed
+    match: {source: webhook, payload_match: {rarity: cursed}}
+    then: {rarity: cursed, title: "{{.Payload.title}}", subtitle: "{{.Payload.subtitle}}", xp: 5}
+  - name: webhook-common
+    match: {source: webhook, payload_match: {rarity: common}}
+    then: {rarity: common, title: "{{.Payload.title}}", subtitle: "{{.Payload.subtitle}}", xp: 10}
+
   # ----------------------------------------------------- Dev / synthetic drops
   # POST /api/dev/fake emits source=dev with kind set to the desired rarity, so
   # the UI and sound design can be exercised without waiting for real money.

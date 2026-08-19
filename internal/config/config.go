@@ -87,6 +87,73 @@ type Sources struct {
 	Flathub    Flathub    `yaml:"flathub"`
 	AppStore   AppStore   `yaml:"appstore"`
 	GooglePlay GooglePlay `yaml:"googleplay"`
+	// Quest 7 sources.
+	MicrosoftStore MicrosoftStore `yaml:"microsoftstore"`
+	Snapcraft      Snapcraft      `yaml:"snapcraft"`
+	GitHub         GitHub         `yaml:"github"`
+	Webhook        Webhook        `yaml:"webhook"`
+}
+
+// MicrosoftStore configures the Partner Center analytics source (Microsoft
+// Store analytics API). It authenticates as an Azure AD application that has
+// been associated with the Partner Center account.
+type MicrosoftStore struct {
+	// TenantID is the Azure AD tenant of the app registration.
+	TenantID string `yaml:"tenant_id"`
+	// ClientID is the app registration's application (client) id.
+	ClientID string `yaml:"client_id"`
+	// ClientSecret is a client secret for the app registration.
+	ClientSecret string `yaml:"client_secret"`
+	// Apps optionally restricts ingest to these Store IDs (e.g. 9NBLGGH4R315).
+	Apps []string `yaml:"apps"`
+	// BackfillDays limits how far back the first run reads. Defaults to 30.
+	BackfillDays int `yaml:"backfill_days"`
+}
+
+// Configured reports whether every field the source cannot run without is set.
+func (m MicrosoftStore) Configured() bool {
+	return m.TenantID != "" && m.ClientID != "" && m.ClientSecret != ""
+}
+
+// Snapcraft configures the Snap Store metrics source. Authentication uses an
+// exported login (macaroon) from `snapcraft export-login`.
+type Snapcraft struct {
+	// Snaps lists the snap names to watch.
+	Snaps []string `yaml:"snaps"`
+	// LoginPath points at the file produced by `snapcraft export-login <file>`.
+	LoginPath string `yaml:"login_path"`
+	// BackfillDays limits how far back the first run reads. Defaults to 30.
+	BackfillDays int `yaml:"backfill_days"`
+}
+
+// Configured reports whether the source can run.
+func (s Snapcraft) Configured() bool { return len(s.Snaps) > 0 && s.LoginPath != "" }
+
+// GitHub configures the GitHub source: polling stars/issues/releases for the
+// listed repositories, and optionally receiving GitHub webhooks at
+// /hooks/github for real-time drops.
+type GitHub struct {
+	// Repos lists "owner/name" repositories to watch.
+	Repos []string `yaml:"repos"`
+	// Token is a personal access token (public repos work without one, at a
+	// lower rate limit).
+	Token string `yaml:"token"`
+	// WebhookSecret, when set, verifies X-Hub-Signature-256 on /hooks/github.
+	WebhookSecret string `yaml:"webhook_secret"`
+	// BackfillDays limits how far back the first run reads. Defaults to 30.
+	BackfillDays int `yaml:"backfill_days"`
+}
+
+// Configured reports whether the source can run.
+func (g GitHub) Configured() bool { return len(g.Repos) > 0 }
+
+// Webhook configures the generic webhook receiver at /hooks/webhook, so any
+// script or service can post drops.
+type Webhook struct {
+	// Enabled mounts the receiver. Defaults to false.
+	Enabled bool `yaml:"enabled"`
+	// Secret, when set, is required as `Authorization: Bearer <secret>`.
+	Secret string `yaml:"secret"`
 }
 
 // AppStore configures the App Store Connect sales-report source. Loot needs an
@@ -182,9 +249,12 @@ func Default() Config {
 		DataDir:         "./data",
 		DisplayCurrency: DefaultDisplayCurrency,
 		Sources: Sources{
-			Flathub:    Flathub{BackfillDays: 7},
-			AppStore:   AppStore{BackfillDays: 30},
-			GooglePlay: GooglePlay{BackfillMonths: 2},
+			Flathub:        Flathub{BackfillDays: 7},
+			AppStore:       AppStore{BackfillDays: 30},
+			GooglePlay:     GooglePlay{BackfillMonths: 2},
+			MicrosoftStore: MicrosoftStore{BackfillDays: 30},
+			Snapcraft:      Snapcraft{BackfillDays: 30},
+			GitHub:         GitHub{BackfillDays: 30},
 		},
 	}
 }
@@ -330,6 +400,54 @@ func applyEnv(cfg *Config) {
 		if n, err := strconv.Atoi(v); err == nil {
 			cfg.Chest.AutoOpenAfterHours = &n
 		}
+	}
+	if v := os.Getenv("LOOT_MICROSOFTSTORE_TENANT_ID"); v != "" {
+		cfg.Sources.MicrosoftStore.TenantID = v
+	}
+	if v := os.Getenv("LOOT_MICROSOFTSTORE_CLIENT_ID"); v != "" {
+		cfg.Sources.MicrosoftStore.ClientID = v
+	}
+	if v := os.Getenv("LOOT_MICROSOFTSTORE_CLIENT_SECRET"); v != "" {
+		cfg.Sources.MicrosoftStore.ClientSecret = v
+	}
+	if v := os.Getenv("LOOT_MICROSOFTSTORE_APPS"); v != "" {
+		cfg.Sources.MicrosoftStore.Apps = splitList(v)
+	}
+	if v := os.Getenv("LOOT_MICROSOFTSTORE_BACKFILL_DAYS"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			cfg.Sources.MicrosoftStore.BackfillDays = n
+		}
+	}
+	if v := os.Getenv("LOOT_SNAPCRAFT_SNAPS"); v != "" {
+		cfg.Sources.Snapcraft.Snaps = splitList(v)
+	}
+	if v := os.Getenv("LOOT_SNAPCRAFT_LOGIN_PATH"); v != "" {
+		cfg.Sources.Snapcraft.LoginPath = v
+	}
+	if v := os.Getenv("LOOT_SNAPCRAFT_BACKFILL_DAYS"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			cfg.Sources.Snapcraft.BackfillDays = n
+		}
+	}
+	if v := os.Getenv("LOOT_GITHUB_REPOS"); v != "" {
+		cfg.Sources.GitHub.Repos = splitList(v)
+	}
+	if v := os.Getenv("LOOT_GITHUB_TOKEN"); v != "" {
+		cfg.Sources.GitHub.Token = v
+	}
+	if v := os.Getenv("LOOT_GITHUB_WEBHOOK_SECRET"); v != "" {
+		cfg.Sources.GitHub.WebhookSecret = v
+	}
+	if v := os.Getenv("LOOT_GITHUB_BACKFILL_DAYS"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			cfg.Sources.GitHub.BackfillDays = n
+		}
+	}
+	if v := os.Getenv("LOOT_WEBHOOK_ENABLED"); v != "" {
+		cfg.Sources.Webhook.Enabled = truthy(v)
+	}
+	if v := os.Getenv("LOOT_WEBHOOK_SECRET"); v != "" {
+		cfg.Sources.Webhook.Secret = v
 	}
 	if v := os.Getenv("LOOT_APPSTORE_KEY_ID"); v != "" {
 		cfg.Sources.AppStore.KeyID = v

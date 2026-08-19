@@ -22,8 +22,12 @@ import (
 	"github.com/nickhirras/loot/internal/server"
 	"github.com/nickhirras/loot/internal/sources/appstore"
 	"github.com/nickhirras/loot/internal/sources/flathub"
+	"github.com/nickhirras/loot/internal/sources/github"
 	"github.com/nickhirras/loot/internal/sources/googleplay"
+	"github.com/nickhirras/loot/internal/sources/microsoftstore"
 	"github.com/nickhirras/loot/internal/sources/revenuecat"
+	"github.com/nickhirras/loot/internal/sources/snapcraft"
+	"github.com/nickhirras/loot/internal/sources/webhook"
 	"github.com/nickhirras/loot/internal/store"
 	"github.com/nickhirras/loot/web"
 )
@@ -207,6 +211,48 @@ func runServe(args []string) error {
 				"bucket", src.Bucket,
 				"packages", cfg.Sources.GooglePlay.Packages,
 				"backfill_months", src.BackfillMonths)
+		}
+	}
+	if !cfg.Demo.Enabled && cfg.Sources.MicrosoftStore.Configured() {
+		src, err := microsoftstore.New(cfg.Sources.MicrosoftStore, log)
+		if err != nil {
+			log.Warn("microsoft store source unavailable", "error", err)
+		} else {
+			src.Since = cfg.Since
+			sources = append(sources, src)
+			log.Info("microsoft store source configured", "apps", cfg.Sources.MicrosoftStore.Apps)
+		}
+	}
+	if !cfg.Demo.Enabled && cfg.Sources.Snapcraft.Configured() {
+		src, err := snapcraft.New(cfg.Sources.Snapcraft, log)
+		if err != nil {
+			log.Warn("snapcraft source unavailable", "error", err)
+		} else {
+			src.Since = cfg.Since
+			sources = append(sources, src)
+			log.Info("snapcraft source configured", "snaps", cfg.Sources.Snapcraft.Snaps)
+		}
+	}
+	if !cfg.Demo.Enabled && cfg.Sources.GitHub.Configured() {
+		src, err := github.New(cfg.Sources.GitHub, log)
+		if err != nil {
+			log.Warn("github source unavailable", "error", err)
+		} else {
+			src.Since = cfg.Since
+			sources = append(sources, src)
+			log.Info("github source configured", "repos", cfg.Sources.GitHub.Repos)
+		}
+	}
+	if !cfg.Demo.Enabled && cfg.Sources.Webhook.Enabled {
+		src, err := webhook.New(cfg.Sources.Webhook, log)
+		if err != nil {
+			log.Warn("webhook source unavailable", "error", err)
+		} else {
+			sources = append(sources, src)
+			log.Info("generic webhook configured at POST /hooks/webhook")
+			if cfg.Sources.Webhook.Secret == "" {
+				log.Warn("generic webhook has no secret; anyone who can reach /hooks/webhook can post drops")
+			}
 		}
 	}
 	if len(sources) == 0 {
