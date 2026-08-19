@@ -618,7 +618,7 @@ func TestSinceOverridesBackfill(t *testing.T) {
 	}
 	api := &fakeAPI{stars: stars}
 	// A 1 day backfill would suppress both; --since 2026-06-01 keeps both.
-	s, _ := newTestSource(t, api, config.GitHub{BackfillDays: 1})
+	s, _ := newTestSource(t, api, config.GitHub{BackfillDays: 1, Token: "tok"})
 	s.Since = "2026-06-01"
 
 	events, _, err := s.Poll(context.Background(), nil)
