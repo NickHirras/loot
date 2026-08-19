@@ -1,4 +1,4 @@
-package bosses
+package debounce
 
 import (
 	"testing"
@@ -11,15 +11,15 @@ import (
 // nudge was then swallowed as "already pending", the timer was never rearmed,
 // and the service stopped reacting to the pipeline entirely.
 func TestSweepDisarmsAPendingNudge(t *testing.T) {
-	d := newDebouncer(time.Hour)
-	defer d.stop()
+	d := New(time.Hour)
+	defer d.Stop()
 
-	d.arm()
-	if !d.armed {
+	d.Arm()
+	if !d.Armed() {
 		t.Fatal("the first nudge did not arm the wait")
 	}
-	d.disarm() // the sweep got there first
-	if d.armed {
+	d.Disarm() // the sweep got there first
+	if d.Armed() {
 		t.Fatal("the sweep left the debouncer armed")
 	}
 	select {
@@ -29,18 +29,18 @@ func TestSweepDisarmsAPendingNudge(t *testing.T) {
 	}
 
 	// And the next nudge must still be heard.
-	d.wait = 5 * time.Millisecond
-	d.arm()
-	if !d.armed {
+	d.wait = 5 * time.Millisecond // internal knob; same package
+	d.Arm()
+	if !d.Armed() {
 		t.Fatal("a later nudge was swallowed")
 	}
 	select {
 	case <-d.C():
-		d.fired()
+		d.Fired()
 	case <-time.After(2 * time.Second):
 		t.Fatal("the rearmed wait never elapsed")
 	}
-	if d.armed {
+	if d.Armed() {
 		t.Error("fired() did not clear the armed flag")
 	}
 }
@@ -48,15 +48,15 @@ func TestSweepDisarmsAPendingNudge(t *testing.T) {
 // disarm must not block when the timer beat it to the channel — the case that
 // makes a naive Stop() deadlock the whole loop.
 func TestDisarmDrainsATimerThatAlreadyFired(t *testing.T) {
-	d := newDebouncer(time.Millisecond)
-	defer d.stop()
+	d := New(time.Millisecond)
+	defer d.Stop()
 
-	d.arm()
+	d.Arm()
 	time.Sleep(20 * time.Millisecond) // the timer has certainly fired by now
 
 	done := make(chan struct{})
 	go func() {
-		d.disarm()
+		d.Disarm()
 		close(done)
 	}()
 	select {
@@ -76,13 +76,13 @@ func TestDisarmDrainsATimerThatAlreadyFired(t *testing.T) {
 // the thing, and it is what stops a poll that ingests four hundred crash rows
 // from costing four hundred evaluations.
 func TestABurstOfNudgesIsOneWait(t *testing.T) {
-	d := newDebouncer(5 * time.Millisecond)
-	defer d.stop()
+	d := New(5 * time.Millisecond)
+	defer d.Stop()
 
-	d.arm()
+	d.Arm()
 	deadline := time.Now().Add(50 * time.Millisecond)
 	for time.Now().Before(deadline) {
-		d.arm() // riders on the first nudge's deadline
+		d.Arm() // riders on the first nudge's deadline
 	}
 	select {
 	case <-d.C():
