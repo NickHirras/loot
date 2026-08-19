@@ -393,3 +393,18 @@ func keysOf(m map[string]core.Event) []string {
 	sortStrings(out)
 	return out
 }
+
+// Seen on first real contact: the API answers 400 "Hours should be unset for
+// DAILY aggregation period" if the timeline's DateTime carries hours: 0.
+func TestDailyDateTimeOmitsHours(t *testing.T) {
+	b, err := json.Marshal(playvitals.DateTime{Year: 2026, Month: 8, Day: 19, TimeZone: &playvitals.TimeZone{ID: playvitals.ReportingTimeZone}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(b), `"hours"`) {
+		t.Fatalf("DAILY DateTime must not mention hours: %s", b)
+	}
+	if !strings.Contains(string(b), `"timeZone":{"id":"America/Los_Angeles"}`) {
+		t.Fatalf("DateTime lost its zone: %s", b)
+	}
+}

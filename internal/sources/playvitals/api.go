@@ -60,10 +60,13 @@ const maxPageSize = 1000
 // DateTime is google.type.DateTime, restricted to the fields Loot sets. The
 // oneof at the end is honoured by only ever setting TimeZone.
 type DateTime struct {
-	Year   int `json:"year"`
-	Month  int `json:"month"`
-	Day    int `json:"day"`
-	Hours  int `json:"hours"`
+	Year  int `json:"year"`
+	Month int `json:"month"`
+	Day   int `json:"day"`
+	// Hours is omitted when zero: seen in the wild, the API answers
+	// 400 "Hours should be unset for DAILY aggregation period" if a DAILY
+	// query so much as mentions hours: 0.
+	Hours  int `json:"hours,omitempty"`
 	Minute int `json:"minutes,omitempty"`
 	Second int `json:"seconds,omitempty"`
 	// TimeZone and UTCOffset are a oneof; setting both is an error at the far
@@ -92,7 +95,6 @@ func dayDateTime(day time.Time) DateTime {
 		Year:     day.Year(),
 		Month:    int(day.Month()),
 		Day:      day.Day(),
-		Hours:    0,
 		TimeZone: &TimeZone{ID: ReportingTimeZone},
 	}
 }
