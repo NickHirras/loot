@@ -5,8 +5,14 @@
 #
 # Environment variables override the file. Useful in Docker:
 #   LOOT_LISTEN, LOOT_DATA_DIR, LOOT_RULES_PATH, LOOT_DEV_ENABLED,
+#   LOOT_DISPLAY_CURRENCY, LOOT_FX_ENABLED,
+#   LOOT_CHEST_ENABLED, LOOT_CHEST_AUTO_OPEN_AFTER_HOURS,
 #   LOOT_REVENUECAT_SECRET, LOOT_REVENUECAT_ENABLED,
-#   LOOT_FLATHUB_APPS (comma separated), LOOT_FLATHUB_BACKFILL_DAYS
+#   LOOT_FLATHUB_APPS (comma separated), LOOT_FLATHUB_BACKFILL_DAYS,
+#   LOOT_APPSTORE_KEY_ID, LOOT_APPSTORE_ISSUER_ID, LOOT_APPSTORE_PRIVATE_KEY_PATH,
+#   LOOT_APPSTORE_VENDOR_NUMBER, LOOT_APPSTORE_APPS, LOOT_APPSTORE_BACKFILL_DAYS,
+#   LOOT_GOOGLEPLAY_SERVICE_ACCOUNT_JSON_PATH, LOOT_GOOGLEPLAY_BUCKET,
+#   LOOT_GOOGLEPLAY_PACKAGES, LOOT_GOOGLEPLAY_BACKFILL_MONTHS
 
 # HTTP bind address for the API, websocket and dashboard.
 listen: ":8080"
@@ -17,6 +23,27 @@ data_dir: "./data"
 # Optional path to a custom rarity rules file. Leave empty to use the rules
 # embedded in the binary (see internal/rules/default.yaml for the format).
 rules_path: ""
+
+# The currency the vault reports in (ISO 4217). Every event keeps the amount
+# and currency its source reported; Loot stores a converted copy alongside it.
+display_currency: "USD"
+
+fx:
+  # Fetch daily reference rates from the ECB (via frankfurter.app, no API key)
+  # every 12 hours and cache them in the database. Set false to work purely
+  # from the rate snapshot embedded in the binary — fine if you only ever earn
+  # in one currency, or if the host has no outbound network.
+  enabled: true
+
+chest:
+  # Ledger sources report a whole day at once. Rather than firing a hundred
+  # drops at 3am, Loot files them into that day's chest and opens it as one
+  # cascade. Set false to publish every drop the moment it is ingested.
+  enabled: true
+  # Open a chest automatically once its day is this many hours old, measured
+  # from midnight UTC of the chest's own day. 36 means yesterday's chest opens
+  # by itself around noon today. 0 waits for you to open it.
+  auto_open_after_hours: 36
 
 sources:
   revenuecat:
@@ -38,6 +65,32 @@ sources:
     # fire six months of drops at once. 0 seeds the cursor and emits nothing.
     # Override once at startup with `loot serve --since 2026-01-01`.
     backfill_days: 7
+
+  appstore:
+    # App Store Connect sales reports (Quest 2). Create an API key with the
+    # "Sales and Reports" role under Users and Access > Integrations > Keys,
+    # download the .p8 once, and take the vendor number from
+    # Payments and Financial Reports.
+    key_id: ""
+    issuer_id: ""
+    private_key_path: ""    # e.g. /etc/loot/AuthKey_2X9R4HXF34.p8
+    vendor_number: ""       # e.g. "80123456"
+    # Optional: restrict ingest to these Apple IDs (numeric app ids).
+    apps: []
+    # How many past days the first run reads. Sales reports are available for
+    # roughly a year; 30 gives the vault some history without a flood.
+    backfill_days: 30
+
+  googleplay:
+    # Google Play sales reports (Quest 2). Play writes monthly CSV reports into
+    # a private Cloud Storage bucket; grant a service account read access to it
+    # and point Loot at the key file.
+    service_account_json_path: ""   # e.g. /etc/loot/play-reports.json
+    bucket: ""                      # e.g. pubsite_prod_rev_01234567890
+    # Optional: restrict ingest to these package names.
+    packages: []
+    # How many monthly reports the first run reads.
+    backfill_months: 2
 
 dev:
   # Mounts POST /api/dev/fake and shows the dev panel in the dashboard, for

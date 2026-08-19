@@ -17,8 +17,9 @@
 # into the raw source payload.
 #
 # Title and subtitle are Go templates over:
-#   .Source .Kind .App .Country .Flag .Amount .AmountFmt .Currency
-#   .Quantity .QuantityFmt .Payload .BaseTitle (floor rules only)
+#   .Source .Kind .App .Day .Country .Flag .Amount .AmountFmt .Currency
+#   .AmountBase .AmountBaseFmt (display currency) .Quantity .QuantityFmt
+#   .Payload .BaseTitle (floor rules only)
 
 rules:
   # ---------------------------------------------------------------- RevenueCat
@@ -96,6 +97,52 @@ rules:
       subtitle: "{{.App}}"
       xp: 20
 
+  # ------------------------------------------------- Ledger day summaries
+  # Ledger sources (App Store Connect, Google Play) store their detail as
+  # silent row events and emit one `sales_day` summary per app per day. These
+  # rules match on kind alone, so every ledger source gets them for free.
+  - name: sales-day-record
+    match:
+      kind: sales_day
+      record_high: true
+    then:
+      rarity: epic
+      title: "Best day ever on {{.Source}}"
+      subtitle: "{{.QuantityFmt}} sales · {{.AmountFmt}}{{if .App}} · {{.App}}{{end}}"
+      xp: 300
+
+  - name: sales-day-big
+    match:
+      kind: sales_day
+      min_amount: 100
+    then:
+      rarity: rare
+      title: "{{.QuantityFmt}} sales · {{.AmountFmt}}"
+      subtitle: "a big day{{if .App}} for {{.App}}{{end}} on {{.Source}}"
+      xp: 120
+
+  - name: sales-day
+    match:
+      kind: sales_day
+    then:
+      rarity: common
+      title: "{{.QuantityFmt}} sales · {{.AmountFmt}}"
+      subtitle: "{{if .App}}{{.App}} · {{end}}{{.Source}}"
+      xp: 10
+
+  # -------------------------------------------------------------- Settlements
+  # The pipeline synthesizes one of these the first time an event carries a
+  # country Loot has never seen, including from silent ledger rows.
+  - name: settlement
+    match:
+      source: loot
+      kind: settlement
+    then:
+      rarity: rare
+      title: "New settlement: {{.Flag}} {{.Country}}"
+      subtitle: "first customer via {{.Payload.via}}"
+      xp: 250
+
   # ------------------------------------------------------------------- Flathub
   - name: flathub-record-day
     match:
@@ -140,16 +187,10 @@ rules:
     match: {source: dev, kind: common}
     then: {rarity: common, title: "A common drop", subtitle: "synthetic test event"}
 
-  # -------------------------------------------------------------- Floor rules
-  # Applied after a winner is chosen; only ever raises rarity.
-  - name: new-country
-    floor: true
-    match:
-      country_first: true
-    then:
-      rarity: rare
-      title: "New settlement: {{.Flag}} {{.Country}}"
-      xp: 250
+  # Floor rules (`floor: true`) are still supported by the engine — they run
+  # after a winner is chosen and may only RAISE rarity — but the defaults no
+  # longer use one for new countries. A first-ever country now produces its own
+  # settlement drop above, so the event that revealed it keeps its own headline.
 
 fallback:
   rarity: common

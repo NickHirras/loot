@@ -54,4 +54,44 @@ CREATE TABLE source_state (
 );
 `,
 	},
+	{
+		// Quest 2: silent ledger events, business days, base-currency amounts,
+		// the daily chest and an FX rate cache.
+		Name: "0002_vault",
+		SQL: `
+ALTER TABLE events ADD COLUMN silent      INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE events ADD COLUMN day         TEXT    NOT NULL DEFAULT '';
+ALTER TABLE events ADD COLUMN amount_base REAL    NOT NULL DEFAULT 0;
+ALTER TABLE events ADD COLUMN chest       INTEGER NOT NULL DEFAULT 0;
+
+-- Existing rows predate the business-day column: derive it from occurred_at
+-- (stored as epoch milliseconds) in UTC, which is what the pipeline would
+-- have done for a realtime event.
+UPDATE events SET day = strftime('%Y-%m-%d', occurred_at / 1000, 'unixepoch') WHERE day = '';
+
+-- amount_base for existing rows is filled in at startup by
+-- BackfillAmountBase, which knows the configured display currency; rows in a
+-- foreign currency stay 0 until "loot fx recompute" converts them.
+
+CREATE INDEX events_day_idx            ON events(day);
+CREATE INDEX events_source_app_day_idx ON events(source, app, day);
+-- events_country_idx already covers (country) for non-empty countries.
+
+ALTER TABLE drops ADD COLUMN chest_date  TEXT NOT NULL DEFAULT '';
+ALTER TABLE drops ADD COLUMN revealed_at INTEGER;
+
+-- The feed and the chest badge both ask "what is still unopened?", which is a
+-- tiny slice of a growing table.
+CREATE INDEX drops_unrevealed_idx ON drops(chest_date) WHERE revealed_at IS NULL;
+CREATE INDEX drops_revealed_idx   ON drops(revealed_at);
+
+CREATE TABLE fx_rates (
+    base  TEXT NOT NULL,
+    quote TEXT NOT NULL,
+    rate  REAL NOT NULL,
+    as_of TEXT NOT NULL DEFAULT '',
+    PRIMARY KEY (base, quote)
+);
+`,
+	},
 }

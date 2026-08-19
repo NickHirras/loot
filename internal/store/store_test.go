@@ -193,7 +193,7 @@ func TestListDropsAndStats(t *testing.T) {
 		time.Sleep(2 * time.Millisecond) // keep ULIDs strictly ordered
 	}
 
-	drops, err := st.ListDrops(ctx, 100, "")
+	drops, err := st.ListDrops(ctx, store.DropQuery{})
 	if err != nil {
 		t.Fatalf("list: %v", err)
 	}
@@ -208,7 +208,7 @@ func TestListDropsAndStats(t *testing.T) {
 	}
 
 	// Pagination: everything strictly older than the newest.
-	page, err := st.ListDrops(ctx, 100, ids[2])
+	page, err := st.ListDrops(ctx, store.DropQuery{Before: ids[2]})
 	if err != nil {
 		t.Fatalf("paged list: %v", err)
 	}

@@ -134,6 +134,11 @@ class LootState {
       } catch {
         return
       }
+      if (msg.type === 'chest') {
+        // TODO(quest 2, frontend): render the chest badge and the open button.
+        // Ignoring it keeps the feed working against a chest-aware server.
+        return
+      }
       if (msg.type === 'drop' && msg.drop) {
         // The wire splits drop and originating event; the API returns them
         // flattened, so merge here to keep one Drop shape everywhere.

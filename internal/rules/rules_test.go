@@ -43,6 +43,38 @@ func defaultEngine(t *testing.T, lookup rules.Lookup) *rules.Engine {
 	return e
 }
 
+// floorEngine compiles a minimal rule set that still exercises the floor
+// mechanism. The shipped defaults no longer use a floor rule (a first-ever
+// country now gets its own settlement drop instead), but the engine still
+// supports them, so they are tested against a config of their own.
+const floorRules = `
+rules:
+  - name: renewal
+    match: {source: revenuecat, kind: renewal}
+    then: {rarity: common, title: "Renewal"}
+  - name: churn
+    match: {source: revenuecat, kind: cancellation}
+    then: {rarity: cursed, title: "Subscriber lost"}
+  - name: new-country
+    floor: true
+    match: {country_first: true}
+    then: {rarity: rare, title: "New settlement: {{.Flag}} {{.Country}}", xp: 250}
+fallback: {rarity: common, title: "{{.Source}} · {{.Kind}}"}
+`
+
+func floorEngine(t *testing.T, lookup rules.Lookup) *rules.Engine {
+	t.Helper()
+	cfg, err := rules.Parse([]byte(floorRules))
+	if err != nil {
+		t.Fatalf("parse floor rules: %v", err)
+	}
+	e, err := rules.New(cfg, lookup)
+	if err != nil {
+		t.Fatalf("compile floor rules: %v", err)
+	}
+	return e
+}
+
 func rcEvent(kind string, amount float64, payload string) core.Event {
 	return core.Event{
 		ID:        core.NewID(),
@@ -156,7 +188,7 @@ func TestCountryFirstRaisesRarity(t *testing.T) {
 	ctx := context.Background()
 
 	// Country count 1 == this very event, so it is the first from there.
-	e := defaultEngine(t, fakeLookup{countryCounts: map[string]int{"JP": 1}})
+	e := floorEngine(t, fakeLookup{countryCounts: map[string]int{"JP": 1}})
 
 	ev := rcEvent("renewal", 4.99, `{}`) // renewal is normally common
 	ev.Country = "JP"
@@ -182,7 +214,7 @@ func TestCountryFirstRaisesRarity(t *testing.T) {
 
 func TestCountryFirstNeverLowersRarity(t *testing.T) {
 	ctx := context.Background()
-	e := defaultEngine(t, fakeLookup{countryCounts: map[string]int{"JP": 1}})
+	e := floorEngine(t, fakeLookup{countryCounts: map[string]int{"JP": 1}})
 
 	// Cursed outranks the rare floor: churn from a new country is still churn.
 	ev := rcEvent("cancellation", 0, `{}`)
@@ -202,7 +234,7 @@ func TestCountryFirstNeverLowersRarity(t *testing.T) {
 
 func TestCountryFirstIsFalseForSeenCountry(t *testing.T) {
 	ctx := context.Background()
-	e := defaultEngine(t, seenCountry("US"))
+	e := floorEngine(t, seenCountry("US"))
 
 	drop, err := e.Classify(ctx, rcEvent("renewal", 4.99, `{}`))
 	if err != nil {
@@ -216,7 +248,7 @@ func TestCountryFirstIsFalseForSeenCountry(t *testing.T) {
 func TestEmptyCountrySkipsFloor(t *testing.T) {
 	ctx := context.Background()
 	// An empty country must not be treated as "the first event from ''".
-	e := defaultEngine(t, fakeLookup{countryCounts: map[string]int{"": 1}})
+	e := floorEngine(t, fakeLookup{countryCounts: map[string]int{"": 1}})
 
 	ev := rcEvent("renewal", 4.99, `{}`)
 	ev.Country = ""
@@ -444,5 +476,139 @@ func TestFlagEmoji(t *testing.T) {
 		if got := rules.FlagEmoji(in); got != want {
 			t.Errorf("FlagEmoji(%q) = %q, want %q", in, got, want)
 		}
+	}
+}
+
+func salesDay(app string, units int, amount float64, currency string) core.Event {
+	return core.Event{
+		ID:        core.NewID(),
+		Source:    "appstore",
+		Kind:      "sales_day",
+		App:       app,
+		Day:       "2026-08-17",
+		Amount:    amount,
+		Currency:  currency,
+		Quantity:  units,
+		IsLedger:  true,
+		Chest:     true,
+		DedupeKey: "appstore:sales_day:" + app + ":2026-08-17",
+	}
+}
+
+func TestSalesDayRules(t *testing.T) {
+	ctx := context.Background()
+
+	cases := []struct {
+		name       string
+		lookup     rules.Lookup
+		event      core.Event
+		wantRarity core.Rarity
+		wantTitle  string
+	}{
+		{
+			name:       "quiet day is common",
+			lookup:     seenCountry("US"),
+			event:      salesDay("com.example.app", 12, 41.50, "USD"),
+			wantRarity: core.Common,
+			wantTitle:  "12 sales · 41.50 USD",
+		},
+		{
+			name:       "a hundred or more is rare",
+			lookup:     seenCountry("US"),
+			event:      salesDay("com.example.app", 90, 240, "USD"),
+			wantRarity: core.Rare,
+			wantTitle:  "90 sales · 240.00 USD",
+		},
+		{
+			name:       "a record day is epic and names the source",
+			lookup:     fakeLookup{record: true},
+			event:      salesDay("com.example.app", 900, 2400, "USD"),
+			wantRarity: core.Epic,
+			wantTitle:  "Best day ever on appstore",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			e := defaultEngine(t, tc.lookup)
+			drop, err := e.Classify(ctx, tc.event)
+			if err != nil {
+				t.Fatalf("classify: %v", err)
+			}
+			if drop.Rarity != tc.wantRarity {
+				t.Errorf("rarity = %s, want %s", drop.Rarity, tc.wantRarity)
+			}
+			if drop.Title != tc.wantTitle {
+				t.Errorf("title = %q, want %q", drop.Title, tc.wantTitle)
+			}
+			if !strings.Contains(drop.Subtitle, "com.example.app") {
+				t.Errorf("subtitle = %q, want it to name the app", drop.Subtitle)
+			}
+		})
+	}
+}
+
+func TestSettlementRule(t *testing.T) {
+	ctx := context.Background()
+	e := defaultEngine(t, seenCountry("JP"))
+
+	ev := core.Event{
+		ID:        core.NewID(),
+		Source:    "loot",
+		Kind:      "settlement",
+		App:       "com.example.app",
+		Country:   "JP",
+		DedupeKey: "loot:settlement:JP",
+		Payload:   []byte(`{"via":"appstore"}`),
+	}
+
+	drop, err := e.Classify(ctx, ev)
+	if err != nil {
+		t.Fatalf("classify: %v", err)
+	}
+	if drop.Rarity != core.Rare {
+		t.Fatalf("rarity = %s, want rare", drop.Rarity)
+	}
+	if !strings.Contains(drop.Title, "New settlement") || !strings.Contains(drop.Title, rules.FlagEmoji("JP")) {
+		t.Fatalf("title = %q, want a flagged settlement headline", drop.Title)
+	}
+	if !strings.Contains(drop.Subtitle, "appstore") {
+		t.Fatalf("subtitle = %q, want it to credit the source that found the country", drop.Subtitle)
+	}
+	if drop.XP != 250 {
+		t.Fatalf("xp = %d, want 250", drop.XP)
+	}
+}
+
+func TestAmountBaseTemplateField(t *testing.T) {
+	ctx := context.Background()
+
+	cfg, err := rules.Parse([]byte(`
+rules:
+  - name: base
+    match: {kind: sales_day}
+    then: {rarity: common, title: "{{.AmountBaseFmt}}", subtitle: "{{.Day}}"}
+`))
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	e, err := rules.New(cfg, seenCountry("US"))
+	if err != nil {
+		t.Fatalf("compile: %v", err)
+	}
+	e.SetDisplayCurrency("eur")
+
+	ev := salesDay("com.example.app", 3, 30, "USD")
+	ev.AmountBase = 25.5
+
+	drop, err := e.Classify(ctx, ev)
+	if err != nil {
+		t.Fatalf("classify: %v", err)
+	}
+	if drop.Title != "25.50 EUR" {
+		t.Fatalf("title = %q, want the base amount in the display currency", drop.Title)
+	}
+	if drop.Subtitle != "2026-08-17" {
+		t.Fatalf("subtitle = %q, want the business day", drop.Subtitle)
 	}
 }

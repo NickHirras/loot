@@ -17,6 +17,13 @@ import (
 // DefaultPath is the config file used when --config is not given.
 const DefaultPath = "loot.yaml"
 
+// DefaultDisplayCurrency is the currency the vault reports in when none is set.
+const DefaultDisplayCurrency = "USD"
+
+// DefaultChestAutoOpenHours is how old a chest's day must be before Loot opens
+// it without being asked.
+const DefaultChestAutoOpenHours = 36
+
 // Config is the whole of Loot's configuration.
 type Config struct {
 	// Listen is the HTTP bind address, e.g. ":8080".
@@ -25,7 +32,13 @@ type Config struct {
 	DataDir string `yaml:"data_dir"`
 	// RulesPath overrides the embedded rarity rules when non-empty.
 	RulesPath string `yaml:"rules_path"`
+	// DisplayCurrency is the currency every vault figure is converted into
+	// (ISO 4217, e.g. "USD"). Events keep their original amount and currency;
+	// amount_base is the converted copy.
+	DisplayCurrency string `yaml:"display_currency"`
 
+	FX      FX      `yaml:"fx"`
+	Chest   Chest   `yaml:"chest"`
 	Sources Sources `yaml:"sources"`
 	Dev     Dev     `yaml:"dev"`
 
@@ -34,10 +47,76 @@ type Config struct {
 	Since string `yaml:"-"`
 }
 
+// FX configures currency conversion.
+type FX struct {
+	// Enabled defaults to true. False pins Loot to the exchange-rate snapshot
+	// embedded in the binary and never calls out to the network.
+	Enabled *bool `yaml:"enabled"`
+}
+
+// Chest configures the daily chest: the pile of drops a ledger day produces,
+// held back so the morning arrives as one event instead of a hundred.
+type Chest struct {
+	// Enabled defaults to true. False publishes every drop immediately, chest
+	// hint or not.
+	Enabled *bool `yaml:"enabled"`
+	// AutoOpenAfterHours opens a chest by itself once its day is that many
+	// hours old, measured from midnight UTC of the chest's own day. Defaults
+	// to 36 (so yesterday's chest springs open around noon today). 0 disables
+	// auto-opening and waits for a click.
+	AutoOpenAfterHours *int `yaml:"auto_open_after_hours"`
+}
+
 // Sources holds per-source configuration.
 type Sources struct {
 	RevenueCat RevenueCat `yaml:"revenuecat"`
 	Flathub    Flathub    `yaml:"flathub"`
+	AppStore   AppStore   `yaml:"appstore"`
+	GooglePlay GooglePlay `yaml:"googleplay"`
+}
+
+// AppStore configures the App Store Connect sales-report source. Loot needs an
+// App Store Connect API key with the Sales and Reports role, plus the vendor
+// number from App Store Connect > Payments and Financial Reports.
+type AppStore struct {
+	// KeyID is the API key identifier, e.g. "2X9R4HXF34".
+	KeyID string `yaml:"key_id"`
+	// IssuerID is the team's issuer UUID.
+	IssuerID string `yaml:"issuer_id"`
+	// PrivateKeyPath points at the downloaded AuthKey_<KeyID>.p8 file.
+	PrivateKeyPath string `yaml:"private_key_path"`
+	// VendorNumber identifies whose sales to fetch, e.g. "80123456".
+	VendorNumber string `yaml:"vendor_number"`
+	// Apps optionally restricts ingest to these Apple IDs (the numeric app
+	// ids). Empty means every app in the report.
+	Apps []string `yaml:"apps"`
+	// BackfillDays limits how far back the first run reads. Defaults to 30.
+	BackfillDays int `yaml:"backfill_days"`
+}
+
+// Configured reports whether every field the source cannot run without is set.
+func (a AppStore) Configured() bool {
+	return a.KeyID != "" && a.IssuerID != "" && a.PrivateKeyPath != "" && a.VendorNumber != ""
+}
+
+// GooglePlay configures the Google Play sales-report source. Play publishes
+// monthly CSV reports into a private Cloud Storage bucket
+// (pubsite_prod_rev_<developer id>), read with a service account.
+type GooglePlay struct {
+	// ServiceAccountJSONPath points at the service-account key file.
+	ServiceAccountJSONPath string `yaml:"service_account_json_path"`
+	// Bucket is the reporting bucket, e.g. "pubsite_prod_rev_01234567890".
+	Bucket string `yaml:"bucket"`
+	// Packages optionally restricts ingest to these package names.
+	Packages []string `yaml:"packages"`
+	// BackfillMonths limits how many monthly reports the first run reads.
+	// Defaults to 2.
+	BackfillMonths int `yaml:"backfill_months"`
+}
+
+// Configured reports whether every field the source cannot run without is set.
+func (g GooglePlay) Configured() bool {
+	return g.ServiceAccountJSONPath != "" && g.Bucket != ""
 }
 
 // RevenueCat configures the webhook receiver at /hooks/revenuecat.
@@ -66,10 +145,13 @@ type Dev struct {
 // Default returns the configuration used when no file and no env are present.
 func Default() Config {
 	return Config{
-		Listen:  ":8080",
-		DataDir: "./data",
+		Listen:          ":8080",
+		DataDir:         "./data",
+		DisplayCurrency: DefaultDisplayCurrency,
 		Sources: Sources{
-			Flathub: Flathub{BackfillDays: 7},
+			Flathub:    Flathub{BackfillDays: 7},
+			AppStore:   AppStore{BackfillDays: 30},
+			GooglePlay: GooglePlay{BackfillMonths: 2},
 		},
 	}
 }
@@ -107,6 +189,29 @@ func Load(path string, explicit bool) (Config, error) {
 	if cfg.Sources.Flathub.BackfillDays < 0 {
 		cfg.Sources.Flathub.BackfillDays = 0
 	}
+	if cfg.Sources.AppStore.BackfillDays < 0 {
+		cfg.Sources.AppStore.BackfillDays = 0
+	}
+	if cfg.Sources.GooglePlay.BackfillMonths < 0 {
+		cfg.Sources.GooglePlay.BackfillMonths = 0
+	}
+	cfg.DisplayCurrency = strings.ToUpper(strings.TrimSpace(cfg.DisplayCurrency))
+	if cfg.DisplayCurrency == "" {
+		cfg.DisplayCurrency = DefaultDisplayCurrency
+	}
+	if len(cfg.DisplayCurrency) != 3 {
+		return cfg, fmt.Errorf("display_currency %q is not a three letter ISO 4217 code", cfg.DisplayCurrency)
+	}
+	if cfg.Sources.AppStore.PrivateKeyPath != "" {
+		if _, err := os.Stat(cfg.Sources.AppStore.PrivateKeyPath); err != nil {
+			return cfg, fmt.Errorf("sources.appstore.private_key_path %s: %w", cfg.Sources.AppStore.PrivateKeyPath, err)
+		}
+	}
+	if cfg.Sources.GooglePlay.ServiceAccountJSONPath != "" {
+		if _, err := os.Stat(cfg.Sources.GooglePlay.ServiceAccountJSONPath); err != nil {
+			return cfg, fmt.Errorf("sources.googleplay.service_account_json_path %s: %w", cfg.Sources.GooglePlay.ServiceAccountJSONPath, err)
+		}
+	}
 	if cfg.RulesPath != "" {
 		if _, err := os.Stat(cfg.RulesPath); err != nil {
 			return cfg, fmt.Errorf("rules_path %s: %w", cfg.RulesPath, err)
@@ -136,19 +241,74 @@ func applyEnv(cfg *Config) {
 		cfg.Sources.RevenueCat.Enabled = &b
 	}
 	if v := os.Getenv("LOOT_FLATHUB_APPS"); v != "" {
-		var apps []string
-		for _, a := range strings.Split(v, ",") {
-			if a = strings.TrimSpace(a); a != "" {
-				apps = append(apps, a)
-			}
-		}
-		cfg.Sources.Flathub.Apps = apps
+		cfg.Sources.Flathub.Apps = splitList(v)
 	}
 	if v := os.Getenv("LOOT_FLATHUB_BACKFILL_DAYS"); v != "" {
 		if n, err := strconv.Atoi(v); err == nil {
 			cfg.Sources.Flathub.BackfillDays = n
 		}
 	}
+	if v := os.Getenv("LOOT_DISPLAY_CURRENCY"); v != "" {
+		cfg.DisplayCurrency = v
+	}
+	if v := os.Getenv("LOOT_FX_ENABLED"); v != "" {
+		b := truthy(v)
+		cfg.FX.Enabled = &b
+	}
+	if v := os.Getenv("LOOT_CHEST_ENABLED"); v != "" {
+		b := truthy(v)
+		cfg.Chest.Enabled = &b
+	}
+	if v := os.Getenv("LOOT_CHEST_AUTO_OPEN_AFTER_HOURS"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			cfg.Chest.AutoOpenAfterHours = &n
+		}
+	}
+	if v := os.Getenv("LOOT_APPSTORE_KEY_ID"); v != "" {
+		cfg.Sources.AppStore.KeyID = v
+	}
+	if v := os.Getenv("LOOT_APPSTORE_ISSUER_ID"); v != "" {
+		cfg.Sources.AppStore.IssuerID = v
+	}
+	if v := os.Getenv("LOOT_APPSTORE_PRIVATE_KEY_PATH"); v != "" {
+		cfg.Sources.AppStore.PrivateKeyPath = v
+	}
+	if v := os.Getenv("LOOT_APPSTORE_VENDOR_NUMBER"); v != "" {
+		cfg.Sources.AppStore.VendorNumber = v
+	}
+	if v := os.Getenv("LOOT_APPSTORE_APPS"); v != "" {
+		cfg.Sources.AppStore.Apps = splitList(v)
+	}
+	if v := os.Getenv("LOOT_APPSTORE_BACKFILL_DAYS"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			cfg.Sources.AppStore.BackfillDays = n
+		}
+	}
+	if v := os.Getenv("LOOT_GOOGLEPLAY_SERVICE_ACCOUNT_JSON_PATH"); v != "" {
+		cfg.Sources.GooglePlay.ServiceAccountJSONPath = v
+	}
+	if v := os.Getenv("LOOT_GOOGLEPLAY_BUCKET"); v != "" {
+		cfg.Sources.GooglePlay.Bucket = v
+	}
+	if v := os.Getenv("LOOT_GOOGLEPLAY_PACKAGES"); v != "" {
+		cfg.Sources.GooglePlay.Packages = splitList(v)
+	}
+	if v := os.Getenv("LOOT_GOOGLEPLAY_BACKFILL_MONTHS"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			cfg.Sources.GooglePlay.BackfillMonths = n
+		}
+	}
+}
+
+// splitList parses a comma separated env value into a trimmed list.
+func splitList(v string) []string {
+	var out []string
+	for _, item := range strings.Split(v, ",") {
+		if item = strings.TrimSpace(item); item != "" {
+			out = append(out, item)
+		}
+	}
+	return out
 }
 
 func truthy(v string) bool {
@@ -169,4 +329,31 @@ func (c Config) RevenueCatEnabled() bool {
 		return true
 	}
 	return *c.Sources.RevenueCat.Enabled
+}
+
+// FXEnabled reports whether Loot may fetch live exchange rates. Defaults to on.
+func (c Config) FXEnabled() bool {
+	if c.FX.Enabled == nil {
+		return true
+	}
+	return *c.FX.Enabled
+}
+
+// ChestEnabled reports whether chest-hinted drops are held back. Defaults to on.
+func (c Config) ChestEnabled() bool {
+	if c.Chest.Enabled == nil {
+		return true
+	}
+	return *c.Chest.Enabled
+}
+
+// ChestAutoOpenAfterHours returns the auto-open delay in hours, or 0 for never.
+func (c Config) ChestAutoOpenAfterHours() int {
+	if c.Chest.AutoOpenAfterHours == nil {
+		return DefaultChestAutoOpenHours
+	}
+	if *c.Chest.AutoOpenAfterHours < 0 {
+		return 0
+	}
+	return *c.Chest.AutoOpenAfterHours
 }

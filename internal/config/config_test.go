@@ -154,3 +154,144 @@ func TestMissingRulesPathIsRejected(t *testing.T) {
 		t.Fatal("expected an error when rules_path does not exist")
 	}
 }
+
+func TestQuest2Defaults(t *testing.T) {
+	cfg, err := config.Load("does-not-exist.yaml", false)
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if cfg.DisplayCurrency != "USD" {
+		t.Errorf("display_currency = %q, want USD", cfg.DisplayCurrency)
+	}
+	if !cfg.FXEnabled() {
+		t.Error("fx should be enabled by default")
+	}
+	if !cfg.ChestEnabled() {
+		t.Error("the chest should be enabled by default")
+	}
+	if cfg.ChestAutoOpenAfterHours() != 36 {
+		t.Errorf("auto_open_after_hours = %d, want 36", cfg.ChestAutoOpenAfterHours())
+	}
+	if cfg.Sources.AppStore.BackfillDays != 30 {
+		t.Errorf("appstore backfill_days = %d, want 30", cfg.Sources.AppStore.BackfillDays)
+	}
+	if cfg.Sources.GooglePlay.BackfillMonths != 2 {
+		t.Errorf("googleplay backfill_months = %d, want 2", cfg.Sources.GooglePlay.BackfillMonths)
+	}
+	if cfg.Sources.AppStore.Configured() || cfg.Sources.GooglePlay.Configured() {
+		t.Error("an empty config must not report a source as configured")
+	}
+}
+
+func TestLedgerSourceConfig(t *testing.T) {
+	dir := t.TempDir()
+	key := filepath.Join(dir, "AuthKey_ABC.p8")
+	if err := os.WriteFile(key, []byte("-----BEGIN PRIVATE KEY-----"), 0o600); err != nil {
+		t.Fatalf("write key: %v", err)
+	}
+	sa := filepath.Join(dir, "service-account.json")
+	if err := os.WriteFile(sa, []byte("{}"), 0o600); err != nil {
+		t.Fatalf("write service account: %v", err)
+	}
+
+	path := writeConfig(t, `
+display_currency: eur
+fx:
+  enabled: false
+chest:
+  enabled: false
+  auto_open_after_hours: 0
+sources:
+  appstore:
+    key_id: ABC123
+    issuer_id: 11111111-2222-3333-4444-555555555555
+    private_key_path: `+key+`
+    vendor_number: "80123456"
+    apps: ["123456789"]
+    backfill_days: 14
+  googleplay:
+    service_account_json_path: `+sa+`
+    bucket: pubsite_prod_rev_01234567890
+    packages: ["com.example.app"]
+    backfill_months: 3
+`)
+
+	cfg, err := config.Load(path, true)
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if cfg.DisplayCurrency != "EUR" {
+		t.Errorf("display_currency = %q, want EUR (upper-cased)", cfg.DisplayCurrency)
+	}
+	if cfg.FXEnabled() {
+		t.Error("fx.enabled: false was ignored")
+	}
+	if cfg.ChestEnabled() {
+		t.Error("chest.enabled: false was ignored")
+	}
+	if cfg.ChestAutoOpenAfterHours() != 0 {
+		t.Errorf("auto_open_after_hours = %d, want 0 (explicitly disabled)", cfg.ChestAutoOpenAfterHours())
+	}
+	if !cfg.Sources.AppStore.Configured() {
+		t.Error("appstore should report as configured")
+	}
+	if !cfg.Sources.GooglePlay.Configured() {
+		t.Error("googleplay should report as configured")
+	}
+	if cfg.Sources.AppStore.BackfillDays != 14 || len(cfg.Sources.AppStore.Apps) != 1 {
+		t.Errorf("appstore = %+v", cfg.Sources.AppStore)
+	}
+	if cfg.Sources.GooglePlay.BackfillMonths != 3 || cfg.Sources.GooglePlay.Bucket == "" {
+		t.Errorf("googleplay = %+v", cfg.Sources.GooglePlay)
+	}
+}
+
+func TestMissingCredentialFileIsAnError(t *testing.T) {
+	path := writeConfig(t, `
+sources:
+  appstore:
+    key_id: ABC123
+    issuer_id: iss
+    private_key_path: /nope/AuthKey.p8
+    vendor_number: "80123456"
+`)
+	if _, err := config.Load(path, true); err == nil {
+		t.Fatal("expected an error for a missing private key file")
+	}
+}
+
+func TestBadDisplayCurrency(t *testing.T) {
+	path := writeConfig(t, "display_currency: dollars\n")
+	if _, err := config.Load(path, true); err == nil {
+		t.Fatal("expected an error for a non ISO 4217 display currency")
+	}
+}
+
+func TestQuest2EnvOverrides(t *testing.T) {
+	t.Setenv("LOOT_DISPLAY_CURRENCY", "gbp")
+	t.Setenv("LOOT_FX_ENABLED", "false")
+	t.Setenv("LOOT_CHEST_AUTO_OPEN_AFTER_HOURS", "12")
+	t.Setenv("LOOT_APPSTORE_VENDOR_NUMBER", "80999999")
+	t.Setenv("LOOT_GOOGLEPLAY_BUCKET", "pubsite_prod_rev_9")
+	t.Setenv("LOOT_GOOGLEPLAY_PACKAGES", "com.a, com.b")
+
+	cfg, err := config.Load("does-not-exist.yaml", false)
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if cfg.DisplayCurrency != "GBP" {
+		t.Errorf("display_currency = %q", cfg.DisplayCurrency)
+	}
+	if cfg.FXEnabled() {
+		t.Error("LOOT_FX_ENABLED=false was ignored")
+	}
+	if cfg.ChestAutoOpenAfterHours() != 12 {
+		t.Errorf("auto_open_after_hours = %d", cfg.ChestAutoOpenAfterHours())
+	}
+	if cfg.Sources.AppStore.VendorNumber != "80999999" {
+		t.Errorf("vendor = %q", cfg.Sources.AppStore.VendorNumber)
+	}
+	if len(cfg.Sources.GooglePlay.Packages) != 2 || cfg.Sources.GooglePlay.Packages[1] != "com.b" {
+		t.Errorf("packages = %v", cfg.Sources.GooglePlay.Packages)
+	}
+}

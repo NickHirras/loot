@@ -51,6 +51,16 @@ func (s *Source) Poll(context.Context, []byte) ([]core.Event, []byte, error) {
 // PollInterval implements core.Source; 0 marks this source as webhook-only.
 func (s *Source) PollInterval() time.Duration { return 0 }
 
+// Check implements core.Checker. There is nothing to call — RevenueCat pushes
+// to us — so the only thing worth reporting is whether the endpoint is
+// protected.
+func (s *Source) Check(context.Context) error {
+	if s.Secret == "" {
+		return errors.New("no secret set: anyone who can reach /hooks/revenuecat can inject drops")
+	}
+	return nil
+}
+
 // webhook is the subset of the RevenueCat webhook envelope Loot reads.
 // Unknown fields are preserved in the raw payload stored with the event.
 type webhook struct {

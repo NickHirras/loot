@@ -8,14 +8,24 @@ import (
 	"github.com/nickhirras/loot/internal/core"
 )
 
-// Message is what travels over the bus. Kind is the wire discriminator used by
-// the websocket protocol.
+// Message is what travels over the bus. Type is the wire discriminator used by
+// the websocket protocol:
+//
+//	{"type":"hello"}                        on connect
+//	{"type":"drop","drop":…,"event":…}      a drop landed
+//	{"type":"drop","chest":true,…}          a drop revealed by opening a chest
+//	{"type":"chest","chests":[…]}           the set of unopened chests changed
 type Message struct {
 	Type string     `json:"type"`
 	Drop *core.Drop `json:"drop,omitempty"`
 	// Event carries the originating event so the UI can render source, country
 	// and amount without a second round trip.
 	Event *core.Event `json:"event,omitempty"`
+	// Chest marks a drop that arrived because a chest was opened, so clients
+	// can badge it and play the cascade differently from a live drop.
+	Chest bool `json:"chest,omitempty"`
+	// Chests is the current set of unopened chests, sent whenever it changes.
+	Chests []core.ChestSummary `json:"chests,omitempty"`
 }
 
 // Bus fans messages out to every current subscriber. Publish never blocks: a

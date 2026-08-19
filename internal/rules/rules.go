@@ -81,6 +81,8 @@ type Engine struct {
 	cfg       Config
 	lookup    Lookup
 	templates map[string]*template.Template
+	// displayCurrency is what {{.AmountBaseFmt}} is denominated in.
+	displayCurrency string
 
 	needsCountryFirst bool
 	needsRecordHigh   bool
@@ -91,9 +93,10 @@ type Engine struct {
 // fails at startup rather than at the first drop.
 func New(cfg Config, lookup Lookup) (*Engine, error) {
 	e := &Engine{
-		cfg:       cfg,
-		lookup:    lookup,
-		templates: map[string]*template.Template{},
+		cfg:             cfg,
+		lookup:          lookup,
+		templates:       map[string]*template.Template{},
+		displayCurrency: "USD",
 	}
 
 	compile := func(ruleName, field, text string) error {
@@ -146,6 +149,14 @@ func New(cfg Config, lookup Lookup) (*Engine, error) {
 	return e, nil
 }
 
+// SetDisplayCurrency tells the engine which currency {{.AmountBase}} is in, so
+// {{.AmountBaseFmt}} can label it. Defaults to USD.
+func (e *Engine) SetDisplayCurrency(cur string) {
+	if cur = strings.TrimSpace(cur); cur != "" {
+		e.displayCurrency = strings.ToUpper(cur)
+	}
+}
+
 // Parse reads a rules config from YAML bytes.
 func Parse(data []byte) (Config, error) {
 	var cfg Config
@@ -175,18 +186,23 @@ func Load(path string, lookup Lookup) (*Engine, error) {
 
 // tmplData is what title/subtitle templates are rendered against.
 type tmplData struct {
-	Source      string
-	Kind        string
-	App         string
-	Country     string
-	Currency    string
-	Amount      float64
-	Quantity    int
-	AmountFmt   string
-	QuantityFmt string
-	Flag        string
-	BaseTitle   string
-	Payload     map[string]any
+	Source   string
+	Kind     string
+	App      string
+	Day      string
+	Country  string
+	Currency string
+	Amount   float64
+	// AmountBase is Amount in the dashboard's display currency, which is what
+	// a multi-currency ledger source should usually show.
+	AmountBase    float64
+	Quantity      int
+	AmountFmt     string
+	AmountBaseFmt string
+	QuantityFmt   string
+	Flag          string
+	BaseTitle     string
+	Payload       map[string]any
 }
 
 // Classify picks a rarity, title and XP for ev and returns the resulting Drop.
@@ -195,7 +211,7 @@ func (e *Engine) Classify(ctx context.Context, ev core.Event) (core.Drop, error)
 	if err != nil {
 		return core.Drop{}, err
 	}
-	data := buildTmplData(ev, facts.payload)
+	data := e.buildTmplData(ev, facts.payload)
 
 	var (
 		chosen  *Rule
@@ -387,14 +403,16 @@ func (e *Engine) render(ruleName, field, text string, data tmplData) string {
 	return strings.TrimSpace(buf.String())
 }
 
-func buildTmplData(ev core.Event, payload map[string]any) tmplData {
+func (e *Engine) buildTmplData(ev core.Event, payload map[string]any) tmplData {
 	d := tmplData{
 		Source:      ev.Source,
 		Kind:        ev.Kind,
 		App:         ev.App,
+		Day:         ev.Day,
 		Country:     ev.Country,
 		Currency:    ev.Currency,
 		Amount:      ev.Amount,
+		AmountBase:  ev.AmountBase,
 		Quantity:    ev.Quantity,
 		QuantityFmt: humanInt(ev.Quantity),
 		Flag:        FlagEmoji(ev.Country),
@@ -402,6 +420,9 @@ func buildTmplData(ev core.Event, payload map[string]any) tmplData {
 	}
 	if ev.Amount > 0 {
 		d.AmountFmt = strings.TrimSpace(fmt.Sprintf("%.2f %s", ev.Amount, ev.Currency))
+	}
+	if ev.AmountBase > 0 {
+		d.AmountBaseFmt = strings.TrimSpace(fmt.Sprintf("%.2f %s", ev.AmountBase, e.displayCurrency))
 	}
 	return d
 }

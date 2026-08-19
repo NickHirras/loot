@@ -25,6 +25,28 @@ import (
 
 func quietLogger() *slog.Logger { return slog.New(slog.NewTextHandler(io.Discard, nil)) }
 
+// fixedRates is a hand-written rate table: rate[X] is units of X per one USD.
+type fixedRates map[string]float64
+
+func (f fixedRates) Convert(amount float64, from, to string) (float64, bool) {
+	if from == to {
+		return amount, true
+	}
+	rate := func(cur string) (float64, bool) {
+		if cur == "USD" {
+			return 1, true
+		}
+		r, ok := f[cur]
+		return r, ok
+	}
+	rf, okFrom := rate(from)
+	rt, okTo := rate(to)
+	if !okFrom || !okTo {
+		return 0, false
+	}
+	return amount / rf * rt, true
+}
+
 type harness struct {
 	srv   *httptest.Server
 	store *store.Store
@@ -46,8 +68,10 @@ func newHarness(t *testing.T, dev bool) *harness {
 		t.Fatalf("load rules: %v", err)
 	}
 
-	b := bus.New(16)
+	b := bus.New(64)
 	p := pipeline.New(st, engine, b, quietLogger())
+	p.ChestEnabled = true
+	p.FX = fixedRates{"EUR": 0.8}
 
 	cfg := config.Default()
 	cfg.Dev.Enabled = dev
@@ -115,10 +139,11 @@ func TestWebhookIngestAndDedupe(t *testing.T) {
 		t.Fatalf("dedupe_key = %v", body["dedupe_key"])
 	}
 
+	// The purchase drop plus the settlement drop for a brand new country.
 	_, drops := h.get(t, "/api/drops")
 	list, _ := drops["drops"].([]any)
-	if len(list) != 1 {
-		t.Fatalf("got %d drops after one webhook, want 1", len(list))
+	if len(list) != 2 {
+		t.Fatalf("got %d drops after one webhook, want 2 (purchase + settlement)", len(list))
 	}
 
 	// Redeliver the identical webhook: still 200, but no second drop.
@@ -129,17 +154,31 @@ func TestWebhookIngestAndDedupe(t *testing.T) {
 
 	_, drops = h.get(t, "/api/drops")
 	list, _ = drops["drops"].([]any)
-	if len(list) != 1 {
-		t.Fatalf("got %d drops after a redelivery, want 1", len(list))
+	if len(list) != 2 {
+		t.Fatalf("got %d drops after a redelivery, want 2", len(list))
 	}
 
-	first, _ := list[0].(map[string]any)
-	if first["source"] != "revenuecat" || first["country"] != "NZ" {
-		t.Fatalf("drop is missing joined event fields: %v", first)
+	var purchase, settlement map[string]any
+	for _, d := range list {
+		m, _ := d.(map[string]any)
+		switch m["kind"] {
+		case "purchase":
+			purchase = m
+		case "settlement":
+			settlement = m
+		}
 	}
-	// NZ is the first country ever seen here, so the floor rule applies.
-	if first["rarity"] != "rare" {
-		t.Fatalf("rarity = %v, want rare", first["rarity"])
+	if purchase == nil || settlement == nil {
+		t.Fatalf("drops = %v, want a purchase and a settlement", list)
+	}
+	if purchase["source"] != "revenuecat" || purchase["country"] != "NZ" {
+		t.Fatalf("drop is missing joined event fields: %v", purchase)
+	}
+	if purchase["rarity"] != "uncommon" {
+		t.Fatalf("rarity = %v, want uncommon", purchase["rarity"])
+	}
+	if settlement["source"] != "loot" || settlement["rarity"] != "rare" {
+		t.Fatalf("settlement = %v, want a rare loot settlement", settlement)
 	}
 }
 
@@ -156,8 +195,14 @@ func TestStatsEndpoint(t *testing.T) {
 	h.post(t, "/hooks/revenuecat", rcWebhook)
 
 	_, body := h.get(t, "/api/stats")
-	if body["total_drops"].(float64) != 1 {
+	if body["total_drops"].(float64) != 2 {
 		t.Fatalf("total_drops = %v", body["total_drops"])
+	}
+	if body["unrevealed_count"].(float64) != 0 {
+		t.Fatalf("unrevealed_count = %v", body["unrevealed_count"])
+	}
+	if body["display_currency"] != "USD" {
+		t.Fatalf("display_currency = %v", body["display_currency"])
 	}
 	if body["total_xp"].(float64) <= 0 {
 		t.Fatalf("total_xp = %v", body["total_xp"])
@@ -166,7 +211,7 @@ func TestStatsEndpoint(t *testing.T) {
 		t.Fatalf("dev = %v, want true", body["dev"])
 	}
 	byRarity, _ := body["by_rarity"].(map[string]any)
-	if byRarity["rare"].(float64) != 1 {
+	if byRarity["rare"].(float64) != 1 || byRarity["uncommon"].(float64) != 1 {
 		t.Fatalf("by_rarity = %v", byRarity)
 	}
 	countries, _ := body["countries"].([]any)
@@ -358,5 +403,173 @@ func TestWebsocketStreamsDrops(t *testing.T) {
 	}
 	if msg.Event == nil || msg.Event.Source != "dev" {
 		t.Fatalf("event = %+v", msg.Event)
+	}
+}
+
+func TestChestEndpoints(t *testing.T) {
+	h := newHarness(t, true)
+
+	// Two chest-bound days, minted through the real pipeline.
+	h.post(t, "/api/dev/fake", `{"rarity":"epic","chest":true,"day":"2026-08-17"}`)
+	h.post(t, "/api/dev/fake", `{"rarity":"common","chest":true,"day":"2026-08-17"}`)
+	h.post(t, "/api/dev/fake", `{"rarity":"rare","chest":true,"day":"2026-08-16"}`)
+
+	// Nothing held may appear in the feed.
+	_, drops := h.get(t, "/api/drops")
+	if list, _ := drops["drops"].([]any); len(list) != 0 {
+		t.Fatalf("feed showed %d unopened chest drops", len(list))
+	}
+
+	_, body := h.get(t, "/api/chest")
+	chests, _ := body["chests"].([]any)
+	if len(chests) != 2 {
+		t.Fatalf("got %d chests, want 2", len(chests))
+	}
+	oldest, _ := chests[0].(map[string]any)
+	if oldest["date"] != "2026-08-16" || oldest["count"].(float64) != 1 {
+		t.Fatalf("oldest chest = %v", oldest)
+	}
+	newest, _ := chests[1].(map[string]any)
+	if newest["count"].(float64) != 2 || newest["xp"].(float64) <= 0 {
+		t.Fatalf("newest chest = %v", newest)
+	}
+	byRarity, _ := newest["by_rarity"].(map[string]any)
+	if byRarity["epic"].(float64) != 1 {
+		t.Fatalf("by_rarity = %v", byRarity)
+	}
+
+	// Opening with no date opens the oldest.
+	resp, opened := h.post(t, "/api/chest/open", `{}`)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("open status = %d", resp.StatusCode)
+	}
+	if opened["opened"] != "2026-08-16" || opened["count"].(float64) != 1 {
+		t.Fatalf("open response = %v", opened)
+	}
+
+	// Opening a named chest returns its drops in cascade order.
+	_, opened = h.post(t, "/api/chest/open", `{"date":"2026-08-17"}`)
+	list, _ := opened["drops"].([]any)
+	if len(list) != 2 {
+		t.Fatalf("opened %d drops, want 2", len(list))
+	}
+	first, _ := list[0].(map[string]any)
+	last, _ := list[1].(map[string]any)
+	if first["rarity"] != "common" || last["rarity"] != "epic" {
+		t.Fatalf("cascade order = %v then %v, want common then epic", first["rarity"], last["rarity"])
+	}
+	if remaining, _ := opened["chests"].([]any); len(remaining) != 0 {
+		t.Fatalf("chests remaining = %v, want none", remaining)
+	}
+
+	// Revealed drops now show up in the feed.
+	_, drops = h.get(t, "/api/drops")
+	if list, _ := drops["drops"].([]any); len(list) != 3 {
+		t.Fatalf("feed has %d drops after opening, want 3", len(list))
+	}
+
+	// Opening an empty chest is a quiet no-op, not an error.
+	resp, empty := h.post(t, "/api/chest/open", `{"date":"2026-08-17"}`)
+	if resp.StatusCode != http.StatusOK || empty["count"].(float64) != 0 {
+		t.Fatalf("reopening returned %d / %v", resp.StatusCode, empty)
+	}
+
+	resp, _ = h.post(t, "/api/chest/open", `{"date":"nonsense"}`)
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("bad date status = %d, want 400", resp.StatusCode)
+	}
+}
+
+func TestVaultSummaryEndpoint(t *testing.T) {
+	h := newHarness(t, true)
+
+	// A ledger day in euros: the vault reports it in the display currency.
+	h.post(t, "/api/dev/fake", `{"kind":"sales_day","amount":80,"currency":"EUR","quantity":12,"country":"DE"}`)
+
+	resp, body := h.get(t, "/api/vault/summary?range=7d")
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d", resp.StatusCode)
+	}
+	if body["display_currency"] != "USD" {
+		t.Fatalf("display_currency = %v", body["display_currency"])
+	}
+	rng, _ := body["range"].(map[string]any)
+	if rng["days"].(float64) != 7 {
+		t.Fatalf("range = %v", rng)
+	}
+	series, _ := body["series"].([]any)
+	if len(series) != 7 {
+		t.Fatalf("series has %d points, want 7", len(series))
+	}
+
+	// The euro row converts: 80 EUR at 0.8 to the dollar is 100 USD. The
+	// sales_day summary rolls up that same row and must not be added again.
+	totals, _ := body["totals"].(map[string]any)
+	if totals["revenue_base"].(float64) != 100 {
+		t.Fatalf("revenue = %v, want 100 (80 EUR converted, counted once)", totals["revenue_base"])
+	}
+	if totals["units"].(float64) != 12 {
+		t.Fatalf("units = %v, want 12", totals["units"])
+	}
+	// Only the settlement drop for a first-ever country is visible; the
+	// summary drop is still shut inside its chest.
+	if totals["drops"].(float64) != 1 {
+		t.Fatalf("drops = %v, want just the settlement while the chest is shut", totals["drops"])
+	}
+
+	h.post(t, "/api/chest/open", `{}`)
+	_, body = h.get(t, "/api/vault/summary?range=7d")
+	totals, _ = body["totals"].(map[string]any)
+	if totals["drops"].(float64) != 2 {
+		t.Fatalf("drops = %v after opening the chest, want 2", totals["drops"])
+	}
+
+	bySource, _ := body["by_source"].([]any)
+	if len(bySource) != 1 {
+		t.Fatalf("by_source = %v", bySource)
+	}
+	src, _ := bySource[0].(map[string]any)
+	if src["source"] != "dev" || src["share"].(float64) != 1 {
+		t.Fatalf("by_source[0] = %v", src)
+	}
+	byCountry, _ := body["by_country"].([]any)
+	if len(byCountry) != 1 || byCountry[0].(map[string]any)["country"] != "DE" {
+		t.Fatalf("by_country = %v", byCountry)
+	}
+
+	realtime, _ := body["realtime"].(map[string]any)
+	if realtime["revenuecat_purchases_today"].(float64) != 0 {
+		t.Fatalf("realtime = %v", realtime)
+	}
+	subs, _ := body["subscriptions"].(map[string]any)
+	if subs["active"] != nil {
+		t.Fatalf("subscriptions = %v, want nulls", subs)
+	}
+
+	resp, _ = h.get(t, "/api/vault/summary?range=decade")
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("unknown range status = %d, want 400", resp.StatusCode)
+	}
+}
+
+func TestDevFakeSalesDayLandsInAChest(t *testing.T) {
+	h := newHarness(t, true)
+
+	_, body := h.post(t, "/api/dev/fake", `{"kind":"sales_day","amount":250,"currency":"USD","quantity":40}`)
+	drop, _ := body["drop"].(map[string]any)
+	if drop["chest_date"] == "" || drop["chest_date"] == nil {
+		t.Fatalf("sales_day drop was not filed into a chest: %v", drop)
+	}
+	if drop["rarity"] != "rare" {
+		t.Fatalf("rarity = %v, want rare for a 250 dollar day", drop["rarity"])
+	}
+	event, _ := body["event"].(map[string]any)
+	if event["is_ledger"] != true || event["chest"] != true {
+		t.Fatalf("event = %v, want a ledger chest event", event)
+	}
+
+	_, chest := h.get(t, "/api/chest")
+	if chests, _ := chest["chests"].([]any); len(chests) != 1 {
+		t.Fatalf("got %d chests, want 1", len(chests))
 	}
 }

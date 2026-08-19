@@ -92,16 +92,17 @@ func streamDrops(ctx context.Context, wsURL string, noBell, plain bool) error {
 			return err
 		}
 		if msg.Type != "drop" || msg.Drop == nil {
+			// {"type":"chest"} and friends are for the dashboard badge.
 			continue
 		}
-		fmt.Println(formatDrop(*msg.Drop, msg.Event, plain))
+		fmt.Println(formatDrop(*msg.Drop, msg.Event, msg.Chest, plain))
 		if !noBell && msg.Drop.Rarity.Rank() >= core.Rare.Rank() {
 			fmt.Print("\a")
 		}
 	}
 }
 
-func formatDrop(d core.Drop, ev *core.Event, plain bool) string {
+func formatDrop(d core.Drop, ev *core.Event, fromChest bool, plain bool) string {
 	color, reset, dim := rarityColor[d.Rarity], ansiReset, ansiDim
 	if plain {
 		color, reset, dim = "", "", ""
@@ -110,8 +111,14 @@ func formatDrop(d core.Drop, ev *core.Event, plain bool) string {
 	ts := d.CreatedAt.Local().Format("15:04:05")
 	badge := strings.ToUpper(string(d.Rarity))
 
+	// A chest reveal is a drop that already happened; the box says so.
+	prefix := ""
+	if fromChest {
+		prefix = "📦 "
+	}
+
 	var b strings.Builder
-	fmt.Fprintf(&b, "%s%s%s %s%-9s%s %s", dim, ts, reset, color, badge, reset, d.Title)
+	fmt.Fprintf(&b, "%s%s%s %s%-9s%s %s%s", dim, ts, reset, color, badge, reset, prefix, d.Title)
 	if d.Subtitle != "" {
 		fmt.Fprintf(&b, " %s· %s%s", dim, d.Subtitle, reset)
 	}

@@ -14,9 +14,12 @@ var version = "dev"
 const usage = `loot — a gamified dashboard for indie app metrics
 
 Usage:
-  loot serve [flags]   Run the API, websocket stream, sources and dashboard (default)
-  loot tail  [flags]   Stream drops into your terminal
-  loot version         Print the version
+  loot serve [flags]        Run the API, websocket stream, sources and dashboard (default)
+  loot tail  [flags]        Stream drops into your terminal
+  loot check [flags]        Verify every configured source and exit
+  loot chest [open [date]]  List the daily chests waiting, or open one
+  loot fx    [recompute]    Show exchange rates, or re-convert stored amounts
+  loot version              Print the version
 
 Run "loot <command> -h" for the flags of a command.
 `
@@ -37,6 +40,12 @@ func main() {
 		err = runServe(args)
 	case "tail":
 		err = runTail(args)
+	case "check":
+		err = runCheck(args)
+	case "chest":
+		err = runChest(args)
+	case "fx":
+		err = runFX(args)
 	case "version":
 		fmt.Println("loot " + version)
 	case "help", "-h", "--help":

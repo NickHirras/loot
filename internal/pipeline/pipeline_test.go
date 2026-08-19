@@ -6,6 +6,7 @@ import (
 	"io"
 	"log/slog"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -32,8 +33,47 @@ func newPipeline(t *testing.T) (*pipeline.Pipeline, *store.Store, *bus.Bus) {
 		t.Fatalf("load rules: %v", err)
 	}
 
-	b := bus.New(16)
-	return pipeline.New(st, engine, b, quietLogger()), st, b
+	b := bus.New(64)
+	p := pipeline.New(st, engine, b, quietLogger())
+	p.ChestEnabled = true
+	p.FX = fixedRates{"EUR": 0.8}
+	return p, st, b
+}
+
+// fixedRates converts with a hand-written table: rate[X] is units of X per one
+// USD, the same convention internal/fx uses.
+type fixedRates map[string]float64
+
+func (f fixedRates) Convert(amount float64, from, to string) (float64, bool) {
+	if from == to {
+		return amount, true
+	}
+	rate := func(cur string) (float64, bool) {
+		if cur == "USD" {
+			return 1, true
+		}
+		r, ok := f[cur]
+		return r, ok
+	}
+	rf, ok := rate(from)
+	if !ok {
+		return 0, false
+	}
+	rt, ok := rate(to)
+	if !ok {
+		return 0, false
+	}
+	return amount / rf * rt, true
+}
+
+// listDrops is the feed's view: revealed and immediate drops only.
+func listDrops(t *testing.T, st *store.Store) []store.DropView {
+	t.Helper()
+	drops, err := st.ListDrops(context.Background(), store.DropQuery{Limit: 50})
+	if err != nil {
+		t.Fatalf("list drops: %v", err)
+	}
+	return drops
 }
 
 func purchase(dedupe string) core.Event {
@@ -68,10 +108,8 @@ func TestIngestCreatesDropAndPublishes(t *testing.T) {
 	if drop == nil {
 		t.Fatal("ingest returned no drop for a new event")
 	}
-	// The US is unseen in a fresh store, so the country_first floor lifts this
-	// uncommon purchase to rare.
-	if drop.Rarity != core.Rare {
-		t.Fatalf("rarity = %s, want rare (first US event)", drop.Rarity)
+	if drop.Rarity != core.Uncommon {
+		t.Fatalf("rarity = %s, want uncommon", drop.Rarity)
 	}
 
 	select {
@@ -86,12 +124,21 @@ func TestIngestCreatesDropAndPublishes(t *testing.T) {
 		t.Fatal("nothing was published to the bus")
 	}
 
-	drops, err := st.ListDrops(ctx, 10, "")
-	if err != nil {
-		t.Fatalf("list drops: %v", err)
+	// The US had never been seen, so a settlement drop follows the purchase.
+	select {
+	case msg := <-msgs:
+		if msg.Drop == nil || msg.Event == nil || msg.Event.Kind != "settlement" {
+			t.Fatalf("second message = %+v, want the settlement", msg)
+		}
+		if msg.Drop.Rarity != core.Rare {
+			t.Fatalf("settlement rarity = %s, want rare", msg.Drop.Rarity)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("no settlement was published")
 	}
-	if len(drops) != 1 {
-		t.Fatalf("stored %d drops, want 1", len(drops))
+
+	if drops := listDrops(t, st); len(drops) != 2 {
+		t.Fatalf("stored %d drops, want 2 (purchase + settlement)", len(drops))
 	}
 }
 
@@ -107,7 +154,8 @@ func TestIngestDuplicateCreatesNoDrop(t *testing.T) {
 	if _, err := p.Ingest(ctx, purchase("rc:same")); err != nil {
 		t.Fatalf("first ingest: %v", err)
 	}
-	<-msgs // drain the first publish
+	<-msgs // drain the purchase
+	<-msgs // drain the settlement it triggered
 
 	// Same dedupe key, brand new event id, as a real retry would arrive.
 	drop, err := p.Ingest(ctx, purchase("rc:same"))
@@ -124,15 +172,11 @@ func TestIngestDuplicateCreatesNoDrop(t *testing.T) {
 	case <-time.After(100 * time.Millisecond):
 	}
 
-	drops, err := st.ListDrops(ctx, 10, "")
-	if err != nil {
-		t.Fatalf("list drops: %v", err)
+	if drops := listDrops(t, st); len(drops) != 2 {
+		t.Fatalf("stored %d drops, want 2 (purchase + settlement)", len(drops))
 	}
-	if len(drops) != 1 {
-		t.Fatalf("stored %d drops, want 1", len(drops))
-	}
-	if n, err := st.EventCount(ctx, ""); err != nil || n != 1 {
-		t.Fatalf("stored %d events, want 1 (%v)", n, err)
+	if n, err := st.EventCount(ctx, ""); err != nil || n != 2 {
+		t.Fatalf("stored %d events, want 2 (%v)", n, err)
 	}
 }
 
@@ -149,15 +193,38 @@ func TestIngestFillsMissingFields(t *testing.T) {
 		t.Fatal("no drop")
 	}
 
-	drops, err := st.ListDrops(ctx, 10, "")
-	if err != nil {
-		t.Fatalf("list: %v", err)
-	}
+	drops := listDrops(t, st)
 	if len(drops) != 1 {
 		t.Fatalf("stored %d drops, want 1", len(drops))
 	}
 	if drops[0].OccurredAt.IsZero() {
 		t.Error("occurred_at was left unset")
+	}
+	if drops[0].Day == "" {
+		t.Error("day was left unset")
+	}
+}
+
+func TestSilentEventMakesNoDrop(t *testing.T) {
+	ctx := context.Background()
+	p, st, _ := newPipeline(t)
+
+	ev := purchase("rc:quiet")
+	ev.Country = "" // no country: nothing to settle, so nothing at all should drop
+	ev.Silent = true
+
+	drop, err := p.Ingest(ctx, ev)
+	if err != nil {
+		t.Fatalf("silent ingest: %v", err)
+	}
+	if drop != nil {
+		t.Fatalf("silent event produced a drop: %+v", drop)
+	}
+	if n, err := st.EventCount(ctx, ""); err != nil || n != 1 {
+		t.Fatalf("stored %d events, want 1 (%v)", n, err)
+	}
+	if drops := listDrops(t, st); len(drops) != 0 {
+		t.Fatalf("silent ingest created %d drops, want 0", len(drops))
 	}
 }
 
@@ -165,18 +232,16 @@ func TestIngestSilentlyStoresWithoutDrop(t *testing.T) {
 	ctx := context.Background()
 	p, st, _ := newPipeline(t)
 
-	if err := p.IngestSilently(ctx, purchase("rc:quiet")); err != nil {
+	ev := purchase("rc:quiet")
+	ev.Country = ""
+	if err := p.IngestSilently(ctx, ev); err != nil {
 		t.Fatalf("silent ingest: %v", err)
 	}
 
 	if n, err := st.EventCount(ctx, ""); err != nil || n != 1 {
 		t.Fatalf("stored %d events, want 1 (%v)", n, err)
 	}
-	drops, err := st.ListDrops(ctx, 10, "")
-	if err != nil {
-		t.Fatalf("list: %v", err)
-	}
-	if len(drops) != 0 {
+	if drops := listDrops(t, st); len(drops) != 0 {
 		t.Fatalf("silent ingest created %d drops, want 0", len(drops))
 	}
 }
@@ -219,12 +284,9 @@ func TestSchedulerPollOnce(t *testing.T) {
 		t.Fatalf("first poll received state %q, want nil", src.gotState)
 	}
 
-	drops, err := st.ListDrops(ctx, 10, "")
-	if err != nil {
-		t.Fatalf("list: %v", err)
-	}
-	if len(drops) != 2 {
-		t.Fatalf("got %d drops, want 2", len(drops))
+	// Two purchases plus the settlement the first one triggered.
+	if drops := listDrops(t, st); len(drops) != 3 {
+		t.Fatalf("got %d drops, want 3", len(drops))
 	}
 
 	saved, err := st.GetSourceState(ctx, "stub")
@@ -252,9 +314,8 @@ func TestSchedulerPollOnce(t *testing.T) {
 	if string(src.gotState) != `{"cursor":"abc"}` {
 		t.Fatalf("second poll received state %q", src.gotState)
 	}
-	drops, _ = st.ListDrops(ctx, 10, "")
-	if len(drops) != 2 {
-		t.Fatalf("after replay: %d drops, want 2", len(drops))
+	if drops := listDrops(t, st); len(drops) != 3 {
+		t.Fatalf("after replay: %d drops, want 3", len(drops))
 	}
 }
 
@@ -279,9 +340,8 @@ func TestSchedulerRecordsPollError(t *testing.T) {
 		t.Fatalf("last_error = %q, want %q", states["stub"].LastError, failing)
 	}
 
-	drops, _ := st.ListDrops(ctx, 10, "")
-	if len(drops) != 1 {
-		t.Fatalf("got %d drops, want the 1 partial result", len(drops))
+	if drops := listDrops(t, st); len(drops) != 2 {
+		t.Fatalf("got %d drops, want the partial result and its settlement", len(drops))
 	}
 }
 
@@ -302,5 +362,324 @@ func TestSchedulerRunStopsOnContextCancel(t *testing.T) {
 	case <-done:
 	case <-time.After(5 * time.Second):
 		t.Fatal("scheduler did not stop when the context was cancelled")
+	}
+}
+
+// salesDay is the shape a ledger source emits once per (app, day): a non-silent
+// summary that asks to be held for the chest.
+func salesDay(app, day string, units int, amount float64, currency string) core.Event {
+	return core.Event{
+		Source:    "appstore",
+		Kind:      "sales_day",
+		App:       app,
+		Day:       day,
+		Amount:    amount,
+		Currency:  currency,
+		Quantity:  units,
+		IsLedger:  true,
+		Chest:     true,
+		DedupeKey: "appstore:sales_day:" + app + ":" + day,
+	}
+}
+
+func TestChestHoldsDropsOutOfTheFeed(t *testing.T) {
+	ctx := context.Background()
+	p, st, b := newPipeline(t)
+
+	msgs, cancel := b.Subscribe()
+	defer cancel()
+
+	drop, err := p.Ingest(ctx, salesDay("com.example.app", "2026-08-17", 12, 40, "USD"))
+	if err != nil {
+		t.Fatalf("ingest: %v", err)
+	}
+	if drop.ChestDate != "2026-08-17" {
+		t.Fatalf("chest_date = %q, want the event's day", drop.ChestDate)
+	}
+
+	if drops := listDrops(t, st); len(drops) != 0 {
+		t.Fatalf("a chest drop leaked into the feed: %+v", drops)
+	}
+
+	// The badge update is the only thing that should reach the bus.
+	select {
+	case msg := <-msgs:
+		if msg.Type != "chest" || len(msg.Chests) != 1 || msg.Chests[0].Count != 1 {
+			t.Fatalf("bus message = %+v, want a chest summary", msg)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("no chest message was published")
+	}
+	select {
+	case msg := <-msgs:
+		t.Fatalf("a held drop was published anyway: %+v", msg)
+	case <-time.After(100 * time.Millisecond):
+	}
+
+	// Stats must not spoil the chest either.
+	stats, err := st.Stats(ctx)
+	if err != nil {
+		t.Fatalf("stats: %v", err)
+	}
+	if stats.TotalDrops != 0 || stats.TotalXP != 0 {
+		t.Fatalf("stats counted a held drop: %+v", stats)
+	}
+	if stats.UnrevealedCount != 1 || len(stats.ChestDates) != 1 {
+		t.Fatalf("stats did not report the waiting chest: %+v", stats)
+	}
+}
+
+func TestRevealChestCascadesInOrder(t *testing.T) {
+	ctx := context.Background()
+	p, st, b := newPipeline(t)
+
+	// One quiet day for app c first, so its next day can be a record.
+	if _, err := p.Ingest(ctx, salesDay("com.example.c", "2026-08-16", 5, 10, "USD")); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	// Three drops in one chest, deliberately minted out of reveal order.
+	for i, ev := range []core.Event{
+		salesDay("com.example.a", "2026-08-17", 5, 10, "USD"),    // common
+		salesDay("com.example.b", "2026-08-17", 50, 500, "USD"),  // rare
+		salesDay("com.example.c", "2026-08-17", 5000, 50, "USD"), // epic: best day ever
+	} {
+		if _, err := p.Ingest(ctx, ev); err != nil {
+			t.Fatalf("ingest %d: %v", i, err)
+		}
+	}
+
+	msgs, cancel := b.Subscribe()
+	defer cancel()
+
+	revealed, err := p.RevealChest(ctx, "2026-08-17")
+	if err != nil {
+		t.Fatalf("reveal: %v", err)
+	}
+	if len(revealed) != 3 {
+		t.Fatalf("revealed %d drops, want 3", len(revealed))
+	}
+
+	// Ascending reveal rank: the cascade climbs towards the best news.
+	for i := 1; i < len(revealed); i++ {
+		prev, cur := revealed[i-1].Rarity, revealed[i].Rarity
+		if core.RevealRank(cur) < core.RevealRank(prev) {
+			t.Fatalf("reveal order %s before %s is downhill", prev, cur)
+		}
+	}
+	if revealed[len(revealed)-1].Rarity != core.Epic {
+		t.Fatalf("cascade ends on %s, want the epic", revealed[len(revealed)-1].Rarity)
+	}
+
+	// Revealed drops now show in the feed, and each carries revealed_at.
+	feed := listDrops(t, st)
+	if len(feed) != 3 {
+		t.Fatalf("feed has %d drops after the reveal, want 3 (the 16th is still shut)", len(feed))
+	}
+	for _, d := range feed {
+		if d.RevealedAt == nil {
+			t.Fatalf("drop %s has no revealed_at", d.ID)
+		}
+	}
+
+	// Every revealed drop is republished, flagged as coming from a chest.
+	seen := 0
+	deadline := time.After(5 * time.Second)
+	for seen < 3 {
+		select {
+		case msg := <-msgs:
+			if msg.Type != "drop" {
+				continue
+			}
+			if !msg.Chest {
+				t.Fatalf("revealed drop was not marked chest:true: %+v", msg)
+			}
+			seen++
+		case <-deadline:
+			t.Fatalf("only %d of 3 drops cascaded onto the bus", seen)
+		}
+	}
+
+	// A second open finds nothing.
+	again, err := p.RevealChest(ctx, "2026-08-17")
+	if err != nil {
+		t.Fatalf("second reveal: %v", err)
+	}
+	if len(again) != 0 {
+		t.Fatalf("reopening an empty chest returned %d drops", len(again))
+	}
+}
+
+func TestRevealOldestChestByDefault(t *testing.T) {
+	ctx := context.Background()
+	p, _, _ := newPipeline(t)
+
+	if _, err := p.Ingest(ctx, salesDay("com.example.app", "2026-08-16", 3, 9, "USD")); err != nil {
+		t.Fatalf("ingest: %v", err)
+	}
+	if _, err := p.Ingest(ctx, salesDay("com.example.app", "2026-08-18", 4, 9, "USD")); err != nil {
+		t.Fatalf("ingest: %v", err)
+	}
+
+	drops, err := p.RevealChest(ctx, "")
+	if err != nil {
+		t.Fatalf("reveal: %v", err)
+	}
+	if len(drops) != 1 || drops[0].ChestDate != "2026-08-16" {
+		t.Fatalf("opened %+v, want the 2026-08-16 chest", drops)
+	}
+}
+
+func TestChestDisabledPublishesImmediately(t *testing.T) {
+	ctx := context.Background()
+	p, st, _ := newPipeline(t)
+	p.ChestEnabled = false
+
+	drop, err := p.Ingest(ctx, salesDay("com.example.app", "2026-08-17", 12, 40, "USD"))
+	if err != nil {
+		t.Fatalf("ingest: %v", err)
+	}
+	if drop.ChestDate != "" {
+		t.Fatalf("chest_date = %q with chests disabled", drop.ChestDate)
+	}
+	if drops := listDrops(t, st); len(drops) != 1 {
+		t.Fatalf("feed has %d drops, want 1", len(drops))
+	}
+}
+
+func TestAutoOpenOnlyOpensStaleChests(t *testing.T) {
+	ctx := context.Background()
+	p, st, _ := newPipeline(t)
+	p.ChestAutoOpenAfterHours = 36
+	// 2026-08-18 10:00 UTC: the 17th's chest is 34h old, the 16th's is 58h.
+	p.Now = func() time.Time { return time.Date(2026, 8, 18, 10, 0, 0, 0, time.UTC) }
+
+	for _, day := range []string{"2026-08-16", "2026-08-17"} {
+		if _, err := p.Ingest(ctx, salesDay("com.example.app", day, 3, 9, "USD")); err != nil {
+			t.Fatalf("ingest %s: %v", day, err)
+		}
+	}
+
+	p.OpenDueChests(ctx)
+
+	chests, err := st.ChestSummaries(ctx)
+	if err != nil {
+		t.Fatalf("chest summaries: %v", err)
+	}
+	if len(chests) != 1 || chests[0].Date != "2026-08-17" {
+		t.Fatalf("chests left = %+v, want only 2026-08-17", chests)
+	}
+}
+
+func TestAmountBaseConversionAtIngest(t *testing.T) {
+	ctx := context.Background()
+	p, st, _ := newPipeline(t) // display currency USD, EUR at 0.8
+
+	ev := purchase("rc:eur")
+	ev.Country = ""
+	ev.Amount = 8
+	ev.Currency = "EUR"
+
+	if _, err := p.Ingest(ctx, ev); err != nil {
+		t.Fatalf("ingest: %v", err)
+	}
+
+	drops := listDrops(t, st)
+	if len(drops) != 1 {
+		t.Fatalf("got %d drops, want 1", len(drops))
+	}
+	if got := drops[0].AmountBase; got != 10 {
+		t.Fatalf("amount_base = %v, want 10 (8 EUR at 0.8)", got)
+	}
+	if drops[0].Amount != 8 || drops[0].Currency != "EUR" {
+		t.Fatalf("the original amount was rewritten: %+v", drops[0])
+	}
+}
+
+func TestAmountBaseUnknownCurrencyStaysZero(t *testing.T) {
+	ctx := context.Background()
+	p, st, _ := newPipeline(t)
+
+	ev := purchase("rc:xyz")
+	ev.Country = ""
+	ev.Amount = 8
+	ev.Currency = "XYZ"
+
+	if _, err := p.Ingest(ctx, ev); err != nil {
+		t.Fatalf("ingest: %v", err)
+	}
+	drops := listDrops(t, st)
+	if len(drops) != 1 || drops[0].AmountBase != 0 {
+		t.Fatalf("amount_base = %v, want 0 for an unknown currency", drops[0].AmountBase)
+	}
+}
+
+func TestSettlementEmittedOncePerCountryIncludingSilentEvents(t *testing.T) {
+	ctx := context.Background()
+	p, st, _ := newPipeline(t)
+
+	// A silent ledger row is still allowed to found a settlement.
+	row := core.Event{
+		Source:    "appstore",
+		Kind:      "sale",
+		App:       "com.example.app",
+		Day:       "2026-08-17",
+		Country:   "jp",
+		Amount:    3,
+		Currency:  "USD",
+		Quantity:  1,
+		IsLedger:  true,
+		Silent:    true,
+		DedupeKey: "appstore:2026-08-17:jp:1",
+	}
+	if _, err := p.Ingest(ctx, row); err != nil {
+		t.Fatalf("ingest row: %v", err)
+	}
+
+	drops := listDrops(t, st)
+	if len(drops) != 1 {
+		t.Fatalf("got %d drops, want just the settlement", len(drops))
+	}
+	if drops[0].Kind != "settlement" || drops[0].Country != "JP" {
+		t.Fatalf("drop = %+v, want a JP settlement", drops[0])
+	}
+	if drops[0].Rarity != core.Rare {
+		t.Fatalf("settlement rarity = %s, want rare", drops[0].Rarity)
+	}
+	if !strings.Contains(drops[0].Subtitle, "appstore") {
+		t.Fatalf("subtitle = %q, want the source that found the country", drops[0].Subtitle)
+	}
+
+	// A second event from the same country settles nothing new.
+	row2 := row
+	row2.ID = ""
+	row2.DedupeKey = "appstore:2026-08-17:jp:2"
+	if _, err := p.Ingest(ctx, row2); err != nil {
+		t.Fatalf("ingest second row: %v", err)
+	}
+	if drops := listDrops(t, st); len(drops) != 1 {
+		t.Fatalf("got %d drops, want the settlement to stay unique", len(drops))
+	}
+}
+
+func TestSettlementInheritsTheChestHint(t *testing.T) {
+	ctx := context.Background()
+	p, st, _ := newPipeline(t)
+
+	ev := salesDay("com.example.app", "2026-08-17", 5, 10, "USD")
+	ev.Country = "NZ"
+	if _, err := p.Ingest(ctx, ev); err != nil {
+		t.Fatalf("ingest: %v", err)
+	}
+
+	if drops := listDrops(t, st); len(drops) != 0 {
+		t.Fatalf("a chest-bound settlement leaked into the feed: %+v", drops)
+	}
+	chests, err := st.ListChest(ctx)
+	if err != nil {
+		t.Fatalf("list chest: %v", err)
+	}
+	if len(chests) != 1 || chests[0].Count != 2 {
+		t.Fatalf("chest = %+v, want the summary and its settlement", chests)
 	}
 }

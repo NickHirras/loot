@@ -49,6 +49,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/drops", s.handleDrops)
 	mux.HandleFunc("GET /api/stats", s.handleStats)
 	mux.HandleFunc("GET /api/sources", s.handleSources)
+	mux.HandleFunc("GET /api/vault/summary", s.handleVaultSummary)
+	mux.HandleFunc("GET /api/chest", s.handleChest)
+	mux.HandleFunc("POST /api/chest/open", s.handleChestOpen)
 	mux.HandleFunc("GET /ws", s.handleWS)
 	// Method-scoped so it does not collide with the catch-all SPA route below.
 	mux.HandleFunc("POST /hooks/{source}", s.handleWebhook)
@@ -75,7 +78,9 @@ func (s *Server) handleDrops(w http.ResponseWriter, r *http.Request) {
 	}
 	before := r.URL.Query().Get("before")
 
-	drops, err := s.Store.ListDrops(r.Context(), limit, before)
+	// Drops waiting in an unopened chest are deliberately absent: the feed is
+	// the "already happened" list, and a chest has not happened yet.
+	drops, err := s.Store.ListDrops(r.Context(), store.DropQuery{Limit: limit, Before: before})
 	if err != nil {
 		s.fail(w, "list drops", err)
 		return
@@ -95,15 +100,18 @@ func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"total_drops":     st.TotalDrops,
-		"total_events":    st.TotalEvents,
-		"total_xp":        st.TotalXP,
-		"by_rarity":       st.ByRarity,
-		"by_source":       st.BySource,
-		"countries":       st.Countries,
-		"countries_count": st.CountriesCount,
-		"dev":             s.Cfg.Dev.Enabled,
-		"listeners":       s.Bus.Subscribers(),
+		"total_drops":      st.TotalDrops,
+		"total_events":     st.TotalEvents,
+		"total_xp":         st.TotalXP,
+		"by_rarity":        st.ByRarity,
+		"by_source":        st.BySource,
+		"countries":        st.Countries,
+		"countries_count":  st.CountriesCount,
+		"unrevealed_count": st.UnrevealedCount,
+		"chest_dates":      st.ChestDates,
+		"display_currency": s.displayCurrency(),
+		"dev":              s.Cfg.Dev.Enabled,
+		"listeners":        s.Bus.Subscribers(),
 	})
 }
 
@@ -180,28 +188,69 @@ func (s *Server) handleWebhook(w http.ResponseWriter, r *http.Request) {
 
 // devFakeRequest is the body of POST /api/dev/fake.
 type devFakeRequest struct {
-	Rarity   string  `json:"rarity"`
+	// Rarity picks the synthetic drop's rarity; the default rules map
+	// source=dev + kind=<rarity> straight onto it.
+	Rarity string `json:"rarity"`
+	// Kind overrides the event kind. "sales_day" builds a realistic ledger
+	// summary event instead, so the chest and the vault can be exercised
+	// without an App Store account.
+	Kind     string  `json:"kind"`
 	App      string  `json:"app"`
 	Country  string  `json:"country"`
 	Amount   float64 `json:"amount"`
 	Currency string  `json:"currency"`
 	Quantity int     `json:"quantity"`
+	// Day overrides the business day (YYYY-MM-DD), which is also the chest the
+	// drop lands in.
+	Day string `json:"day"`
+	// Chest asks for the drop to be held for the daily chest.
+	Chest bool `json:"chest"`
+	// Silent stores the event without minting any drop at all.
+	Silent bool `json:"silent"`
 }
 
 // handleDevFake emits a synthetic event whose kind is the requested rarity.
 // The default rules map source=dev + kind=<rarity> straight onto that rarity,
-// so fake drops travel the real pipeline instead of bypassing it.
+// so fake drops travel the real pipeline instead of bypassing it. Pass
+// kind=sales_day for a ledger-shaped day summary, and chest=true to have the
+// drop held for a daily chest.
 func (s *Server) handleDevFake(w http.ResponseWriter, r *http.Request) {
 	var req devFakeRequest
 	if r.Body != nil {
 		// An empty body is fine; query params can carry everything instead.
 		_ = json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<16)).Decode(&req)
 	}
-	if v := r.URL.Query().Get("rarity"); v != "" {
+	q := r.URL.Query()
+	if v := q.Get("rarity"); v != "" {
 		req.Rarity = v
 	}
-	if v := r.URL.Query().Get("country"); v != "" {
+	if v := q.Get("kind"); v != "" {
+		req.Kind = v
+	}
+	if v := q.Get("country"); v != "" {
 		req.Country = v
+	}
+	if v := q.Get("currency"); v != "" {
+		req.Currency = v
+	}
+	if v := q.Get("day"); v != "" {
+		req.Day = v
+	}
+	if v := q.Get("amount"); v != "" {
+		if f, err := strconv.ParseFloat(v, 64); err == nil {
+			req.Amount = f
+		}
+	}
+	if v := q.Get("quantity"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			req.Quantity = n
+		}
+	}
+	if v := q.Get("chest"); v != "" {
+		req.Chest = truthy(v)
+	}
+	if v := q.Get("silent"); v != "" {
+		req.Silent = truthy(v)
 	}
 
 	rarity := core.Rarity(strings.ToLower(strings.TrimSpace(req.Rarity)))
@@ -217,6 +266,12 @@ func (s *Server) handleDevFake(w http.ResponseWriter, r *http.Request) {
 	if app == "" {
 		app = "com.example.loot"
 	}
+	if req.Day != "" {
+		if _, err := time.Parse(core.DayLayout, req.Day); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "day must be YYYY-MM-DD"})
+			return
+		}
+	}
 	now := time.Now().UTC()
 
 	ev := core.Event{
@@ -226,15 +281,45 @@ func (s *Server) handleDevFake(w http.ResponseWriter, r *http.Request) {
 		App:        app,
 		OccurredAt: now,
 		ObservedAt: now,
+		Day:        req.Day,
 		Country:    strings.ToUpper(strings.TrimSpace(req.Country)),
 		Amount:     req.Amount,
-		Currency:   req.Currency,
+		Currency:   strings.ToUpper(strings.TrimSpace(req.Currency)),
 		Quantity:   req.Quantity,
 		// Unique per request: firing the same button twice should produce two
 		// drops, unlike a real webhook retry.
 		DedupeKey: "dev:" + core.NewID(),
 		IsLedger:  false,
+		Silent:    req.Silent,
+		Chest:     req.Chest,
 		Payload:   json.RawMessage(`{"synthetic":true}`),
+	}
+
+	isSalesDay := strings.EqualFold(strings.TrimSpace(req.Kind), "sales_day")
+	if isSalesDay {
+		devSalesDay(&ev, req)
+	} else if k := strings.TrimSpace(req.Kind); k != "" {
+		ev.Kind = k
+	}
+
+	// Normalizing before ingest means the echoed event shows the business day
+	// and base amount that were actually stored.
+	s.Pipeline.Normalize(&ev)
+
+	if isSalesDay {
+		// Imitate a real ledger source properly: the silent detail row is what
+		// the vault sums, and the summary is what the chest shows.
+		row := ev
+		row.ID = core.NewID()
+		row.Kind = "sale"
+		row.IsLedger = true
+		row.Silent = true
+		row.Chest = false
+		row.DedupeKey = "dev:row:" + core.NewID()
+		if _, err := s.Pipeline.Ingest(r.Context(), row); err != nil {
+			s.fail(w, "dev fake row", err)
+			return
+		}
 	}
 
 	drop, err := s.Pipeline.Ingest(r.Context(), ev)
@@ -242,7 +327,55 @@ func (s *Server) handleDevFake(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, "dev fake", err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "drop": drop})
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "drop": drop, "event": ev})
+}
+
+// devSalesDay reshapes a fake event into what a ledger source would emit for a
+// completed sales day: a non-silent, chest-bound summary with a real
+// core.SalesDaySummary payload.
+func devSalesDay(ev *core.Event, req devFakeRequest) {
+	ev.Kind = "sales_day"
+	ev.IsLedger = true
+	ev.Source = "dev"
+	if !req.Silent {
+		ev.Chest = true
+	}
+	if ev.Quantity == 0 {
+		ev.Quantity = 42
+	}
+	if ev.Amount == 0 {
+		ev.Amount = 128.5
+	}
+	if ev.Currency == "" {
+		ev.Currency = "USD"
+	}
+
+	summary := core.SalesDaySummary{
+		Units:      ev.Quantity,
+		Refunds:    ev.Quantity / 20,
+		Proceeds:   ev.Amount,
+		Currency:   ev.Currency,
+		Countries:  3,
+		TopCountry: ev.Country,
+		BySKU: map[string]core.SKUTotals{
+			"pro_monthly": {Units: ev.Quantity, Proceeds: ev.Amount},
+		},
+	}
+	if summary.TopCountry == "" {
+		summary.TopCountry = "US"
+	}
+	if payload, err := json.Marshal(summary); err == nil {
+		ev.Payload = payload
+	}
+}
+
+// truthy parses the loose booleans that query strings carry.
+func truthy(v string) bool {
+	switch strings.ToLower(strings.TrimSpace(v)) {
+	case "1", "true", "yes", "on", "y":
+		return true
+	}
+	return false
 }
 
 func (s *Server) fail(w http.ResponseWriter, what string, err error) {

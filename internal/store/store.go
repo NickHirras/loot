@@ -116,15 +116,21 @@ func (s *Store) InsertEvent(ctx context.Context, ev core.Event) (exists bool, er
 		payload = nil
 	}
 
+	day := ev.Day
+	if day == "" {
+		day = core.DayOf(ev.OccurredAt)
+	}
+
 	res, err := s.db.ExecContext(ctx, `
-        INSERT INTO events (id, source, kind, app, occurred_at, observed_at, country,
-                            amount, currency, quantity, dedupe_key, is_ledger, payload)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO events (id, source, kind, app, occurred_at, observed_at, day, country,
+                            amount, currency, amount_base, quantity, dedupe_key,
+                            is_ledger, silent, chest, payload)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(dedupe_key) DO NOTHING`,
 		ev.ID, ev.Source, ev.Kind, ev.App,
-		ev.OccurredAt.UTC().UnixMilli(), ev.ObservedAt.UTC().UnixMilli(),
-		strings.ToUpper(ev.Country), ev.Amount, ev.Currency, ev.Quantity,
-		ev.DedupeKey, ev.IsLedger, payload,
+		ev.OccurredAt.UTC().UnixMilli(), ev.ObservedAt.UTC().UnixMilli(), day,
+		strings.ToUpper(ev.Country), ev.Amount, ev.Currency, ev.AmountBase, ev.Quantity,
+		ev.DedupeKey, ev.IsLedger, ev.Silent, ev.Chest, payload,
 	)
 	if err != nil {
 		return false, fmt.Errorf("insert event: %w", err)
@@ -136,12 +142,18 @@ func (s *Store) InsertEvent(ctx context.Context, ev core.Event) (exists bool, er
 	return n == 0, nil
 }
 
-// InsertDrop persists a classified drop.
+// InsertDrop persists a classified drop. A drop with a ChestDate and no
+// RevealedAt is invisible to the feed until its chest is opened.
 func (s *Store) InsertDrop(ctx context.Context, d core.Drop) error {
+	var revealed any
+	if d.RevealedAt != nil {
+		revealed = d.RevealedAt.UTC().UnixMilli()
+	}
 	_, err := s.db.ExecContext(ctx, `
-        INSERT INTO drops (id, event_id, rarity, title, subtitle, xp, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		d.ID, d.EventID, string(d.Rarity), d.Title, d.Subtitle, d.XP, d.CreatedAt.UTC().UnixMilli())
+        INSERT INTO drops (id, event_id, rarity, title, subtitle, xp, created_at, chest_date, revealed_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		d.ID, d.EventID, string(d.Rarity), d.Title, d.Subtitle, d.XP,
+		d.CreatedAt.UTC().UnixMilli(), d.ChestDate, revealed)
 	if err != nil {
 		return fmt.Errorf("insert drop: %w", err)
 	}
@@ -212,31 +224,77 @@ type DropView struct {
 	App        string          `json:"app"`
 	Country    string          `json:"country"`
 	Amount     float64         `json:"amount"`
+	AmountBase float64         `json:"amount_base"`
 	Currency   string          `json:"currency"`
 	Quantity   int             `json:"quantity"`
+	Day        string          `json:"day"`
 	OccurredAt time.Time       `json:"occurred_at"`
 	Payload    json.RawMessage `json:"payload,omitempty"`
 }
 
+// Event reconstructs the originating event from the joined columns, which is
+// what the bus needs when replaying a revealed chest drop. Payload is not
+// selected by the feed queries, so it is absent here.
+func (v DropView) Event() core.Event {
+	return core.Event{
+		ID:         v.EventID,
+		Source:     v.Source,
+		Kind:       v.Kind,
+		App:        v.App,
+		OccurredAt: v.OccurredAt,
+		Day:        v.Day,
+		Country:    v.Country,
+		Amount:     v.Amount,
+		AmountBase: v.AmountBase,
+		Currency:   v.Currency,
+		Quantity:   v.Quantity,
+	}
+}
+
 const dropSelect = `
 SELECT d.id, d.event_id, d.rarity, d.title, d.subtitle, d.xp, d.created_at,
-       e.source, e.kind, e.app, e.country, e.amount, e.currency, e.quantity, e.occurred_at
+       d.chest_date, d.revealed_at,
+       e.source, e.kind, e.app, e.country, e.amount, e.amount_base, e.currency,
+       e.quantity, e.day, e.occurred_at
 FROM drops d
 JOIN events e ON e.id = d.event_id`
 
-// ListDrops returns the most recent drops, newest first. When before is a
-// non-empty drop id, only drops older than it are returned (ULIDs sort by
-// time, so id ordering is time ordering).
-func (s *Store) ListDrops(ctx context.Context, limit int, before string) ([]DropView, error) {
+// unrevealed matches drops that are waiting inside an unopened chest. An
+// immediate drop has no chest_date at all, so it is always visible.
+const unrevealed = `(d.chest_date <> '' AND d.revealed_at IS NULL)`
+
+// DropQuery parameterizes ListDrops.
+type DropQuery struct {
+	// Limit caps the page; 0 means 100, and anything over 500 is clamped.
+	Limit int
+	// Before returns only drops older than this drop id (ULIDs sort by time).
+	Before string
+	// IncludeUnrevealed lets drops still sitting in an unopened chest through.
+	// The feed leaves it false: an unopened chest must not spoil itself.
+	IncludeUnrevealed bool
+}
+
+// ListDrops returns the most recent drops, newest first. Drops held in an
+// unopened chest are excluded unless q.IncludeUnrevealed is set.
+func (s *Store) ListDrops(ctx context.Context, q DropQuery) ([]DropView, error) {
+	limit := q.Limit
 	if limit <= 0 || limit > 500 {
 		limit = 100
 	}
 
-	query := dropSelect
+	where := []string{}
 	args := []any{}
-	if before != "" {
-		query += ` WHERE d.id < ?`
-		args = append(args, before)
+	if q.Before != "" {
+		where = append(where, `d.id < ?`)
+		args = append(args, q.Before)
+	}
+	if !q.IncludeUnrevealed {
+		where = append(where, `NOT `+unrevealed)
+	}
+
+	query := dropSelect
+	if len(where) > 0 {
+		query += ` WHERE ` + strings.Join(where, ` AND `)
 	}
 	query += ` ORDER BY d.id DESC LIMIT ?`
 	args = append(args, limit)
@@ -247,20 +305,35 @@ func (s *Store) ListDrops(ctx context.Context, limit int, before string) ([]Drop
 	}
 	defer rows.Close()
 
-	out := make([]DropView, 0, limit)
+	out, err := scanDrops(rows, limit)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func scanDrops(rows *sql.Rows, capacity int) ([]DropView, error) {
+	out := make([]DropView, 0, capacity)
 	for rows.Next() {
 		var (
 			v          DropView
 			rarity     string
 			createdAt  int64
+			revealedAt sql.NullInt64
 			occurredAt int64
 		)
 		if err := rows.Scan(&v.ID, &v.EventID, &rarity, &v.Title, &v.Subtitle, &v.XP, &createdAt,
-			&v.Source, &v.Kind, &v.App, &v.Country, &v.Amount, &v.Currency, &v.Quantity, &occurredAt); err != nil {
+			&v.ChestDate, &revealedAt,
+			&v.Source, &v.Kind, &v.App, &v.Country, &v.Amount, &v.AmountBase, &v.Currency,
+			&v.Quantity, &v.Day, &occurredAt); err != nil {
 			return nil, fmt.Errorf("scan drop: %w", err)
 		}
 		v.Rarity = core.Rarity(rarity)
 		v.CreatedAt = time.UnixMilli(createdAt).UTC()
+		if revealedAt.Valid {
+			t := time.UnixMilli(revealedAt.Int64).UTC()
+			v.RevealedAt = &t
+		}
 		v.OccurredAt = time.UnixMilli(occurredAt).UTC()
 		out = append(out, v)
 	}
@@ -270,7 +343,165 @@ func (s *Store) ListDrops(ctx context.Context, limit int, before string) ([]Drop
 	return out, nil
 }
 
-// Stats is the aggregate shown in the dashboard header.
+// Chest is one day's worth of held drops.
+type Chest struct {
+	Date     string         `json:"date"`
+	Count    int            `json:"count"`
+	XP       int            `json:"xp"`
+	ByRarity map[string]int `json:"by_rarity"`
+	// Drops is populated by ListChest and left empty by ChestSummaries.
+	Drops []DropView `json:"drops,omitempty"`
+}
+
+// ChestSummaries returns one row per unopened chest, oldest day first. This is
+// the cheap query behind the UI badge and the `chest` bus message.
+func (s *Store) ChestSummaries(ctx context.Context) ([]core.ChestSummary, error) {
+	rows, err := s.db.QueryContext(ctx, `
+        SELECT chest_date, rarity, COUNT(*), COALESCE(SUM(xp), 0)
+        FROM drops d
+        WHERE `+unrevealed+`
+        GROUP BY chest_date, rarity
+        ORDER BY chest_date ASC`)
+	if err != nil {
+		return nil, fmt.Errorf("chest summaries: %w", err)
+	}
+	defer rows.Close()
+
+	var (
+		out   []core.ChestSummary
+		index = map[string]int{}
+	)
+	for rows.Next() {
+		var (
+			date, rarity string
+			n, xp        int
+		)
+		if err := rows.Scan(&date, &rarity, &n, &xp); err != nil {
+			return nil, fmt.Errorf("scan chest summary: %w", err)
+		}
+		i, ok := index[date]
+		if !ok {
+			out = append(out, core.ChestSummary{Date: date, ByRarity: map[string]int{}})
+			i = len(out) - 1
+			index[date] = i
+		}
+		out[i].Count += n
+		out[i].XP += xp
+		out[i].ByRarity[rarity] += n
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate chest summaries: %w", err)
+	}
+	return out, nil
+}
+
+// ListChest returns every unopened chest with its drops, oldest day first.
+// Drops within a chest come back in reveal order (see core.RevealRank).
+func (s *Store) ListChest(ctx context.Context) ([]Chest, error) {
+	rows, err := s.db.QueryContext(ctx, dropSelect+`
+        WHERE `+unrevealed+`
+        ORDER BY d.chest_date ASC, `+revealOrder+`, d.created_at ASC, d.id ASC`)
+	if err != nil {
+		return nil, fmt.Errorf("list chest: %w", err)
+	}
+	defer rows.Close()
+
+	drops, err := scanDrops(rows, 32)
+	if err != nil {
+		return nil, err
+	}
+
+	var (
+		out   []Chest
+		index = map[string]int{}
+	)
+	for _, d := range drops {
+		i, ok := index[d.ChestDate]
+		if !ok {
+			out = append(out, Chest{Date: d.ChestDate, ByRarity: map[string]int{}})
+			i = len(out) - 1
+			index[d.ChestDate] = i
+		}
+		c := &out[i]
+		c.Count++
+		c.XP += d.XP
+		c.ByRarity[string(d.Rarity)]++
+		c.Drops = append(c.Drops, d)
+	}
+	return out, nil
+}
+
+// revealOrder sorts a chest cascade so it builds towards the best news. It
+// mirrors core.RevealRank, which cannot be expressed in SQL directly.
+const revealOrder = `CASE d.rarity
+    WHEN 'cursed'    THEN 0
+    WHEN 'common'    THEN 1
+    WHEN 'uncommon'  THEN 2
+    WHEN 'rare'      THEN 3
+    WHEN 'epic'      THEN 4
+    WHEN 'legendary' THEN 5
+    ELSE 1 END`
+
+// OldestChestDate returns the day of the oldest unopened chest, or "".
+func (s *Store) OldestChestDate(ctx context.Context) (string, error) {
+	var date sql.NullString
+	err := s.db.QueryRowContext(ctx,
+		`SELECT MIN(chest_date) FROM drops d WHERE `+unrevealed).Scan(&date)
+	if err != nil {
+		return "", fmt.Errorf("oldest chest date: %w", err)
+	}
+	return date.String, nil
+}
+
+// RevealChest opens the chest for chestDate (or the oldest unopened chest when
+// chestDate is empty), stamps revealed_at on its drops and returns them in
+// cascade order: least exciting first, so the reveal climaxes. Opening an
+// already-open or unknown chest returns no drops and no error.
+func (s *Store) RevealChest(ctx context.Context, chestDate string, now time.Time) ([]DropView, error) {
+	if chestDate == "" {
+		oldest, err := s.OldestChestDate(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if oldest == "" {
+			return nil, nil
+		}
+		chestDate = oldest
+	}
+
+	// Select before update: once revealed_at is stamped the rows no longer
+	// match "unrevealed", and we still need to hand them back in order.
+	rows, err := s.db.QueryContext(ctx, dropSelect+`
+        WHERE `+unrevealed+` AND d.chest_date = ?
+        ORDER BY `+revealOrder+`, d.created_at ASC, d.id ASC`, chestDate)
+	if err != nil {
+		return nil, fmt.Errorf("reveal chest: %w", err)
+	}
+	drops, err := scanDrops(rows, 32)
+	rows.Close()
+	if err != nil {
+		return nil, err
+	}
+	if len(drops) == 0 {
+		return nil, nil
+	}
+
+	stamp := now.UTC()
+	if _, err := s.db.ExecContext(ctx, `
+        UPDATE drops SET revealed_at = ?
+        WHERE chest_date = ? AND revealed_at IS NULL`, stamp.UnixMilli(), chestDate); err != nil {
+		return nil, fmt.Errorf("mark chest revealed: %w", err)
+	}
+	for i := range drops {
+		t := stamp
+		drops[i].RevealedAt = &t
+	}
+	return drops, nil
+}
+
+// Stats is the aggregate shown in the dashboard header. Every drop count
+// excludes drops still held in an unopened chest — an unopened chest must not
+// leak its contents through the XP counter.
 type Stats struct {
 	TotalDrops     int            `json:"total_drops"`
 	TotalEvents    int            `json:"total_events"`
@@ -279,28 +510,39 @@ type Stats struct {
 	BySource       map[string]int `json:"by_source"`
 	Countries      []string       `json:"countries"`
 	CountriesCount int            `json:"countries_count"`
+	// UnrevealedCount is how many drops are waiting in chests, and ChestDates
+	// which days those chests are for (oldest first).
+	UnrevealedCount int      `json:"unrevealed_count"`
+	ChestDates      []string `json:"chest_dates"`
 }
 
 // Stats computes dashboard aggregates in a handful of grouped queries.
 func (s *Store) Stats(ctx context.Context) (Stats, error) {
 	st := Stats{
-		ByRarity:  map[string]int{},
-		BySource:  map[string]int{},
-		Countries: []string{},
+		ByRarity:   map[string]int{},
+		BySource:   map[string]int{},
+		Countries:  []string{},
+		ChestDates: []string{},
 	}
 	for _, r := range core.Rarities {
 		st.ByRarity[string(r)] = 0
 	}
 
 	if err := s.db.QueryRowContext(ctx,
-		`SELECT COUNT(*), COALESCE(SUM(xp), 0) FROM drops`).Scan(&st.TotalDrops, &st.TotalXP); err != nil {
+		`SELECT COUNT(*), COALESCE(SUM(xp), 0) FROM drops d WHERE NOT `+unrevealed).
+		Scan(&st.TotalDrops, &st.TotalXP); err != nil {
 		return st, fmt.Errorf("stats totals: %w", err)
 	}
 	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM events`).Scan(&st.TotalEvents); err != nil {
 		return st, fmt.Errorf("stats events: %w", err)
 	}
+	if err := s.db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM drops d WHERE `+unrevealed).Scan(&st.UnrevealedCount); err != nil {
+		return st, fmt.Errorf("stats unrevealed: %w", err)
+	}
 
-	rarityRows, err := s.db.QueryContext(ctx, `SELECT rarity, COUNT(*) FROM drops GROUP BY rarity`)
+	rarityRows, err := s.db.QueryContext(ctx,
+		`SELECT rarity, COUNT(*) FROM drops d WHERE NOT `+unrevealed+` GROUP BY rarity`)
 	if err != nil {
 		return st, fmt.Errorf("stats rarity: %w", err)
 	}
@@ -318,7 +560,8 @@ func (s *Store) Stats(ctx context.Context) (Stats, error) {
 	}
 
 	sourceRows, err := s.db.QueryContext(ctx, `
-        SELECT e.source, COUNT(*) FROM drops d JOIN events e ON e.id = d.event_id GROUP BY e.source`)
+        SELECT e.source, COUNT(*) FROM drops d JOIN events e ON e.id = d.event_id
+        WHERE NOT `+unrevealed+` GROUP BY e.source`)
 	if err != nil {
 		return st, fmt.Errorf("stats source: %w", err)
 	}
@@ -352,6 +595,14 @@ func (s *Store) Stats(ctx context.Context) (Stats, error) {
 		return st, fmt.Errorf("iterate countries: %w", err)
 	}
 	st.CountriesCount = len(st.Countries)
+
+	chests, err := s.ChestSummaries(ctx)
+	if err != nil {
+		return st, err
+	}
+	for _, c := range chests {
+		st.ChestDates = append(st.ChestDates, c.Date)
+	}
 
 	return st, nil
 }

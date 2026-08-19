@@ -94,6 +94,24 @@ func (s *Source) Name() string { return Name }
 // plenty and stays polite to a free public API.
 func (s *Source) PollInterval() time.Duration { return time.Hour }
 
+// Check implements core.Checker: it fetches one app's stats so a
+// misconfigured app id or a blocked network shows up in `loot check` rather
+// than in an hour's time.
+func (s *Source) Check(ctx context.Context) error {
+	if len(s.Apps) == 0 {
+		return fmt.Errorf("flathub: no apps configured")
+	}
+	app := s.Apps[0]
+	stats, err := s.fetch(ctx, app)
+	if err != nil {
+		return err
+	}
+	if len(stats.InstallsPerDay) == 0 {
+		return fmt.Errorf("flathub: %s returned no daily installs (is the app id right?)", app)
+	}
+	return nil
+}
+
 // Poll fetches stats for every configured app and emits install events for
 // completed days newer than the stored cursor.
 func (s *Source) Poll(ctx context.Context, raw []byte) ([]core.Event, []byte, error) {

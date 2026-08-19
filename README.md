@@ -12,6 +12,8 @@ Every install, subscription and cancellation becomes a *drop* — with a rarity,
 
 Shipping an indie app means watching numbers scattered across half a dozen dashboards that all look like accounting software. Loot collects those numbers into one place and treats them like what they actually feel like: loot. A new subscriber is an **uncommon** drop. Their first annual plan is **rare**. Your best install day ever on Flathub is **epic**. The first sale from a country you have never sold in before is a **new settlement**. A cancellation is **cursed**, and it sounds like it.
 
+Money that arrives a whole day at a time — App Store and Play sales reports — does not interrupt the feed. It goes into a **daily chest** that you open when you are ready, and the drops cascade out one by one, quietest first, so the day ends on its best news. Every amount is also converted into one display currency, so the **vault** can answer "how did this month go?" in a single number.
+
 Loot is a single Go binary with an embedded Svelte dashboard and a SQLite database. There is no cloud service, no account, and no telemetry — you run it on a VPS, a Raspberry Pi or your laptop, point your webhooks at it, and leave the feed open on a second monitor. Sources push or poll into one pipeline: every event is deduplicated, stored, classified into a rarity by a YAML rules engine, and streamed live to every connected browser over a websocket. `loot tail` does the same thing in your terminal, and rings the bell when something good lands.
 
 <div align="center">
@@ -76,7 +78,22 @@ The image is a distroless static binary (~14 MB). Mount a volume at `/data` to k
 19:55:28 COMMON    587 installs on Flathub · org.gnome.Calculator [+10 xp flathub]
 ```
 
-Rare and above ring the terminal bell. Use `--no-bell` if your coworkers object, `--no-color` for logs.
+Rare and above ring the terminal bell. Use `--no-bell` if your coworkers object, `--no-color` for logs. Drops that came out of a chest are marked 📦.
+
+### Check your configuration
+
+```bash
+./bin/loot check
+```
+
+```
+✓ flathub      2 app(s)
+✗ revenuecat   no secret set: anyone who can reach /hooks/revenuecat can inject drops
+
+1 of 2 sources ready
+```
+
+`loot check` builds every configured source, calls its `Check` (Flathub fetches one app's stats, RevenueCat reports whether the webhook is protected) and exits non-zero if anything is wrong — which makes it a usable container healthcheck or post-deploy smoke test.
 
 ## Configuring sources
 
@@ -151,6 +168,100 @@ Loot polls `https://flathub.org/api/v2/stats/{app_id}` once an hour and emits on
 
 The Flathub API also returns `installs_per_country`, but those figures are cumulative and carry no dates, so they cannot be turned into events without double counting. Country data currently comes from RevenueCat only.
 
+### App Store Connect and Google Play (Quest 2)
+
+Both sources read the stores' own financial reports, so their figures are settled money rather than estimates. Configure them like this — the fields are parsed and validated today, and the sources themselves land during Quest 2:
+
+```yaml
+sources:
+  appstore:
+    key_id: "2X9R4HXF34"
+    issuer_id: "11111111-2222-3333-4444-555555555555"
+    private_key_path: "/etc/loot/AuthKey_2X9R4HXF34.p8"
+    vendor_number: "80123456"
+    apps: []            # optional: only these Apple IDs
+    backfill_days: 30
+
+  googleplay:
+    service_account_json_path: "/etc/loot/play-reports.json"
+    bucket: "pubsite_prod_rev_01234567890"
+    packages: []        # optional: only these package names
+    backfill_months: 2
+```
+
+A section counts as *configured* only when every required field is set (`key_id`, `issuer_id`, `private_key_path` and `vendor_number` for the App Store; `service_account_json_path` and `bucket` for Play), and Loot checks that the credential files exist at startup rather than at the first poll.
+
+## The daily chest
+
+A ledger source does not report a sale when it happens; it reports yesterday, all at once, as hundreds of rows. Loot handles that with two kinds of event:
+
+- **silent row events** — stored, counted in the vault and in stats, but they produce no drop at all. This is where the money lives.
+- **one summary event per app per day** (`kind: sales_day`), whose drop is filed into that day's **chest** instead of being published.
+
+A chest is opened by clicking it, by `loot chest open`, or by itself once its day is `chest.auto_open_after_hours` old (36 by default, measured from midnight UTC of the chest's own day — so yesterday's chest springs open around noon). Opening it cascades the drops onto the websocket 600 ms apart, ordered cursed → common → … → legendary, so the reveal builds instead of dumping.
+
+```bash
+./bin/loot chest                      # what is waiting
+./bin/loot chest open                 # open the oldest chest
+./bin/loot chest open 2026-08-17      # open a specific day
+```
+
+```
+📦 2026-08-17  4 drops  +1265 xp  1 common, 1 rare, 1 legendary, 1 cursed
+📦 opened 2026-08-17 — 4 drops
+   CURSED    A cursed drop · synthetic test event [+5 xp dev]
+   COMMON    412 sales · 1,204.55 USD · com.example.app [+10 xp appstore]
+   RARE      New settlement: 🇧🇷 BR · first customer via appstore [+250 xp loot]
+   LEGENDARY Best day ever on appstore [+1000 xp appstore]
+   total +1265 xp
+```
+
+Everything an unopened chest holds is invisible until it is opened: `GET /api/drops` excludes it, `GET /api/stats` does not count its XP, and the vault does not count its drops. Set `chest.enabled: false` to publish everything the moment it is ingested.
+
+## Currency
+
+Every event keeps the amount and currency its source reported. Loot stores a converted copy alongside it (`amount_base`) in `display_currency`, and it is that copy the vault sums.
+
+```yaml
+display_currency: "USD"
+fx:
+  enabled: true
+```
+
+Rates are the ECB daily reference rates, fetched from [frankfurter.app](https://frankfurter.app) (no API key) every 12 hours and cached in the database. A snapshot of ~30 currencies is embedded in the binary, so conversion works offline, on the first run, and with `fx.enabled: false`. A currency with no known rate leaves `amount_base` at 0 and logs once — it is never silently guessed at.
+
+```bash
+./bin/loot fx rates       # which rates would be used, and how old they are
+./bin/loot fx recompute    # re-convert every stored amount (stop the server first)
+```
+
+## The vault
+
+`GET /api/vault/summary?range=7d|30d|90d|365d` is the money view. Its cardinal rule is that **only ledger rows count as revenue**:
+
+- RevenueCat amounts are pre-tax, pre-store-cut estimates. They are reported separately, as `realtime`, and never added to revenue.
+- `sales_day` summaries are a rollup of the rows beside them, so they are excluded too — otherwise every ledger day would count twice.
+- A refund is a ledger row whose kind is `refund` or whose quantity is negative, stored with a negative amount. Revenue nets out; `units` and `refunds` are reported as two positive counts, so a day with 10 sales and 2 refunds reads as "10 / 2", not "8".
+
+```jsonc
+{
+  "display_currency": "USD",
+  "range": { "from": "2026-07-21", "to": "2026-08-19", "days": 30 },
+  "totals":      { "revenue_base": 4192.4, "units": 731, "refunds": 9,
+                   "drops": 214, "events": 5120, "countries": 37 },
+  "prev_totals": { /* the same shape, for the preceding 30 days */ },
+  "series":    [ { "day": "2026-07-21", "revenue_base": 132.4, "units": 22,
+                   "by_source": { "appstore": 110.0, "googleplay": 22.4 } } ],
+  "by_source": [ { "source": "appstore", "revenue_base": 3100.0, "units": 540, "share": 0.7394 } ],
+  "by_app":    [ { "app": "com.example.app", "revenue_base": 4192.4, "units": 731, "share": 1 } ],
+  "by_country":[ { "country": "US", "revenue_base": 2100.0, "units": 380, "share": 0.5009 } ],
+  "subscriptions": { "active": 412, "as_of": "2026-08-18" },
+  "realtime":      { "revenuecat_purchases_today": 6, "revenuecat_amount_base_today": 178.94 }
+}
+```
+
+`series` is zero-filled, one point per day, so a chart never has holes. `by_country` lists the top 25 and folds the tail into a row called `other`. `subscriptions` sums the newest `subscription_snapshot` event of each (source, app), and is `null` when no source has ever reported one.
+
 ## Rarity rules
 
 Classification is a small ordered YAML rule list. The defaults are embedded in the binary ([`internal/rules/default.yaml`](internal/rules/default.yaml)); point `rules_path` at your own file to override them.
@@ -170,27 +281,28 @@ rules:
       xp: 150
 
   # Floor rules do not terminate matching; they only ever RAISE rarity.
-  - name: new-country
+  - name: weekend-bonus
     floor: true
     match:
-      country_first: true
+      min_amount: 500
     then:
-      rarity: rare
-      title: "New settlement: {{.Flag}} {{.Country}}"
-      xp: 250
+      rarity: epic
+      title: "A big one"
 
 fallback:
   rarity: common
   title: "{{.Source}} · {{.Kind}}"
 ```
 
-The first non-floor rule that matches wins. Then every matching floor rule may raise the rarity — which is how "a first-ever country is *at least* rare" works without repeating the condition in every rule. Because `cursed` outranks `legendary`, a cancellation from a brand-new country stays cursed rather than being relabelled as a celebration.
+The first non-floor rule that matches wins. Then every matching floor rule may raise the rarity — which is how "anything over $500 is *at least* epic" works without repeating the condition in every rule. Because `cursed` outranks `legendary`, a floor rule can never relabel a cancellation as a celebration.
+
+The first sale from a country Loot has never seen does not use a floor rule. The pipeline synthesizes a second event for it — `{source: loot, kind: settlement}`, carrying the country and `payload.via` — so the settlement gets its own **rare** drop and the event that revealed it keeps its own headline. Silent ledger rows found settlements too: the country is the news, not the row.
 
 **Match fields**: `source`/`sources`, `kind`/`kinds`, `app`, `min_amount`, `max_amount`, `min_quantity`, `is_ledger`, `has_country`, `country_first`, `record_high`, `payload_match` (dotted JSON paths into the raw source payload).
 
 `country_first` and `record_high` are answered by the database — the first is true when no earlier event carries that country, the second when the event's quantity beats every previous event for the same source, app and kind.
 
-**Template fields** for `title` and `subtitle`: `.Source .Kind .App .Country .Flag .Amount .AmountFmt .Currency .Quantity .QuantityFmt .Payload`, plus `.BaseTitle` in floor rules.
+**Template fields** for `title` and `subtitle`: `.Source .Kind .App .Day .Country .Flag .Amount .AmountFmt .AmountBase .AmountBaseFmt .Currency .Quantity .QuantityFmt .Payload`, plus `.BaseTitle` in floor rules. `.AmountBaseFmt` is the amount in your display currency.
 
 ## Development
 
@@ -236,6 +348,7 @@ The dashboard synthesizes all of its sounds with the Web Audio API — no audio 
 | `internal/core` | `Event`, `Drop`, `Rarity`, the `Source` interface, ULID generation |
 | `internal/store` | SQLite via `modernc.org/sqlite` (pure Go, no cgo); migrations, dedupe, queries |
 | `internal/rules` | YAML rarity engine with embedded defaults |
+| `internal/fx` | currency conversion: ECB rates, SQLite cache, embedded fallback snapshot |
 | `internal/sources/*` | one package per integration |
 | `internal/pipeline` | ingest path and the polling scheduler |
 | `internal/bus` | in-process pub/sub, non-blocking so a slow browser cannot stall ingest |
@@ -248,12 +361,27 @@ Adding a source means implementing `core.Source` (and optionally `core.WebhookHa
 
 | endpoint | purpose |
 |---|---|
-| `GET /api/drops?limit=100&before=<id>` | recent drops, newest first, with joined event fields |
-| `GET /api/stats` | XP total, drop counts by rarity and source, countries seen |
+| `GET /api/drops?limit=100&before=<id>` | recent drops, newest first, with joined event fields; excludes unopened chests |
+| `GET /api/stats` | XP total, drop counts by rarity and source, countries seen, chests waiting |
 | `GET /api/sources` | source list with last poll time and last error |
-| `GET /ws` | websocket stream of `{"type":"drop","drop":{…},"event":{…}}` |
+| `GET /api/vault/summary?range=30d` | revenue, units, series and breakdowns in the display currency |
+| `GET /api/chest` | the chests waiting to be opened, oldest first |
+| `POST /api/chest/open` | `{"date":"2026-08-17"}` (or `{}` for the oldest) — reveals and returns the cascade |
+| `GET /ws` | websocket stream, see below |
 | `POST /hooks/{source}` | source webhook receiver |
 | `POST /api/dev/fake` | synthetic drop, only when `dev.enabled` |
+
+The websocket carries four kinds of message:
+
+```jsonc
+{"type": "hello"}                                   // on connect
+{"type": "drop",  "drop": {…}, "event": {…}}        // a drop landed
+{"type": "drop",  "chest": true, "drop": {…}, …}    // a drop revealed by opening a chest
+{"type": "chest", "chests": [{"date": "2026-08-17", "count": 4, "xp": 1265,
+                              "by_rarity": {"rare": 1, …}}]}   // the waiting set changed
+```
+
+In dev mode, `POST /api/dev/fake` takes `{"rarity","kind","app","country","amount","currency","quantity","day","chest","silent"}`. `{"kind":"sales_day"}` imitates a ledger source properly: it stores a silent revenue row *and* a chest-bound summary drop with a real `SalesDaySummary` payload, so the vault and the chest can both be exercised without an App Store account.
 
 ### Security note
 
@@ -263,8 +391,8 @@ Loot has no authentication of its own. The RevenueCat webhook secret protects th
 
 Loot ships in quests.
 
-- **Quest 1 — First Blood** ✅ *(you are here)* — the scaffold: event pipeline, SQLite store, rarity rules engine, RevenueCat webhooks, Flathub polling, live feed with synthesized sounds, `loot tail`.
-- **Quest 2 — The Vault Opens** — App Store Connect and Google Play sources, plus a **Daily Chest**: one summary drop each morning with yesterday's takings, streaks, and a bonus for beating your rolling average.
+- **Quest 1 — First Blood** ✅ — the scaffold: event pipeline, SQLite store, rarity rules engine, RevenueCat webhooks, Flathub polling, live feed with synthesized sounds, `loot tail`.
+- **Quest 2 — The Vault Opens** 🔨 *(you are here)* — the core has landed: silent ledger events, the **daily chest** with its cascade, currency conversion and the vault API, settlement drops, `loot check` / `loot chest` / `loot fx`. Still in flight: the App Store Connect and Google Play sources themselves, and the Vault and Chest pages in the dashboard.
 - **Quest 3 — Know Thy Enemy** — Crashlytics and Sentry as *boss fights*: a crash spike spawns a named boss with a health bar that drains as you ship fixes and the crash-free rate recovers.
 - **Quest 4 — The Hearth** — a rotating globe where every country you have sold in grows a settlement, scaled by revenue and installs. New countries plant a flag with fanfare; lapsed ones dim.
 

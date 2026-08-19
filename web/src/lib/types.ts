@@ -27,15 +27,31 @@ export interface Drop {
   subtitle: string
   xp: number
   created_at: string
+  /** The day whose chest held this drop, or absent for an immediate drop. */
+  chest_date?: string
+  /** When the chest holding this drop was opened; absent while it waits. */
+  revealed_at?: string | null
 
   source: string
   kind: string
   app: string
   country: string
   amount: number
+  /** `amount` converted into the dashboard's display currency at ingest. */
+  amount_base?: number
   currency: string
   quantity: number
+  /** Business day (YYYY-MM-DD) the event belongs to. */
+  day?: string
   occurred_at: string
+}
+
+/** One unopened daily chest, as returned by GET /api/chest. */
+export interface ChestSummary {
+  date: string
+  count: number
+  xp: number
+  by_rarity: Record<string, number>
 }
 
 export interface Stats {
@@ -46,6 +62,11 @@ export interface Stats {
   by_source: Record<string, number>
   countries: string[]
   countries_count: number
+  /** How many drops are waiting inside unopened chests. */
+  unrevealed_count: number
+  /** The days those chests are for, oldest first. */
+  chest_dates: string[]
+  display_currency: string
   dev: boolean
   listeners: number
 }
@@ -59,11 +80,25 @@ export interface SourceInfo {
   events: number
 }
 
-/** Websocket envelope from GET /ws. */
+/**
+ * Websocket envelope from GET /ws.
+ *
+ *   {"type":"hello"}                      on connect
+ *   {"type":"drop","drop":…,"event":…}    a drop landed
+ *   {"type":"drop","chest":true,…}        a drop revealed by opening a chest
+ *   {"type":"chest","chests":[…]}         the set of unopened chests changed
+ */
 export interface WSMessage {
-  type: 'hello' | 'drop'
-  drop?: Pick<Drop, 'id' | 'event_id' | 'rarity' | 'title' | 'subtitle' | 'xp' | 'created_at'>
+  type: 'hello' | 'drop' | 'chest'
+  drop?: Pick<
+    Drop,
+    'id' | 'event_id' | 'rarity' | 'title' | 'subtitle' | 'xp' | 'created_at' | 'chest_date' | 'revealed_at'
+  >
   event?: Record<string, unknown>
+  /** True when this drop arrived because a chest was opened. */
+  chest?: boolean
+  /** Present on `chest` messages: the chests still waiting. */
+  chests?: ChestSummary[]
 }
 
 /** Turns an ISO 3166-1 alpha-2 code into its flag emoji. */
