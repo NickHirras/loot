@@ -56,7 +56,7 @@ func (s *Source) PollInterval() time.Duration { return 0 }
 // protected.
 func (s *Source) Check(context.Context) error {
 	if s.Secret == "" {
-		return errors.New("no secret set: anyone who can reach /hooks/revenuecat can inject drops")
+		return core.Warning{Msg: "no secret set: anyone who can reach /hooks/revenuecat can inject drops"}
 	}
 	return nil
 }

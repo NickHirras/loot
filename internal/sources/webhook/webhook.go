@@ -80,7 +80,7 @@ func (s *Source) Poll(context.Context, []byte) ([]core.Event, []byte, error) {
 // worth reporting is whether the door is locked.
 func (s *Source) Check(context.Context) error {
 	if strings.TrimSpace(s.cfg.Secret) == "" {
-		return errors.New("no secret set: anyone who can reach /hooks/webhook can inject drops")
+		return core.Warning{Msg: "no secret set: anyone who can reach /hooks/webhook can inject drops"}
 	}
 	return nil
 }

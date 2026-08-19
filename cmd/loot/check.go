@@ -136,6 +136,10 @@ func runCheck(args []string) error {
 			err = checker.Check(ctx)
 		}
 
+		if core.IsWarning(err) {
+			fmt.Printf("⚠ %-12s %v\n", c.name, err)
+			continue
+		}
 		if err != nil {
 			failed++
 			fmt.Printf("✗ %-12s %v\n", c.name, err)

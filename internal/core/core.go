@@ -6,6 +6,7 @@ package core
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"time"
 )
@@ -212,4 +213,17 @@ type WebhookHandler interface {
 // means "this source would work right now".
 type Checker interface {
 	Check(ctx context.Context) error
+}
+
+// Warning is an advisory Check result: the source works, but something is
+// worth telling the operator (an unset webhook secret, say). `loot check`
+// prints it as ⚠ and does not count it as a failure.
+type Warning struct{ Msg string }
+
+func (w Warning) Error() string { return w.Msg }
+
+// IsWarning reports whether err is (or wraps) a Warning.
+func IsWarning(err error) bool {
+	var w Warning
+	return errors.As(err, &w)
 }
