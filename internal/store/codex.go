@@ -376,8 +376,10 @@ func (s *Store) CodexAggregates(ctx context.Context) (CodexAggregates, error) {
 		// same rule the feed and the XP counter use. Without it, an unlock
 		// drop sitting in today's chest would hand out "your first legendary
 		// drop" for a trophy nobody has seen.
+		// Webhook test pings and Loot's own bookkeeping drops don't count as
+		// "something to report" either.
 		{&agg.FirstDropDay, `SELECT MIN(e.day) FROM drops d JOIN events e ON e.id = d.event_id
-             WHERE NOT ` + unrevealed},
+             WHERE NOT ` + unrevealed + ` AND e.kind <> 'test' AND e.source <> 'loot'`},
 		{&agg.FirstSaleDay, `SELECT MIN(e.day) FROM events e
              WHERE ` + ledgerRows + ` AND e.kind IN ('sale', 'iap', 'subscription') AND e.quantity > 0`},
 		{&agg.FirstSubscriberDay, `SELECT MIN(day) FROM events
