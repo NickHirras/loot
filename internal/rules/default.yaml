@@ -118,7 +118,7 @@ rules:
     then:
       rarity: epic
       title: "Best day ever on {{.SourceName}}"
-      subtitle: "{{.QuantityFmt}} sales · {{.AmountFmt}}{{if .App}} · {{.App}}{{end}}"
+      subtitle: "{{if gt .Quantity 0}}{{.QuantityFmt}} sale{{if ne .Quantity 1}}s{{end}} · {{.AmountFmt}}{{else if .Payload.downloads}}{{.Payload.downloads}} download{{if ne (printf \"%v\" .Payload.downloads) \"1\"}}s{{end}}{{else}}a quiet day{{end}}{{if .App}} · {{.App}}{{end}}"
       xp: 300
 
   - name: sales-day-big
@@ -127,7 +127,7 @@ rules:
       min_amount: 100
     then:
       rarity: rare
-      title: "{{.QuantityFmt}} sales · {{.AmountFmt}}"
+      title: "{{if gt .Quantity 0}}{{.QuantityFmt}} sale{{if ne .Quantity 1}}s{{end}} · {{.AmountFmt}}{{else if .Payload.downloads}}{{.Payload.downloads}} download{{if ne (printf \"%v\" .Payload.downloads) \"1\"}}s{{end}}{{else}}a quiet day{{end}}"
       subtitle: "a big day{{if .App}} for {{.App}}{{end}} on {{.SourceName}}"
       xp: 120
 
@@ -136,7 +136,7 @@ rules:
       kind: sales_day
     then:
       rarity: common
-      title: "{{.QuantityFmt}} sales · {{.AmountFmt}}"
+      title: "{{if gt .Quantity 0}}{{.QuantityFmt}} sale{{if ne .Quantity 1}}s{{end}} · {{.AmountFmt}}{{else if .Payload.downloads}}{{.Payload.downloads}} download{{if ne (printf \"%v\" .Payload.downloads) \"1\"}}s{{end}}{{else}}a quiet day{{end}}"
       subtitle: "{{if .App}}{{.App}} · {{end}}{{.SourceName}}"
       xp: 10
 

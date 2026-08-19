@@ -2,8 +2,10 @@ package rules_test
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/nickhirras/loot/internal/core"
 	"github.com/nickhirras/loot/internal/rules"
@@ -795,6 +797,40 @@ func TestAchievementTiersMatchTheRules(t *testing.T) {
 		}
 		if drop.XP != tier.XP() {
 			t.Errorf("%s pays %d XP, but core says %d", tier, drop.XP, tier.XP())
+		}
+	}
+}
+
+// Seen on first real contact: a download-only App Store day read "0 sales ·"
+// and a one-sale day read "1 sales".
+func TestSalesDayTitlesReadWell(t *testing.T) {
+	cfg, err := rules.Parse(rules.DefaultYAML)
+	if err != nil {
+		t.Fatal(err)
+	}
+	e, err := rules.New(cfg, fakeLookup{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	mk := func(q int, amt float64, downloads int) core.Event {
+		p, _ := json.Marshal(map[string]any{"downloads": downloads, "units": q})
+		return core.Event{Source: "appstore", Kind: "sales_day", App: "Nistis", Quantity: q, Amount: amt, Currency: "USD", OccurredAt: time.Now(), Payload: p}
+	}
+	for _, tc := range []struct {
+		ev   core.Event
+		want string
+	}{
+		{mk(1, 14, 0), "1 sale · 14.00 USD"},
+		{mk(3, 42, 1), "3 sales · 42.00 USD"},
+		{mk(0, 0, 2), "2 downloads"},
+		{mk(0, 0, 1), "1 download"},
+	} {
+		d, err := e.Classify(context.Background(), tc.ev)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if d.Title != tc.want {
+			t.Errorf("title = %q, want %q", d.Title, tc.want)
 		}
 	}
 }
