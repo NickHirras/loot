@@ -58,6 +58,16 @@ func (f *fixture) server(t *testing.T) *httptest.Server {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
+		if r.Method == http.MethodPost {
+			// As strict as the real API (seen on first contact): a DAILY query
+			// whose timeline mentions hours at all is a 400.
+			body, _ := io.ReadAll(r.Body)
+			if strings.Contains(string(body), `"hours"`) {
+				w.WriteHeader(http.StatusBadRequest)
+				_, _ = io.WriteString(w, `{"error":{"code":400,"message":"Hours should be unset for DAILY aggregation period with 'start_time' and 'end_time'.","status":"INVALID_ARGUMENT"}}`)
+				return
+			}
+		}
 		switch {
 		case r.Method == http.MethodGet:
 			_, _ = io.WriteString(w, f.freshnessJSON())

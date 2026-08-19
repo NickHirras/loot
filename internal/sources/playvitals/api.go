@@ -99,6 +99,12 @@ func dayDateTime(day time.Time) DateTime {
 	}
 }
 
+// dayOnly strips a DateTime down to its calendar day in the reporting zone —
+// the only shape a DAILY query accepts.
+func dayOnly(d DateTime) DateTime {
+	return DateTime{Year: d.Year, Month: d.Month, Day: d.Day, TimeZone: &TimeZone{ID: ReportingTimeZone}}
+}
+
 // timelineSpec is the window and granularity of a query.
 type timelineSpec struct {
 	AggregationPeriod string   `json:"aggregationPeriod"`
@@ -217,7 +223,11 @@ func (s *Source) Query(ctx context.Context, pkg, metricSet string, dimensions, m
 		TimelineSpec: timelineSpec{
 			AggregationPeriod: "DAILY",
 			StartTime:         dayDateTime(from),
-			EndTime:           to,
+			// The freshness endpoint hands back a full DateTime (hours: 0,
+			// sometimes a utcOffset). Echoing it verbatim earns a 400 "Hours
+			// should be unset for DAILY aggregation period", so send the
+			// calendar day only, in the reporting zone.
+			EndTime: dayOnly(to),
 		},
 		Dimensions: dimensions,
 		Metrics:    metrics,
