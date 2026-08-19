@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/nickhirras/loot/internal/bus"
+	"github.com/nickhirras/loot/internal/codex"
 	"github.com/nickhirras/loot/internal/config"
 	"github.com/nickhirras/loot/internal/core"
 	"github.com/nickhirras/loot/internal/demo"
@@ -170,9 +171,19 @@ func runServe(args []string) error {
 	questSvc := quests.NewService(st, pipe, b, cfg.DisplayCurrency, log)
 	mysterySvc := mysteries.NewService(st, pipe, b, log)
 	detector := mysteries.NewDetector(st, b, cfg.DisplayCurrency, log)
-	// A drop that just pushed a quest over its target should pay out now, not
-	// in a minute. Trigger only nudges a goroutine, so ingest stays fast.
-	pipe.AfterIngest = func(core.Event) { questSvc.Trigger() }
+
+	// Quest 6: the Codex. Achievements unlock through the same pipeline as
+	// everything else, so a trophy lands in the feed with a sound — and, on a
+	// first run over an existing database, in today's chest instead.
+	codexSvc := codex.NewService(st, pipe, b, cfg.DisplayCurrency, log)
+
+	// A drop that just pushed a quest over its target — or an achievement over
+	// its threshold — should pay out now, not in a minute. Both Triggers only
+	// nudge a goroutine, so ingest stays fast.
+	pipe.AfterIngest = func(core.Event) {
+		questSvc.Trigger()
+		codexSvc.Trigger()
+	}
 
 	var sources []core.Source
 	if cfg.Demo.Enabled {
@@ -207,6 +218,15 @@ func runServe(args []string) error {
 			log.Warn("demo mystery detection failed", "error", err)
 		} else if len(found) > 0 {
 			log.Info("demo mysteries found", "count", len(found))
+		}
+		// And a Codex with trophies already on the wall, dated to the days the
+		// invented history actually earned them. Their drops go into today's
+		// chest, so the demo opens with something to unwrap rather than with
+		// fifteen achievement sounds firing at once.
+		if res, err := codexSvc.Evaluate(ctx); err != nil {
+			log.Warn("demo codex evaluation failed", "error", err)
+		} else if len(res.Unlocked) > 0 {
+			log.Info("demo achievements unlocked", "count", len(res.Unlocked), "backfilled", res.Backfilled)
 		}
 	}
 	if !cfg.Demo.Enabled && cfg.RevenueCatEnabled() {
@@ -302,10 +322,15 @@ func runServe(args []string) error {
 	go sched.Run(ctx)
 	go questSvc.Run(ctx)
 	go detector.RunLoop(ctx)
+	go codexSvc.Run(ctx)
 
 	srv := server.New(cfg, st, b, pipe, sources, web.DistFS(), log)
 	srv.Quests = questSvc
 	srv.Mysteries = mysterySvc
+	srv.Codex = codexSvc
+	// An unlock invalidates the wall's memo, so the refetch its websocket nudge
+	// provokes cannot be answered with a board from before the trophy.
+	codexSvc.OnChange = srv.InvalidateCodex
 	return srv.ListenAndServe(ctx)
 }
 

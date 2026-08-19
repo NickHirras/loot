@@ -710,3 +710,91 @@ func TestSettlementStillClassifiesAfterQuestRules(t *testing.T) {
 		t.Fatalf("settlement drop = %s / %q", drop.Rarity, drop.Title)
 	}
 }
+
+// TestAchievementRules covers Quest 6's four rules: a trophy's tier decides
+// the rarity of the drop its unlock pays, and a tier the file has never heard
+// of still gets a celebration rather than nothing.
+func TestAchievementRules(t *testing.T) {
+	ctx := context.Background()
+	e := defaultEngine(t, fakeLookup{})
+
+	cases := []struct {
+		name       string
+		payload    string
+		wantRarity core.Rarity
+		wantXP     int
+	}{
+		{
+			name:       "bronze is uncommon",
+			payload:    `{"key":"settler_1","title":"Settler I","tier":"bronze","description":"Customers in 5 countries."}`,
+			wantRarity: core.Uncommon,
+			wantXP:     50,
+		},
+		{
+			name:       "silver is rare",
+			payload:    `{"key":"settler_3","title":"Settler III","tier":"silver","description":"Customers in 25 countries."}`,
+			wantRarity: core.Rare,
+			wantXP:     150,
+		},
+		{
+			name:       "gold is epic",
+			payload:    `{"key":"settler_4","title":"Settler IV","tier":"gold","description":"Customers in 50 countries."}`,
+			wantRarity: core.Epic,
+			wantXP:     400,
+		},
+		{
+			name:       "legendary is legendary",
+			payload:    `{"key":"cartographer","title":"Cartographer","tier":"legendary","description":"A settlement on every inhabited continent."}`,
+			wantRarity: core.Legendary,
+			wantXP:     1000,
+		},
+		{
+			name:       "an unknown tier still celebrates",
+			payload:    `{"key":"future","title":"Mythic thing","tier":"mythic","description":"From a later version."}`,
+			wantRarity: core.Uncommon,
+			wantXP:     50,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			drop, err := e.Classify(ctx, lootEvent(core.KindAchievement, tc.payload))
+			if err != nil {
+				t.Fatalf("classify: %v", err)
+			}
+			if drop.Rarity != tc.wantRarity {
+				t.Errorf("rarity = %s, want %s", drop.Rarity, tc.wantRarity)
+			}
+			if drop.XP != tc.wantXP {
+				t.Errorf("xp = %d, want %d", drop.XP, tc.wantXP)
+			}
+			if !strings.HasPrefix(drop.Title, "Achievement: ") {
+				t.Errorf("title = %q, want an \"Achievement: …\" headline", drop.Title)
+			}
+			if drop.Subtitle == "" {
+				t.Errorf("subtitle is empty; the description is the whole story")
+			}
+		})
+	}
+}
+
+// The tiers in internal/core and the rules that pay them must not drift apart:
+// core decides what the UI promises, default.yaml decides what actually drops.
+func TestAchievementTiersMatchTheRules(t *testing.T) {
+	ctx := context.Background()
+	e := defaultEngine(t, fakeLookup{})
+
+	for _, tier := range core.AchievementTiers {
+		payload := `{"key":"k","title":"T","tier":"` + string(tier) + `","description":"d"}`
+		drop, err := e.Classify(ctx, lootEvent(core.KindAchievement, payload))
+		if err != nil {
+			t.Fatalf("classify %s: %v", tier, err)
+		}
+		if drop.Rarity != tier.Rarity() {
+			t.Errorf("%s drops %s, but core says %s", tier, drop.Rarity, tier.Rarity())
+		}
+		if drop.XP != tier.XP() {
+			t.Errorf("%s pays %d XP, but core says %d", tier, drop.XP, tier.XP())
+		}
+	}
+}

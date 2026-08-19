@@ -1,5 +1,6 @@
 <script lang="ts">
   import ChestOverlay from './lib/ChestOverlay.svelte'
+  import CodexPage from './lib/CodexPage.svelte'
   import DevPanel from './lib/DevPanel.svelte'
   import Feed from './lib/Feed.svelte'
   import Header from './lib/Header.svelte'
@@ -51,6 +52,8 @@
   <VaultPage />
 {:else if router.tab === 'quests'}
   <QuestsPage />
+{:else if router.tab === 'codex'}
+  <CodexPage />
 {:else}
   <Feed />
 {/if}

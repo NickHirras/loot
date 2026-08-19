@@ -537,6 +537,14 @@ The **Quests** tab gives you goals worth chasing and puzzles worth poking at —
 - **Quests** are generated from your own history each week and month ("Beat last week's revenue · $1,240", "Settle 2 new countries this month", "Earn 10,900 XP this week"), plus custom ones you create. Completing one mints a rare (weekly) or epic (monthly) drop. An unmet quest quietly ends as "ended · 62%" — never red, never a broken streak.
 - **Mysteries** are anomalies Loot noticed in your data and turned into open questions: "Google Play installs tripled on Fri Aug 14 — why?", refund spikes, a cluster of new countries, or a source that has gone quiet (usually broken credentials — Loot allows for each store's normal reporting lag, asks once, and dismisses the question itself when data resumes). Each card has a 28-day sparkline; write a one-line explanation and **Solve** it for a drop, or dismiss it. Solved mysteries become a notebook of your own explanations.
 
+## Codex & season recap
+
+The **Codex** tab is the permanent record — see [docs/codex.md](docs/codex.md).
+
+- **Trophy wall**: 49 achievements in bronze/silver/gold/legendary tiers (first sale, Settler I–IV, Cartographer — a settlement on every inhabited continent — lifetime revenue and install milestones, Steady 7/30 earning days, quests and mysteries, GitHub stars, era achievements…). Each unlock is a drop with a sound. On an existing database the first pass dates every trophy to the day you actually earned it and files the drops into today's chest instead of blasting them live.
+- **Records & totals**: best revenue/units/install day (overall and per source), longest run of earning days, biggest drop, lifetime totals.
+- **Season recap**: a poster-shaped summary of any month (or the year so far) — revenue with a neutral delta, best day, new countries, top app/country/source, drops by rarity, achievements unlocked, and highlights in plain words. **Copy summary** puts a text version on your clipboard.
+
 ## Rarity rules
 
 Classification is a small ordered YAML rule list. The defaults are embedded in the binary ([`internal/rules/default.yaml`](internal/rules/default.yaml)); point `rules_path` at your own file to override them.
@@ -703,7 +711,7 @@ Loot ships in quests.
 - **Quest 4 — The Hearth** ✅ — the globe: a settlement per country that grows with every customer, tiers from outpost to metropolis, eras from Camp to Dynasty, live arcs flying home to your capital, a real day/night terminator, and **ambient mode** for the spare monitor.
 - **Quest 3 — Know Thy Enemy** 🔨 *(next)* — Crashlytics and Sentry as *boss fights*: a crash spike spawns a named boss with a health bar that drains as you ship fixes and the crash-free rate recovers.
 - **Quest 5 — Quests & Mysteries** ✅ — auto-generated weekly/monthly goals from your own history plus custom quests, and anomaly detection surfaced as puzzles with a notebook of your explanations.
-- **Quest 6 — Codex & Season Recap** — a permanent record of everything that has ever dropped, and a shareable end-of-season summary of the year in loot.
+- **Quest 6 — Codex & Season Recap** ✅ — the trophy wall, records, and a poster-style monthly/yearly recap with copyable summary.
 - **Quest 7 — More Worlds** ✅ — Microsoft Store, Snapcraft and GitHub as sources, plus a generic webhook so anything that can POST JSON can drop loot.
 
 Along the way: **demo mode** (`loot serve --demo`) landed with Quest 4's polish — a seeded 120-day world plus a live emitter in a separate `demo.db`, so the project can be tried, screenshotted and recorded without an App Store account.

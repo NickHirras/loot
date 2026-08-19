@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/nickhirras/loot/internal/bus"
+	"github.com/nickhirras/loot/internal/codex"
 	"github.com/nickhirras/loot/internal/core"
 	"github.com/nickhirras/loot/internal/fx"
 	"github.com/nickhirras/loot/internal/pipeline"
@@ -395,4 +396,74 @@ func TestEmitterProducesEventsWithinItsWindow(t *testing.T) {
 		}
 	}
 	t.Fatal("the live emitter produced no event within its own pace window")
+}
+
+// TestSeededWorldFillsTheCodex is Quest 6's half of the demo promise: a demo
+// should open on a Codex with trophies already on the wall, dated to the days
+// the invented history actually earned them, and with their drops waiting in
+// today's chest rather than firing fifteen achievement sounds at once.
+func TestSeededWorldFillsTheCodex(t *testing.T) {
+	ctx := context.Background()
+	d, st := newDemo(t, t.TempDir(), 20260818, 120)
+
+	if _, err := d.Seed(ctx); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	svc := codex.NewService(st, d.live, bus.New(16), "USD", quietLogger())
+	res, err := svc.Evaluate(ctx)
+	if err != nil {
+		t.Fatalf("evaluate: %v", err)
+	}
+	if !res.Backfilled {
+		t.Fatalf("the first pass over a seeded world was not a backfill")
+	}
+	if len(res.Unlocked) < 15 {
+		t.Errorf("a 120 day demo unlocked only %d achievements, want at least 15", len(res.Unlocked))
+	}
+
+	board, err := svc.List(ctx)
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	today := core.DayOf(time.Now().UTC())
+	for _, a := range board.Achievements {
+		if !a.Unlocked() {
+			continue
+		}
+		if a.UnlockedAt.Format(core.DayLayout) > today {
+			t.Errorf("%s is dated in the future (%s)", a.Key, a.UnlockedAt)
+		}
+	}
+
+	// Every unlock drop is sealed in today's chest, so nothing was spilled
+	// onto the live feed.
+	var loose int
+	if err := st.DB().QueryRowContext(ctx, `
+        SELECT COUNT(*) FROM drops d JOIN events e ON e.id = d.event_id
+        WHERE e.kind = 'achievement' AND d.chest_date = ''`).Scan(&loose); err != nil {
+		t.Fatalf("count loose achievement drops: %v", err)
+	}
+	if loose > 0 {
+		t.Errorf("%d achievement drops went straight to the feed", loose)
+	}
+
+	// And the previous month's recap is worth screenshotting.
+	lastMonth := time.Now().UTC().AddDate(0, -1, 0).Format("2006-01")
+	recap, err := svc.Recap(ctx, lastMonth, "")
+	if err != nil {
+		t.Fatalf("recap %s: %v", lastMonth, err)
+	}
+	if recap.Empty {
+		t.Fatalf("the seeded month %s recapped as empty", lastMonth)
+	}
+	if recap.RevenueBase <= 0 || recap.Drops == 0 {
+		t.Errorf("recap %s = %.2f over %d drops", lastMonth, recap.RevenueBase, recap.Drops)
+	}
+	if len(recap.Highlights) < 3 {
+		t.Errorf("recap %s has only %d highlights: %v", lastMonth, len(recap.Highlights), recap.Highlights)
+	}
+	if len(recap.Series) < 28 {
+		t.Errorf("recap sparkline has %d points", len(recap.Series))
+	}
 }

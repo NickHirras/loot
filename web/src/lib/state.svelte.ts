@@ -1,4 +1,5 @@
 import { fetchChests, fetchDrops, fetchSources, fetchStats, openChest, websocketURL } from './api'
+import { codexState } from './codex.svelte'
 import { questsState } from './quests.svelte'
 import { prefersReducedMotion } from './route.svelte'
 import { sounds } from './sound'
@@ -302,11 +303,16 @@ class LootState {
         this.#setChests(msg.chests ?? [])
         return
       }
-      // The quest board and the casebook are nudges, not payloads: the page
-      // refetches, and the header's counts ride along on the next stats read.
+      // The quest board, the casebook and the codex are nudges, not payloads:
+      // the page refetches, and the header's counts ride along on the next
+      // stats read.
       if (msg.type === 'quests' || msg.type === 'mysteries') {
         questsState.markStale()
         void this.refreshMeta()
+        return
+      }
+      if (msg.type === 'codex') {
+        codexState.markStale()
         return
       }
       if (msg.type === 'drop' && msg.drop) {
@@ -369,6 +375,9 @@ class LootState {
     // A completion drop is the quest board's own news; refresh it so the card
     // lights up as the sound plays.
     if (drop.kind === 'quest_complete' || drop.kind === 'mystery_solved') questsState.markStale()
+    // An achievement drop *is* the unlock, arriving on the normal drop
+    // pathway with its own rarity and sound; the wall behind it is stale.
+    if (drop.kind === 'achievement') codexState.markStale()
 
     if (!this.muted && !quiet) sounds.play(drop.rarity)
 

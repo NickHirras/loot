@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/nickhirras/loot/internal/bus"
+	"github.com/nickhirras/loot/internal/codex"
 	"github.com/nickhirras/loot/internal/config"
 	"github.com/nickhirras/loot/internal/core"
 	"github.com/nickhirras/loot/internal/mysteries"
@@ -38,9 +39,14 @@ type Server struct {
 	// whether this server has Quest 5 in it.
 	Quests    *quests.Service
 	Mysteries *mysteries.Service
+	// Codex is optional in the same way: without it /api/codex answers an
+	// empty wall rather than 404.
+	Codex *codex.Service
 
 	// hearth memoizes the globe aggregate; see hearth.go.
 	hearth hearthCache
+	// codex memoizes the trophy wall; see codex.go.
+	codex codexCache
 }
 
 // New returns a server.
@@ -70,6 +76,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/mysteries", s.handleMysteries)
 	mux.HandleFunc("POST /api/mysteries/{id}/solve", s.handleMysterySolve)
 	mux.HandleFunc("POST /api/mysteries/{id}/dismiss", s.handleMysteryDismiss)
+	mux.HandleFunc("GET /api/codex", s.handleCodex)
+	mux.HandleFunc("GET /api/recap", s.handleRecap)
 	mux.HandleFunc("GET /ws", s.handleWS)
 	// Method-scoped so it does not collide with the catch-all SPA route below.
 	mux.HandleFunc("POST /hooks/{source}", s.handleWebhook)

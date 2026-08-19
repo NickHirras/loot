@@ -148,4 +148,36 @@ CREATE UNIQUE INDEX mysteries_dedupe_key_idx ON mysteries(dedupe_key);
 CREATE INDEX mysteries_status_idx           ON mysteries(status, day);
 `,
 	},
+	{
+		// Quest 6: the Codex. Achievements are the only thing Loot stores that
+		// can never be taken away, so the table has no "locked" transition at
+		// all — unlocked_at goes from NULL to a timestamp exactly once, and
+		// the guarded UPDATE that sets it is what makes the unlock drop
+		// unrepeatable.
+		//
+		// Records and the season recap are deliberately *not* here: both are
+		// computed on read from events and drops, so they can never drift out
+		// of step with the vault, and a restated report improves a record
+		// rather than leaving a stale one behind.
+		Name: "0004_codex",
+		SQL: `
+CREATE TABLE achievements (
+    id              TEXT PRIMARY KEY,
+    key             TEXT    NOT NULL,
+    tier            TEXT    NOT NULL,
+    title           TEXT    NOT NULL,
+    description     TEXT    NOT NULL DEFAULT '',
+    -- NULL while locked; the time the achievement was *earned*, which on a
+    -- backfill is a day in the past rather than the moment Loot noticed.
+    unlocked_at     INTEGER,
+    progress_value  REAL    NOT NULL DEFAULT 0,
+    progress_target REAL    NOT NULL DEFAULT 0,
+    meta            BLOB,
+    created_at      INTEGER NOT NULL
+);
+
+CREATE UNIQUE INDEX achievements_key_idx      ON achievements(key);
+CREATE INDEX        achievements_unlocked_idx ON achievements(unlocked_at);
+`,
+	},
 }

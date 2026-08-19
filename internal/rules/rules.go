@@ -452,20 +452,10 @@ func humanInt(n int) string {
 
 // FlagEmoji converts an ISO 3166-1 alpha-2 code into its regional-indicator
 // flag emoji. Anything that is not two ASCII letters returns "".
-func FlagEmoji(iso2 string) string {
-	c := strings.ToUpper(strings.TrimSpace(iso2))
-	if len(c) != 2 {
-		return ""
-	}
-	var r []rune
-	for _, ch := range c {
-		if ch < 'A' || ch > 'Z' {
-			return ""
-		}
-		r = append(r, rune(0x1F1E6+(ch-'A')))
-	}
-	return string(r)
-}
+//
+// The implementation lives in internal/core so the Codex's recap can print the
+// same flags in its highlights without importing the rules engine.
+func FlagEmoji(iso2 string) string { return core.FlagEmoji(iso2) }
 
 // lookupPath walks a dotted path through decoded JSON, e.g. "event.period_type".
 func lookupPath(m map[string]any, path string) (any, bool) {

@@ -1,6 +1,8 @@
 import type {
+  Achievement,
   Casebook,
   ChestSummary,
+  CodexBoard,
   Drop,
   Hearth,
   HearthCountry,
@@ -10,6 +12,9 @@ import type {
   NewQuest,
   Quest,
   QuestBoard,
+  Recap,
+  RecapPeriod,
+  RecapResponse,
   SourceInfo,
   Stats,
   VaultRange,
@@ -188,4 +193,31 @@ export async function dismissMystery(id: string): Promise<Mystery> {
   const res = await postJSON(`/api/mysteries/${encodeURIComponent(id)}/dismiss`, {})
   const data = (await res.json()) as { mystery: Mystery }
   return data.mystery
+}
+
+// ------------------------------------------------------------------ codex
+
+/**
+ * The trophy wall: every achievement with its progress, plus the records and
+ * lifetime totals, which the server computes on read.
+ */
+export async function fetchCodex(): Promise<CodexBoard> {
+  const data = await getJSON<Omit<CodexBoard, 'achievements'> & { achievements: Achievement[] | null }>('/api/codex')
+  return { ...data, achievements: data.achievements ?? [] }
+}
+
+/**
+ * One season recap. `period` is a month key ("2026-07") or a year ("2026");
+ * omitting it asks for the last complete month, which is the one worth
+ * sharing.
+ */
+export async function fetchRecap(period = ''): Promise<RecapResponse> {
+  const params = new URLSearchParams()
+  if (/^\d{4}$/.test(period)) params.set('season', period)
+  else if (period) params.set('month', period)
+  const query = params.toString()
+  const data = await getJSON<{ recap: Recap; periods: RecapPeriod[] | null }>(
+    query ? `/api/recap?${query}` : '/api/recap',
+  )
+  return { recap: data.recap, periods: data.periods ?? [] }
 }

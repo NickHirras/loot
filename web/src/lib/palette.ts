@@ -61,3 +61,25 @@ export const RARITY_COLORS: Record<string, string> = {
 export function rarityColor(rarity: string): string {
   return RARITY_COLORS[rarity] ?? RARITY_COLORS.common
 }
+
+/**
+ * Achievement tier colours.
+ *
+ * These are metals rather than rarities on purpose. A trophy's tier and the
+ * rarity of the drop it pays are two different facts — a gold trophy pays an
+ * epic drop — and painting the tier in the rarity's colour made the wall read
+ * as "you have four epics" instead of "you have four gold trophies". The
+ * legendary tier is the one that borrows: a violet that reads as mythic beside
+ * three metals, and the card gives it a gradient of its own.
+ */
+export const TIER_COLORS: Record<string, string> = {
+  bronze: '#cf8a4e',
+  silver: '#c2cddf',
+  gold: '#ffc23d',
+  legendary: '#e0a3ff',
+}
+
+/** A tier's colour, falling back to bronze for anything unknown. */
+export function tierColor(tier: string): string {
+  return TIER_COLORS[tier] ?? TIER_COLORS.bronze
+}

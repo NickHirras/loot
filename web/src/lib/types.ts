@@ -95,9 +95,10 @@ export interface SourceInfo {
  *   {"type":"chest","chests":[…]}         the set of unopened chests changed
  *   {"type":"quests"}                     the quest board changed — refetch
  *   {"type":"mysteries"}                  the casebook changed — refetch
+ *   {"type":"codex"}                      an achievement unlocked — refetch
  */
 export interface WSMessage {
-  type: 'hello' | 'drop' | 'chest' | 'quests' | 'mysteries'
+  type: 'hello' | 'drop' | 'chest' | 'quests' | 'mysteries' | 'codex'
   drop?: Pick<
     Drop,
     'id' | 'event_id' | 'rarity' | 'title' | 'subtitle' | 'xp' | 'created_at' | 'chest_date' | 'revealed_at'
@@ -542,4 +543,229 @@ export const MYSTERY_KIND_LABEL: Record<MysteryKind, string> = {
   record: 'record',
   new_country_cluster: 'new countries',
   silence: 'silence',
+}
+
+// --------------------------------------------------------------- codex types
+
+/**
+ * How grand a trophy is, mirroring internal/core. A tier decides the rarity of
+ * the drop an unlock pays, which is why the wall can say "rare" next to
+ * "silver" without a second table.
+ */
+export const TIERS = ['bronze', 'silver', 'gold', 'legendary'] as const
+
+export type Tier = (typeof TIERS)[number]
+
+/** The drop rarity each tier pays out at; mirrors internal/rules/default.yaml. */
+export const TIER_RARITY: Record<Tier, Rarity> = {
+  bronze: 'uncommon',
+  silver: 'rare',
+  gold: 'epic',
+  legendary: 'legendary',
+}
+
+/** What an unlock at each tier is worth. */
+export const TIER_XP: Record<Tier, number> = {
+  bronze: 50,
+  silver: 150,
+  gold: 400,
+  legendary: 1000,
+}
+
+/** Small facts about an unlock; `backfilled` means it was already earned when
+ * Loot first looked. */
+export interface AchievementMeta {
+  backfilled?: boolean
+  earned_day?: string
+}
+
+/** One trophy: locked with a progress bar, or unlocked with the day it was won. */
+export interface Achievement {
+  id: string
+  key: string
+  tier: Tier
+  title: string
+  description: string
+  /** Null while locked; when it was *earned*, which may predate Loot noticing. */
+  unlocked_at: string | null
+  progress_value: number
+  progress_target: number
+  /** The noun the progress line reads in: "countries", "chests". */
+  unit: string
+  /** True when the progress pair is money in the display currency. */
+  money: boolean
+  meta?: AchievementMeta
+  /** progress_value / progress_target, clamped to 0..1. */
+  pct: number
+}
+
+/** A "best ever" day. */
+export interface DayRecord {
+  day: string
+  value: number
+}
+
+export interface SourceDayRecord extends DayRecord {
+  source: string
+}
+
+/** The longest unbroken run of days that earned money, and when it ended. */
+export interface RunRecord {
+  days: number
+  ended_on: string
+}
+
+/** The biggest single drop Loot has ever minted. */
+export interface BiggestDrop {
+  id: string
+  title: string
+  subtitle: string
+  rarity: Rarity
+  xp: number
+  day: string
+  source: string
+}
+
+/** Every "best ever" the Codex knows. Computed on read, so records only rise. */
+export interface CodexRecords {
+  best_revenue_day: DayRecord
+  best_revenue_day_by_source: SourceDayRecord[]
+  best_units_day: DayRecord
+  best_install_day: DayRecord
+  most_drops_day: DayRecord
+  most_xp_day: DayRecord
+  most_countries_day: DayRecord
+  longest_revenue_run: RunRecord
+  biggest_drop: BiggestDrop | null
+  first_event_day: string
+  days_since_first_event: number
+}
+
+/** The lifetime column: everything that has ever happened, counted. */
+export interface CodexTotals {
+  revenue_base: number
+  units: number
+  refunds: number
+  installs: number
+  drops: number
+  xp: number
+  era: HearthEra
+  chests_opened: number
+  countries: number
+  continents: number
+  currencies: number
+  quests_completed: number
+  mysteries_solved: number
+  stars: number
+  record_days: number
+}
+
+/** The whole of GET /api/codex. */
+export interface CodexBoard {
+  display_currency: string
+  achievements: Achievement[]
+  unlocked: number
+  total: number
+  records: CodexRecords
+  totals: CodexTotals
+}
+
+// ---------------------------------------------------------------- recap types
+
+/** The window a recap covers: one month, or one calendar year. */
+export interface RecapPeriod {
+  kind: 'month' | 'season'
+  /** What the API accepts to ask for it again: "2026-07" or "2026". */
+  key: string
+  label: string
+  from: string
+  to: string
+  days: number
+  /** True while the window is still running. */
+  partial: boolean
+}
+
+/** A period-over-period change, stated neutrally — never as a verdict. */
+export interface RecapDelta {
+  previous: number
+  change: number
+  /** Fractional change (0.12 for +12%); 0 without a basis. */
+  pct: number
+  direction: Direction
+  /** False when the previous period was empty, so a percentage would be noise. */
+  has_basis: boolean
+}
+
+/** One "the biggest of these" answer. */
+export interface RecapTop {
+  key: string
+  revenue_base: number
+  units: number
+}
+
+/** A country founded inside the window. */
+export interface RecapCountry {
+  country: string
+  day: string
+}
+
+/** One day of the recap sparkline. */
+export interface RecapPoint {
+  day: string
+  value: number
+}
+
+/** The whole of GET /api/recap. */
+export interface Recap {
+  period: RecapPeriod
+  display_currency: string
+  /** True when nothing at all happened, so the card says so kindly. */
+  empty: boolean
+
+  revenue_base: number
+  revenue_delta: RecapDelta
+  units: number
+  units_delta: RecapDelta
+  refunds: number
+  installs: number
+
+  new_countries: RecapCountry[]
+  best_day: DayRecord
+  top_app: RecapTop
+  top_country: RecapTop
+  top_source: RecapTop
+
+  drops: number
+  drops_by_rarity: Record<string, number>
+  /** The rarest rarity that actually dropped; the poster's gradient. */
+  top_rarity: string
+  xp: number
+
+  level_start: number
+  level_end: number
+  era_start: string
+  era_end: string
+
+  chests_opened: number
+  quests_completed: number
+  mysteries_solved: number
+  achievements_unlocked: Achievement[]
+
+  /** Short, ordered, already-written lines: the caption of the poster. */
+  highlights: string[]
+  series: RecapPoint[]
+}
+
+/** What GET /api/recap answers with: the recap, and the picker's options. */
+export interface RecapResponse {
+  recap: Recap
+  periods: RecapPeriod[]
+}
+
+/** "Aug 2026"-style month label for the recap picker. */
+export function monthLabel(period: RecapPeriod): string {
+  if (period.kind === 'season') return period.key
+  const parsed = new Date(`${period.from}T00:00:00Z`)
+  if (Number.isNaN(parsed.getTime())) return period.label
+  return parsed.toLocaleDateString(undefined, { month: 'short', year: 'numeric', timeZone: 'UTC' })
 }

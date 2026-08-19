@@ -218,6 +218,56 @@ rules:
       subtitle: "{{.Payload.detail}}"
       xp: 200
 
+  # A Codex achievement. The tier travels in the payload, so one rule per tier
+  # is the whole mapping — bronze is uncommon, silver rare, gold epic, and a
+  # legendary trophy is a legendary drop. A trophy is permanent, so this is the
+  # one place in Loot where the *drop* is a souvenir of something that already
+  # happened rather than the news itself.
+  - name: achievement-legendary
+    match:
+      source: loot
+      kind: achievement
+      payload_match: {tier: legendary}
+    then:
+      rarity: legendary
+      title: "Achievement: {{.Payload.title}}"
+      subtitle: "{{.Payload.description}}"
+      xp: 1000
+
+  - name: achievement-gold
+    match:
+      source: loot
+      kind: achievement
+      payload_match: {tier: gold}
+    then:
+      rarity: epic
+      title: "Achievement: {{.Payload.title}}"
+      subtitle: "{{.Payload.description}}"
+      xp: 400
+
+  - name: achievement-silver
+    match:
+      source: loot
+      kind: achievement
+      payload_match: {tier: silver}
+    then:
+      rarity: rare
+      title: "Achievement: {{.Payload.title}}"
+      subtitle: "{{.Payload.description}}"
+      xp: 150
+
+  # Bronze, and the catch-all for a tier this file has not heard of: an
+  # achievement is always worth at least an uncommon drop.
+  - name: achievement
+    match:
+      source: loot
+      kind: achievement
+    then:
+      rarity: uncommon
+      title: "Achievement: {{.Payload.title}}"
+      subtitle: "{{.Payload.description}}"
+      xp: 50
+
   # Writing down what you think happened is the whole feature; the drop is the
   # thank-you note.
   - name: mystery-solved
