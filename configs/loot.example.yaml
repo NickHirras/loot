@@ -106,6 +106,43 @@ sources:
     # about six weeks of history without burying the feed.
     backfill_months: 2
 
+  microsoftstore:
+    # Microsoft Store analytics via Partner Center. Register an app in Entra
+    # (Azure AD), then associate it in Partner Center > Account settings > User
+    # management > Azure AD applications with the Manager role.
+    # See docs/sources/microsoftstore.md.
+    tenant_id: ""
+    client_id: ""
+    client_secret: ""
+    # Optional: restrict to these Store IDs (e.g. 9NBLGGH4R315); empty = all.
+    apps: []
+    backfill_days: 30
+
+  snapcraft:
+    # Snap Store metrics. Export a login with:
+    #   snapcraft export-login --snaps=<name> --acls=package_access,package_metrics ./snapcraft-login
+    # See docs/sources/snapcraft.md.
+    snaps: []
+    # - my-snap
+    login_path: ""                  # e.g. /etc/loot/snapcraft-login
+    backfill_days: 30
+
+  github:
+    # Stars, forks, issues, pull requests and releases — polled every 10 min,
+    # and in real time if you point a GitHub webhook at POST /hooks/github.
+    # See docs/sources/github.md.
+    repos: []
+    # - NickHirras/loot
+    token: ""                       # optional; raises the rate limit, needed for private repos
+    webhook_secret: ""              # verifies X-Hub-Signature-256 on /hooks/github
+    backfill_days: 30
+
+  webhook:
+    # Generic webhook at POST /hooks/webhook: anything that can POST JSON can
+    # drop loot. See docs/sources/webhook.md.
+    enabled: false
+    secret: ""
+
 dev:
   # Mounts POST /api/dev/fake and shows the dev panel in the dashboard, for
   # testing sounds and animations. Keep this off in production.

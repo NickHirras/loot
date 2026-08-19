@@ -1,0 +1,38 @@
+{
+  "Value": [
+    {
+      "applicationId": "9NBLGGH4R315",
+      "applicationName": "Tide Clock",
+      "inAppProductName": "Pro Pack",
+      "addonProductId": "9NBLGGH4R316",
+      "acquisitionType": "iap",
+      "market": "US",
+      "deviceType": "PC",
+      "osVersion": "Windows 11",
+      "date": "2026-08-14",
+      "acquisitionQuantity": 2,
+      "purchasePriceUSDAmount": 7.98,
+      "purchasePriceLocalAmount": 7.98,
+      "purchaseTaxUSDAmount": 0.0,
+      "purchaseTaxLocalAmount": 0.0
+    },
+    {
+      "applicationId": "9NBLGGH4R315",
+      "applicationName": "Tide Clock",
+      "inAppProductName": "Pro Pack",
+      "addonProductId": "9NBLGGH4R316",
+      "acquisitionType": "iap",
+      "market": "US",
+      "deviceType": "PC",
+      "osVersion": "Windows 10",
+      "date": "2026-08-14",
+      "acquisitionQuantity": 1,
+      "purchasePriceUSDAmount": 3.99,
+      "purchasePriceLocalAmount": 3.99,
+      "purchaseTaxUSDAmount": 0.0,
+      "purchaseTaxLocalAmount": 0.0
+    }
+  ],
+  "TotalCount": 2,
+  "DataFreshnessTimestamp": "2026-08-18T08:42:00"
+}

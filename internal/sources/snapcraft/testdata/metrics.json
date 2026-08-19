@@ -1,0 +1,27 @@
+{
+  "metrics": [
+    {
+      "status": "OK",
+      "snap_id": "SNAPID00000000000000000000000001",
+      "metric_name": "daily_device_change",
+      "buckets": ["2026-08-15", "2026-08-16", "2026-08-17"],
+      "series": [
+        {"name": "new", "values": [12, 20, null]},
+        {"name": "continued", "values": [300, 310, null]},
+        {"name": "lost", "values": [5, 3, null]}
+      ]
+    },
+    {
+      "status": "OK",
+      "snap_id": "SNAPID00000000000000000000000001",
+      "metric_name": "installed_base_by_country",
+      "buckets": ["2026-08-14", "2026-08-15", "2026-08-16", "2026-08-17"],
+      "series": [
+        {"name": "US", "values": [100, 110, 118, null]},
+        {"name": "DE", "values": [50, 47, 47, null]},
+        {"name": "FR", "values": [null, 5, 9, null]},
+        {"name": "??", "values": [3, 4, 5, null]}
+      ]
+    }
+  ]
+}

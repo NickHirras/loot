@@ -308,6 +308,19 @@ Because the current month's file is still being rewritten and late rows genuinel
 
 The first poll reads `backfill_months` months (the current one and last, by default) and turns every settled day in them into a chest. That is roughly six weeks of history waiting to be opened, and it gives the "best day ever" rules a baseline to beat. Afterwards each poll re-lists the bucket but only downloads a file whose `md5Hash` has changed, so a quiet day costs two listings and nothing else.
 
+### More sources: Microsoft Store, Snapcraft, GitHub, generic webhook
+
+Each has its own guide with setup steps, config (YAML + env), what it emits, and caveats:
+
+| Source | Guide | What it produces |
+|---|---|---|
+| Microsoft Store (Partner Center analytics, 6h) | [docs/sources/microsoftstore.md](docs/sources/microsoftstore.md) | ledger rows per app/market/day (gross prices, settled after 3 days), `sales_day` chests, subscription snapshots |
+| Snapcraft (Snap Store metrics, 6h) | [docs/sources/snapcraft.md](docs/sources/snapcraft.md) | new/active/lost devices per snap/day, derived per-country installs (settlements), `installs_day` chests |
+| GitHub (poll 10 min + `POST /hooks/github`) | [docs/sources/github.md](docs/sources/github.md) | stars, star milestones, forks, issues opened/closed ("a quest appears"), PRs, releases |
+| Generic webhook (`POST /hooks/webhook`) | [docs/sources/webhook.md](docs/sources/webhook.md) | anything: name your kind, rarity, title; batch posts; optional ledger amounts |
+
+`loot check` validates all of them.
+
 ## The daily chest
 
 A ledger source does not report a sale when it happens; it reports yesterday, all at once, as hundreds of rows. Loot handles that with two kinds of event:
@@ -583,7 +596,7 @@ Loot ships in quests.
 - **Quest 3 — Know Thy Enemy** 🔨 *(next)* — Crashlytics and Sentry as *boss fights*: a crash spike spawns a named boss with a health bar that drains as you ship fixes and the crash-free rate recovers.
 - **Quest 5 — Quests & Mysteries** — goals worth chasing: streaks, "sell in a country you have never sold in", "beat last month", each with its own reward.
 - **Quest 6 — Codex & Season Recap** — a permanent record of everything that has ever dropped, and a shareable end-of-season summary of the year in loot.
-- **Quest 7 — More Worlds** — Microsoft Store, Snapcraft and GitHub as sources, plus a generic webhook so anything that can POST JSON can drop loot.
+- **Quest 7 — More Worlds** ✅ — Microsoft Store, Snapcraft and GitHub as sources, plus a generic webhook so anything that can POST JSON can drop loot.
 
 Along the way: **demo mode** (`loot serve --demo`) landed with Quest 4's polish — a seeded 120-day world plus a live emitter in a separate `demo.db`, so the project can be tried, screenshotted and recorded without an App Store account.
 

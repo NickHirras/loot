@@ -1,0 +1,23 @@
+{
+  "Value": [
+    {
+      "date": "2026-08-15",
+      "applicationId": "9NBLGGH4R315",
+      "applicationName": "Tide Clock",
+      "subscriptionProductId": "9NBLGGH4R317",
+      "subscriptionProductName": "Tide Clock Pro Monthly",
+      "skuId": "0010",
+      "market": "US",
+      "deviceType": "PC",
+      "currencyCode": "USD",
+      "grossSalesBeforeTax": 1204.55,
+      "totalActiveCount": 412,
+      "totalChurnCount": 2,
+      "newCount": 5,
+      "renewCount": 40,
+      "goodStandingActiveCount": 400,
+      "pendingGraceActiveCount": 12
+    }
+  ],
+  "TotalCount": 1
+}
