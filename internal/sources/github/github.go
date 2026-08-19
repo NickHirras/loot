@@ -357,6 +357,17 @@ func (s *Source) pollStars(ctx context.Context, r repoRef, rs *repoState, now ti
 			var batch []stargazer
 			path := fmt.Sprintf("/repos/%s/%s/stargazers?per_page=%d&page=%d", r.Owner, r.Name, perPage, page)
 			if err := s.get(ctx, path, "application/vnd.github.star+json", &batch); err != nil {
+				// A fine-grained token can only read the stargazer list of
+				// the repositories it was issued for; on any other repo the
+				// endpoint answers 401/403 (seen in the wild: 403 "Resource
+				// not accessible by personal access token" for a public repo
+				// outside the token's selection). Same deal as no token at
+				// all: keep the totals, skip the per-star drops.
+				if isAuthStatus(err) {
+					s.log.Info("github: token cannot list stargazers; keeping star totals only", "repo", r.Owner+"/"+r.Name)
+					stars = nil
+					break
+				}
 				return nil, err
 			}
 			if len(batch) == 0 {
@@ -1041,3 +1052,10 @@ var (
 	_ core.WebhookHandler = (*Source)(nil)
 	_ core.Checker        = (*Source)(nil)
 )
+
+// isAuthStatus reports whether err carries a 401 or 403 from the API — the
+// two ways GitHub says a token may not read an endpoint.
+func isAuthStatus(err error) bool {
+	var ae *apiError
+	return errors.As(err, &ae) && (ae.Status == http.StatusUnauthorized || ae.Status == http.StatusForbidden)
+}

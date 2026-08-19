@@ -55,6 +55,10 @@ type fakeAPI struct {
 	// starsRequireAuth mirrors api.github.com since Aug 2026: the stargazers
 	// listing answers 401 unless an Authorization header is present.
 	starsRequireAuth bool
+	// starsForbidden answers the stargazers listing with 403 even when
+	// authenticated — a fine-grained token asking about a repo outside its
+	// selection.
+	starsForbidden bool
 
 	// Observed traffic.
 	starPages      []int
@@ -94,6 +98,11 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if f.starsRequireAuth && r.Header.Get("Authorization") == "" {
 			w.WriteHeader(http.StatusUnauthorized)
 			_, _ = io.WriteString(w, `{"message":"Requires authentication","status":"401"}`)
+			return
+		}
+		if f.starsForbidden {
+			w.WriteHeader(http.StatusForbidden)
+			_, _ = io.WriteString(w, `{"message":"Resource not accessible by personal access token","status":"403"}`)
 			return
 		}
 		page, _ := strconv.Atoi(r.URL.Query().Get("page"))
@@ -926,5 +935,33 @@ func TestTokenlessPollSkipsStargazersButKeepsTotals(t *testing.T) {
 	}
 	if !sawTotal {
 		t.Fatal("stars_total should still be emitted from repo metadata")
+	}
+}
+
+// A fine-grained token can only list stargazers on the repos it was issued
+// for; any other repo (public included) answers 403. Seen in the wild. The
+// poll must keep the totals and skip the per-star drops, not fail.
+func TestForbiddenStargazersKeepTotalsAndThePollAlive(t *testing.T) {
+	api := &fakeAPI{starsRequireAuth: true, starsForbidden: true}
+	for i := 0; i < 5; i++ {
+		api.stars = append(api.stars, star(t, fmt.Sprintf("u%d", i), "2026-08-10T00:00:00Z"))
+	}
+	s, _ := newTestSource(t, api, config.GitHub{BackfillDays: 30, Token: "tok"})
+
+	events, _, err := s.Poll(context.Background(), nil)
+	if err != nil {
+		t.Fatalf("a forbidden stargazers listing must not fail the poll: %v", err)
+	}
+	var sawStar, sawTotal bool
+	for _, ev := range events {
+		if ev.Kind == "star" {
+			sawStar = true
+		}
+		if ev.Kind == "stars_total" && ev.Quantity == 5 {
+			sawTotal = true
+		}
+	}
+	if sawStar || !sawTotal {
+		t.Fatalf("sawStar=%v sawTotal=%v; want totals only", sawStar, sawTotal)
 	}
 }
