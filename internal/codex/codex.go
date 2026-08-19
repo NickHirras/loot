@@ -3,12 +3,12 @@ package codex
 import (
 	"context"
 	"encoding/json"
-	"github.com/nickhirras/loot/internal/debounce"
 	"log/slog"
 	"sort"
 	"strconv"
 	"time"
 
+	"github.com/nickhirras/loot/internal/debounce"
 	"github.com/nickhirras/loot/internal/bus"
 	"github.com/nickhirras/loot/internal/core"
 	"github.com/nickhirras/loot/internal/store"

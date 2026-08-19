@@ -30,10 +30,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/nickhirras/loot/internal/debounce"
 	"log/slog"
 	"time"
 
+	"github.com/nickhirras/loot/internal/debounce"
 	"github.com/nickhirras/loot/internal/bus"
 	"github.com/nickhirras/loot/internal/core"
 	"github.com/nickhirras/loot/internal/store"
