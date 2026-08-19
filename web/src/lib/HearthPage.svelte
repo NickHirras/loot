@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from 'svelte'
   import Globe from './Globe.svelte'
   import { countryName } from './geo'
   import { hearth } from './hearth.svelte'
@@ -7,8 +8,10 @@
   import { loot } from './state.svelte'
   import { currency, flagEmoji, integer, timeAgo } from './types'
 
-  // The page owns the polling: mounting starts it, leaving stops it.
-  $effect(() => hearth.activate())
+  // The page owns the polling: mounting starts it, leaving stops it. The
+  // store already untracks its own setup; untracking here as well means a
+  // future edit to either side cannot turn this into a fetch loop.
+  $effect(() => untrack(() => hearth.activate()))
 
   const data = $derived(hearth.data)
   const code = $derived(data?.display_currency ?? 'USD')

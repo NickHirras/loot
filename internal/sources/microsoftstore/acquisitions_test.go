@@ -199,6 +199,65 @@ func TestBuildEventsIgnoresDaysOutsideTheWindow(t *testing.T) {
 	}
 }
 
+// Two free acquisitions that differ only in whether the API reported a local
+// currency code must land on one dedupe key with their units summed. Zeroing a
+// download's currency *after* the group key was computed made them two groups
+// with one key, and the pipeline dropped the second as a duplicate — silently
+// losing its units from the vault and from the day's summary.
+func TestBuildEventsFreeRowsWithMixedCurrencyDoNotCollide(t *testing.T) {
+	observed := time.Date(2026, 8, 18, 9, 0, 0, 0, time.UTC)
+
+	// Both rows come out of normalize(): a free acquisition priced at zero,
+	// one of which arrived with localCurrencyCode set.
+	withCode, ok := normalize(apiAcquisition{
+		Date: "2026-08-14", ApplicationID: "9NB", Market: "us",
+		AcquisitionType: "Free", AcquisitionQuantity: 3, LocalCurrencyCode: "eur",
+	}, false)
+	if !ok {
+		t.Fatal("row with a currency code was rejected")
+	}
+	withoutCode, ok := normalize(apiAcquisition{
+		Date: "2026-08-14", ApplicationID: "9NB", Market: "US",
+		AcquisitionType: "free", AcquisitionQuantity: 4,
+	}, false)
+	if !ok {
+		t.Fatal("row without a currency code was rejected")
+	}
+	if withCode.Currency == withoutCode.Currency {
+		t.Fatalf("the two rows do not differ in currency (%q); the test proves nothing",
+			withCode.Currency)
+	}
+
+	events, err := BuildEvents("9NB", "Tide Clock",
+		[]Acquisition{withCode, withoutCode}, "2026-08-14", "2026-08-14", observed)
+	if err != nil {
+		t.Fatalf("build: %v", err)
+	}
+
+	seen := map[string]int{}
+	rows := 0
+	for _, ev := range events {
+		seen[ev.DedupeKey]++
+		if ev.Kind == KindDownload {
+			rows++
+			if ev.Quantity != 7 {
+				t.Errorf("download units = %d, want 7 (3 + 4 folded into one group)", ev.Quantity)
+			}
+			if ev.Currency != "" || ev.Amount != 0 {
+				t.Errorf("a free download booked money: %+v", ev)
+			}
+		}
+	}
+	if rows != 1 {
+		t.Fatalf("emitted %d download events, want 1: %v", rows, events)
+	}
+	for key, n := range seen {
+		if n > 1 {
+			t.Errorf("dedupe key %q was emitted %d times; the pipeline would drop all but one", key, n)
+		}
+	}
+}
+
 func TestBuildEventsEmptyDayEmitsNothing(t *testing.T) {
 	events, err := BuildEvents("9NB", "Tide Clock", nil, "2026-08-13", "2026-08-15", time.Now())
 	if err != nil {

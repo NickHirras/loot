@@ -328,6 +328,140 @@ func TestDetectSilence(t *testing.T) {
 	}
 }
 
+// A store that settles its days three behind the calendar is not broken when
+// its newest row is three days old — that is what "settled" means. Measuring
+// every source against one flat two-day rule turned the Microsoft Store into a
+// false alarm every single morning.
+func TestSilenceAllowsForEachSourcesSettlementLag(t *testing.T) {
+	ctx := context.Background()
+	st := newStore(t)
+
+	// Both sources report daily and are equally "behind": their newest row is
+	// for three days ago. The Microsoft Store settles three days back by
+	// design; App Store Connect publishes yesterday's report each morning.
+	for i := 39; i >= 3; i-- {
+		ledgerRow(t, st, "microsoftstore", "Tide Clock", day(i), "sale", 20, 200, 1)
+		ledgerRow(t, st, "appstore", "Notes", day(i), "sale", 20, 200, 1)
+	}
+
+	found, err := newDetector(st, newSpy()).Run(ctx)
+	if err != nil {
+		t.Fatalf("run: %v", err)
+	}
+
+	var quietSources []string
+	for _, m := range found {
+		if m.Kind == core.MysterySilence {
+			quietSources = append(quietSources, m.Source)
+		}
+	}
+	for _, source := range quietSources {
+		if source == "microsoftstore" {
+			t.Errorf("a store that settles three days behind was reported quiet:\n%s", titles(found))
+		}
+	}
+	if len(quietSources) != 1 || quietSources[0] != "appstore" {
+		t.Errorf("quiet sources = %v, want just appstore:\n%s", quietSources, titles(found))
+	}
+}
+
+// A source that is quiet is one question, however long it stays quiet and
+// however its last reported day shifts underneath. A late backfilled row moves
+// the first silent day forward, which used to mint a second mystery beside the
+// first — and then a third, and a fourth.
+func TestSilenceAsksOnceWhileItStaysQuiet(t *testing.T) {
+	ctx := context.Background()
+	st := newStore(t)
+
+	for i := 39; i >= 6; i-- {
+		ledgerRow(t, st, "appstore", "Notes", day(i), "sale", 20, 200, 1)
+	}
+
+	d := newDetector(st, newSpy())
+	found, err := d.Run(ctx)
+	if err != nil {
+		t.Fatalf("first run: %v", err)
+	}
+	first := find(found, core.MysterySilence)
+	if first == nil {
+		t.Fatalf("no silence found in:\n%s", titles(found))
+	}
+	if first.Day != day(5) {
+		t.Errorf("silence day = %s, want %s", first.Day, day(5))
+	}
+
+	// A late row for one of the silent days lands. The source is still quiet,
+	// but the first silent day has moved.
+	ledgerRow(t, st, "appstore", "Notes", day(4), "sale", 20, 200, 9)
+	found, err = d.Run(ctx)
+	if err != nil {
+		t.Fatalf("second run: %v", err)
+	}
+	if m := find(found, core.MysterySilence); m != nil {
+		t.Errorf("a second silence question was opened for the same quiet source: %s", m.Title)
+	}
+
+	open, err := st.OpenMysteriesOfKind(ctx, core.MysterySilence)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(open) != 1 {
+		t.Fatalf("%d open silence mysteries, want exactly 1", len(open))
+	}
+}
+
+// When the source starts reporting again the question has answered itself, so
+// it comes off the board rather than sitting there forever.
+func TestSilenceIsDismissedWhenTheSourceResumes(t *testing.T) {
+	ctx := context.Background()
+	st := newStore(t)
+
+	for i := 39; i >= 6; i-- {
+		ledgerRow(t, st, "appstore", "Notes", day(i), "sale", 20, 200, 1)
+	}
+
+	b := newSpy()
+	d := newDetector(st, b)
+	found, err := d.Run(ctx)
+	if err != nil {
+		t.Fatalf("first run: %v", err)
+	}
+	quiet := find(found, core.MysterySilence)
+	if quiet == nil {
+		t.Fatalf("no silence found in:\n%s", titles(found))
+	}
+
+	// The credential is fixed and the missing days arrive.
+	for i := 5; i >= 0; i-- {
+		ledgerRow(t, st, "appstore", "Notes", day(i), "sale", 20, 200, 1)
+	}
+	if _, err := d.Run(ctx); err != nil {
+		t.Fatalf("second run: %v", err)
+	}
+
+	open, err := st.OpenMysteriesOfKind(ctx, core.MysterySilence)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(open) != 0 {
+		t.Fatalf("%d silence mysteries still open after the source resumed", len(open))
+	}
+
+	closed, err := st.GetMystery(ctx, quiet.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if closed.Status != core.MysteryDismissed {
+		t.Errorf("status = %q, want dismissed", closed.Status)
+	}
+	if closed.Note != "resumed" {
+		t.Errorf("note = %q, want \"resumed\"", closed.Note)
+	}
+	if b.seen["mysteries"] == 0 {
+		t.Error("closing a resumed silence told nobody")
+	}
+}
+
 func TestSolveAndDismiss(t *testing.T) {
 	ctx := context.Background()
 	st := newStore(t)

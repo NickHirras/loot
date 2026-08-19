@@ -88,12 +88,17 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleDrops(w http.ResponseWriter, r *http.Request) {
-	limit := 100
+	limit := 0
 	if v := r.URL.Query().Get("limit"); v != "" {
 		if n, err := strconv.Atoi(v); err == nil && n > 0 {
 			limit = n
 		}
 	}
+	// Clamp here, with the same rule the store uses, because next_before is
+	// decided by comparing the page against the limit: asking for 1000 got a
+	// page of 500, which never equalled 1000, so the cursor was never issued
+	// and the feed simply stopped at the first page.
+	limit = store.ClampDropLimit(limit)
 	before := r.URL.Query().Get("before")
 
 	// Drops waiting in an unopened chest are deliberately absent: the feed is

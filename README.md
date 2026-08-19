@@ -6,6 +6,12 @@
 
 Every install, subscription and cancellation becomes a *drop* — with a rarity, a colour and a sound.
 
+[![CI](https://github.com/NickHirras/loot/actions/workflows/ci.yml/badge.svg)](https://github.com/NickHirras/loot/actions/workflows/ci.yml) [![Release](https://img.shields.io/github/v/release/NickHirras/loot?label=release&color=a855f7)](https://github.com/NickHirras/loot/releases/latest) [![Image](https://img.shields.io/badge/ghcr.io-nickhirras%2Floot-3b82f6?logo=docker&logoColor=white)](https://github.com/NickHirras/loot/pkgs/container/loot) [![License](https://img.shields.io/github/license/NickHirras/loot?color=64748b)](LICENSE)
+
+<img src="docs/screenshots/hearth.png" alt="The Hearth: a turning globe with a lit settlement for every country you have sold in, beside an era ladder and a settlement list" width="100%">
+
+<sub>The Hearth, on demo data. Every screenshot here is `loot serve --demo` — see below.</sub>
+
 </div>
 
 ---
@@ -36,7 +42,7 @@ Loot is a single Go binary with an embedded Svelte dashboard and a SQLite databa
 Loot ships with a whole fictional business inside it. `--demo` fills a **separate** database with four months of plausible history for three invented apps — an App Store subscription business, a weather app that spikes at weekends, a Linux tide clock on Flathub — and then keeps emitting live events while you watch.
 
 ```bash
-docker run --rm -p 8080:8080 -e LOOT_DEMO=1 ghcr.io/nickhirras/loot
+docker run --rm -p 8080:8080 -e LOOT_DEMO=1 ghcr.io/nickhirras/loot:latest
 # or, from source:
 make build && ./bin/loot serve --demo
 ```
@@ -60,7 +66,66 @@ A few knobs:
 
 `demo.pace` also lives in the config file, along with `demo.seed` and `demo.days`; `LOOT_DEMO`, `LOOT_DEMO_PACE`, `LOOT_DEMO_SEED` and `LOOT_DEMO_DAYS` are the environment equivalents. The dashboard wears a small **demo** pill next to the live indicator the whole time, so nobody mistakes an invented number for one of yours.
 
+## What it looks like
+
+Six screens, all of them demo data at 1400×900. Because the demo world comes from a fixed seed, they are reproducible: [`docs/screenshots/capture.mjs`](docs/screenshots/capture.mjs) re-shoots every one of them against `loot serve --demo`.
+
+<table>
+<tr>
+<td width="50%">
+<img src="docs/screenshots/feed.png" alt="The live feed: drops stacked newest first, each with a rarity badge, an amount and a country">
+<b>Feed</b> — every drop as it lands, rarest colours loudest. The chest in the top right is yesterday, still shut, with 8 drops in it.
+</td>
+<td width="50%">
+<img src="docs/screenshots/chest.png" alt="The chest cascade: a rare drop revealed on top of the drops already opened">
+<b>The cascade</b> — a chest opens one drop at a time, 600 ms apart, quietest first, so the day ends on its best news.
+</td>
+</tr>
+<tr>
+<td width="50%">
+<img src="docs/screenshots/vault.png" alt="The vault: revenue, units and refunds over ninety days, with a stacked area chart and breakdowns">
+<b>Vault</b> — ninety days of settled revenue in one display currency, stacked by source, with units underneath and the change against the window before it.
+</td>
+<td width="50%">
+<img src="docs/screenshots/quests.png" alt="The quests tab: weekly and monthly goals with progress bars, and mysteries with sparklines">
+<b>Quests</b> — goals generated from your own history, and the anomalies Loot could not explain, waiting for you to write down why.
+</td>
+</tr>
+<tr>
+<td width="50%">
+<img src="docs/screenshots/ambient.png" alt="Ambient mode: a full-bleed globe on a starfield with an era label and a ticker of arrivals">
+<b>Ambient</b> — the Hearth with everything else taken away, for the spare monitor. <kbd>Esc</kbd> leaves.
+</td>
+<td width="50%">
+<img src="docs/screenshots/chest-haul.png" alt="The end of a chest: total XP, the best drop of the day, and the full haul listed underneath">
+<b>The haul</b> — what the chest was worth, the best thing in it, and then it settles into the feed tagged 📦.
+</td>
+</tr>
+</table>
+
 ## Quickstart
+
+### A release binary
+
+Every tag publishes one static binary per platform — macOS (Apple silicon and Intel), Linux (x86-64 and arm64) and Windows — each with the dashboard already embedded in it. Nothing else needs installing; there is no runtime and no cgo.
+
+```bash
+VERSION=v0.1.0                  # or whatever the latest release says
+PLATFORM=darwin_arm64           # darwin_amd64, linux_amd64, linux_arm64
+BASE=https://github.com/NickHirras/loot/releases/download/$VERSION
+
+curl -fsSL "$BASE/loot_${VERSION}_${PLATFORM}.tar.gz" | tar -xz
+sudo install "loot_${VERSION}_${PLATFORM}/loot" /usr/local/bin/loot
+
+loot serve --demo               # or just `loot serve`
+```
+
+Windows gets `loot_<version>_windows_amd64.zip`. Every release also carries a `checksums.txt`:
+
+```bash
+curl -fsSLO "$BASE/checksums.txt"
+shasum -a 256 -c checksums.txt --ignore-missing
+```
 
 ### From source
 
@@ -84,15 +149,24 @@ $EDITOR loot.yaml
 
 ### With Docker
 
+The published image is multi-arch (`linux/amd64` and `linux/arm64`, so a Raspberry Pi 4 and a VPS pull the same tag):
+
 ```bash
-docker build -t loot .
 docker run -d --name loot \
   -p 8080:8080 \
   -v "$PWD/data:/data" \
   -e LOOT_REVENUECAT_SECRET=choose-a-long-random-string \
   -e LOOT_FLATHUB_APPS=org.example.YourApp \
-  loot
+  ghcr.io/nickhirras/loot:latest
 ```
+
+| tag | what it is |
+|---|---|
+| `latest` | the newest release |
+| `1.2.3`, `1.2` | that exact release, and the newest patch of that minor |
+| `edge` | the tip of `main`, rebuilt on every push — newer than `latest`, and less careful |
+
+Building it yourself is `docker build -t loot .`, or `make docker`.
 
 The image is a distroless static binary (~14 MB). Mount a volume at `/data` to keep `loot.db` across restarts. Every config field has a `LOOT_*` environment override, so no config file is required.
 
@@ -189,7 +263,7 @@ sources:
     backfill_days: 7
 ```
 
-Loot polls `https://flathub.org/api/v2/stats/{app_id}` once an hour and emits one `install` event per app per **completed** day (today is still accumulating, so it is never emitted — its count would be frozen at a partial value). Events are keyed `flathub:<app>:<date>`, so re-polling is free.
+Loot polls `https://flathub.org/api/v2/stats/{app_id}` once an hour and, for each app and each **completed** day (today is still accumulating, so it is never emitted — its count would be frozen at a partial value), stores a silent `install` row (`flathub:<app>:<date>`) and mints one chest-bound `installs_day` drop (`flathub:installs_day:<app>:<date>`) — the same shape as Google Play and Snapcraft, so a day's installs land in that day's chest instead of the live feed. Re-polling is free.
 
 `backfill_days` limits what the *first* poll emits. The API returns roughly 180 days of history, and replaying all of it would bury you in drops; the default of 7 gives the feed some history and gives the "best day ever" rule a baseline to beat. Set it to `0` to emit nothing on the first run and only report days from here on. For a one-off bootstrap from a specific date:
 
@@ -197,7 +271,7 @@ Loot polls `https://flathub.org/api/v2/stats/{app_id}` once an hour and emits on
 ./bin/loot serve --since 2026-01-01
 ```
 
-The Flathub API also returns `installs_per_country`, but those figures are cumulative and carry no dates, so they cannot be turned into events without double counting. Country data currently comes from RevenueCat only.
+The Flathub API also returns `installs_per_country`, but those figures are cumulative and carry no dates, so they cannot be turned into events without double counting. Flathub installs therefore count toward the Hearth's "unknown lands", not toward any settlement.
 
 ### App Store Connect (polling, hourly)
 
@@ -461,7 +535,7 @@ Events with no country at all are counted apart, as **unknown lands**: Flathub r
 The **Quests** tab gives you goals worth chasing and puzzles worth poking at — see [docs/quests.md](docs/quests.md) for the full design and API.
 
 - **Quests** are generated from your own history each week and month ("Beat last week's revenue · $1,240", "Settle 2 new countries this month", "Earn 10,900 XP this week"), plus custom ones you create. Completing one mints a rare (weekly) or epic (monthly) drop. An unmet quest quietly ends as "ended · 62%" — never red, never a broken streak.
-- **Mysteries** are anomalies Loot noticed in your data and turned into open questions: "Google Play installs tripled on Fri Aug 14 — why?", refund spikes, a cluster of new countries, or a source that has gone quiet (usually broken credentials). Each card has a 28-day sparkline; write a one-line explanation and **Solve** it for a drop, or dismiss it. Solved mysteries become a notebook of your own explanations.
+- **Mysteries** are anomalies Loot noticed in your data and turned into open questions: "Google Play installs tripled on Fri Aug 14 — why?", refund spikes, a cluster of new countries, or a source that has gone quiet (usually broken credentials — Loot allows for each store's normal reporting lag, asks once, and dismisses the question itself when data resumes). Each card has a 28-day sparkline; write a one-line explanation and **Solve** it for a drop, or dismiss it. Solved mysteries become a notebook of your own explanations.
 
 ## Rarity rules
 
@@ -512,12 +586,39 @@ make dev      # Go server on :8080 + Vite dev server on :5173 (proxies /api, /ws
 make test     # go test ./...
 make check    # go vet + gofmt + svelte-check
 make build    # frontend, then binary with the SPA embedded
+make dist     # cross-compile every release archive into dist/
 make help     # everything else
 ```
 
 Prefer two terminals? `go run ./cmd/loot serve --config configs/loot.example.yaml --dev` in one, `cd web && npm run dev` in the other, then open <http://localhost:5173>.
 
 The dashboard synthesizes all of its sounds with the Web Audio API — no audio files ship with Loot. Browsers block audio until a user gesture, so the UI shows a "click to enable drop sounds" banner until you do. Press <kbd>m</kbd> to mute; the setting persists in `localStorage`.
+
+### CI and releases
+
+Two workflows, and nothing to run by hand:
+
+| workflow | when | what it does |
+|---|---|---|
+| [`ci.yml`](.github/workflows/ci.yml) | every push to `main`, every PR | `svelte-check`, `vite build`, `gofmt -l`, `go vet`, `go test`, then a `docker build` that pushes nowhere, purely so the Dockerfile cannot drift away from the tree |
+| [`release.yml`](.github/workflows/release.yml) | push to `main` | builds `linux/amd64` + `linux/arm64` and pushes `ghcr.io/nickhirras/loot:edge` |
+| | push of a `v*` tag | the same image as `latest`, `<semver>` and `<major.minor>`, plus the five release archives and their checksums, attached to a GitHub Release |
+
+Cutting a release is one command:
+
+```bash
+git tag v0.1.0 && git push origin v0.1.0
+```
+
+To see exactly what the tag will produce, build it locally first — same cross-compile, same archive layout, published nowhere:
+
+```bash
+make dist                 # dist/loot_<version>_<os>_<arch>.tar.gz|.zip + checksums.txt
+make dist VERSION=v0.1.0  # with the version string the tag would stamp in
+```
+
+> [!NOTE]
+> **One manual step, once.** A package GHCR creates from a workflow starts out private, and `GITHUB_TOKEN` cannot change that — there is no API for it. After the first successful push, go to the [package page](https://github.com/NickHirras/loot/pkgs/container/loot) → **Package settings** → **Danger Zone** → **Change visibility** → **Public**, and while you are there, **Manage Actions access** → add the `loot` repository with **Write** so later runs keep the permission. Until that is done, `docker pull ghcr.io/nickhirras/loot:edge` asks strangers for a login.
 
 ## Architecture
 

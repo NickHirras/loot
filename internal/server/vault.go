@@ -8,6 +8,7 @@ import (
 
 	"github.com/nickhirras/loot/internal/config"
 	"github.com/nickhirras/loot/internal/core"
+	"github.com/nickhirras/loot/internal/store"
 )
 
 // ranges maps the `range` query parameter of GET /api/vault/summary onto a
@@ -99,11 +100,11 @@ func (s *Server) handleChestOpen(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, "chest open", err)
 		return
 	}
-	if drops == nil {
-		writeJSON(w, http.StatusOK, map[string]any{"opened": "", "drops": []any{}, "count": 0})
-		return
-	}
 
+	// The response shape is the same whether or not there was anything to
+	// open. A client that opened an already-open chest still needs to know
+	// what is left waiting — that is exactly the case where its badge is out
+	// of date — and leaving `chests` out made it look like nothing was.
 	chests, err := s.Store.ChestSummaries(r.Context())
 	if err != nil {
 		s.fail(w, "chest open", err)
@@ -112,8 +113,15 @@ func (s *Server) handleChestOpen(w http.ResponseWriter, r *http.Request) {
 	if chests == nil {
 		chests = []core.ChestSummary{}
 	}
+
+	opened := ""
+	if len(drops) > 0 {
+		opened = drops[0].ChestDate
+	} else {
+		drops = []store.DropView{}
+	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"opened": drops[0].ChestDate,
+		"opened": opened,
 		"count":  len(drops),
 		"drops":  drops,
 		"chests": chests,

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from 'svelte'
   import Breakdown from './Breakdown.svelte'
   import RevenueChart from './RevenueChart.svelte'
   import StatTile from './StatTile.svelte'
@@ -7,8 +8,10 @@
   import { VAULT_RANGES, currency, delta, flagEmoji, integer } from './types'
   import { vault } from './vault.svelte'
 
-  // The page owns the polling: mounting starts it, leaving stops it.
-  $effect(() => vault.activate())
+  // The page owns the polling: mounting starts it, leaving stops it. The
+  // store already untracks its own setup; untracking here as well means a
+  // future edit to either side cannot turn this into a fetch loop.
+  $effect(() => untrack(() => vault.activate()))
 
   const summary = $derived(vault.summary)
   const code = $derived(summary?.display_currency ?? 'USD')

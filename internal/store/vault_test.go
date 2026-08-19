@@ -302,3 +302,49 @@ func TestChestQueries(t *testing.T) {
 		t.Fatalf("revealing with nothing left returned %d drops (%v)", len(empty), err)
 	}
 }
+
+// A subscription snapshot is a level, and a level goes stale. Without a
+// recency bound the newest snapshot of an app that stopped reporting last
+// spring kept contributing its final subscriber count to the headline forever.
+func TestVaultSubscriptionsIgnoreStaleSnapshots(t *testing.T) {
+	ctx := context.Background()
+	st := newStore(t)
+
+	today := "2026-08-18"
+	snapshot := func(source, app, day string, qty int) {
+		occurred, _ := time.Parse(core.DayLayout, day)
+		if _, err := st.InsertEvent(ctx, core.Event{
+			ID:         core.NewID(),
+			Source:     source,
+			Kind:       "subscription_snapshot",
+			App:        app,
+			Day:        day,
+			OccurredAt: occurred,
+			ObservedAt: occurred,
+			Quantity:   qty,
+			Silent:     true,
+			DedupeKey:  source + ":subs:" + app + ":" + day,
+		}); err != nil {
+			t.Fatalf("insert snapshot: %v", err)
+		}
+	}
+
+	// Live: reported yesterday. Stale: last reported five weeks ago.
+	snapshot("appstore", "Notes", "2026-08-17", 400)
+	snapshot("appstore", "Notes", "2026-08-10", 390)
+	snapshot("microsoftstore", "Tide Clock", "2026-07-10", 900)
+
+	summary, err := st.VaultSummary(ctx, "2026-07-01", today, "USD", today)
+	if err != nil {
+		t.Fatalf("vault summary: %v", err)
+	}
+	if summary.Subscriptions.Active == nil {
+		t.Fatal("no active subscriber count at all")
+	}
+	if got := *summary.Subscriptions.Active; got != 400 {
+		t.Errorf("active = %d, want 400: the five-week-old snapshot is not news", got)
+	}
+	if summary.Subscriptions.AsOf == nil || *summary.Subscriptions.AsOf != "2026-08-17" {
+		t.Errorf("as_of = %v, want 2026-08-17", summary.Subscriptions.AsOf)
+	}
+}

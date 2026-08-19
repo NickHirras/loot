@@ -49,14 +49,20 @@ const (
 	maxWindowDays = 90
 
 	// maxSubsUnavailable is how many consecutive empty or refused subscription
-	// responses it takes before Loot stops asking. Most accounts have no
-	// subscription add-ons at all.
+	// responses it takes before Loot stops asking *for that app*. Most
+	// accounts have no subscription add-ons at all.
 	maxSubsUnavailable = 3
 
 	// subsRecheckDays is how long a switched-off subscription query is left
 	// alone before one more attempt, so an app that starts selling
 	// subscriptions is picked up without a restart.
 	subsRecheckDays = 7
+
+	// maxSubsDays bounds how many settled days of subscription snapshots one
+	// poll will ask for per app. A snapshot is a level rather than a flow, so
+	// missing a day of it loses nothing that matters; catching up on a week
+	// after an outage costs seven small requests and is worth it.
+	maxSubsDays = 7
 )
 
 // API paths, relative to /v1.0/my/.
@@ -80,12 +86,21 @@ const (
 // LastSettledDay is the newest settled day already ingested, per Store ID.
 // Everything after it — and the last [resweepDays] days regardless — is read
 // on the next poll.
+//
+// The subscription bookkeeping is per Store ID, not per account: one app with
+// no subscription add-ons must not switch the query off for an app that has
+// them. The JSON names deliberately differ from the account-wide fields they
+// replace, so an old state blob's scalars are ignored rather than failing the
+// whole decode and re-running the backfill.
 type state struct {
-	LastSettledDay        map[string]string `json:"last_settled_day,omitempty"`
-	SubsDay               map[string]string `json:"subs_day,omitempty"`
-	SubsUnavailableStreak int               `json:"subs_unavailable_streak,omitempty"`
-	SubsDisabledSince     string            `json:"subs_disabled_since,omitempty"`
-	Seeded                bool              `json:"seeded"`
+	LastSettledDay map[string]string `json:"last_settled_day,omitempty"`
+	SubsDay        map[string]string `json:"subs_day,omitempty"`
+	// SubsUnavailable counts consecutive empty or refused subscription
+	// responses per Store ID; SubsDisabled records the day the count crossed
+	// maxSubsUnavailable, which is what subsRecheckDays is measured from.
+	SubsUnavailable map[string]int    `json:"subs_unavailable,omitempty"`
+	SubsDisabled    map[string]string `json:"subs_disabled_day,omitempty"`
+	Seeded          bool              `json:"seeded"`
 }
 
 // app is one app to poll: its Store ID and, when Loot discovered it rather
@@ -201,14 +216,11 @@ func (s *Source) Poll(ctx context.Context, raw []byte) ([]core.Event, []byte, er
 		}
 		st.LastSettledDay[a.ID] = maxDay(st.LastSettledDay[a.ID], settled)
 
-		if st.SubsDay[a.ID] == settled || !s.wantSubscriptions(st, settled) {
-			continue
-		}
-		subEvents, err := s.fetchSubscriptions(ctx, a, settled, observed, &st)
+		subEvents, err := s.collectSubscriptions(ctx, a, settled, observed, &st)
+		events = append(events, subEvents...)
 		if err != nil && pollError == nil {
 			pollError = err
 		}
-		events = append(events, subEvents...)
 	}
 
 	st.Seeded = true
@@ -254,12 +266,20 @@ func (s *Source) Check(ctx context.Context) error {
 // collect reads one app's window from both acquisition endpoints and turns it
 // into events. The window is split so no single request spans more than
 // [maxWindowDays].
+//
+// The app acquisitions call is the one that must succeed. Partner Center
+// answers "this app has no data" and "there is no such app" with the same 404,
+// which getJSON maps onto errNoData — and quietly treating that as an empty
+// day would advance the cursor straight past a window Loot never actually
+// read, so a mistyped Store ID or a lapsed association would look like a very
+// quiet month rather than like a problem. Only the add-on call may answer
+// errNoData, because an app with no add-ons legitimately always does.
 func (s *Source) collect(ctx context.Context, a app, from, to string, observed time.Time) ([]core.Event, error) {
 	var rows []Acquisition
 	for _, w := range windows(from, to, maxWindowDays) {
 		appRows, err := s.fetchAcquisitions(ctx, appAcquisitionsPath, a.ID, w.from, w.to, false)
-		if err != nil && !errors.Is(err, errNoData) {
-			return nil, err
+		if err != nil {
+			return nil, fmt.Errorf("app acquisitions %s..%s: %w", w.from, w.to, err)
 		}
 		rows = append(rows, appRows...)
 
@@ -315,11 +335,61 @@ func (s *Source) fetchAcquisitions(ctx context.Context, path, storeID, from, to 
 	return rows, nil
 }
 
+// collectSubscriptions reads the settled days this app has no snapshot for
+// yet, oldest first. It stops at the first real failure, and at the moment the
+// empty-answer streak switches the query off.
+func (s *Source) collectSubscriptions(ctx context.Context, a app, settled string, observed time.Time, st *state) ([]core.Event, error) {
+	if !s.wantSubscriptions(*st, a.ID, settled) {
+		return nil, nil
+	}
+	var events []core.Event
+	for _, day := range subsDays(st.SubsDay[a.ID], settled) {
+		// Only the newest settled day decides whether this app has
+		// subscriptions at all. A day in the middle of a catch-up window can
+		// be empty for a dozen reasons that say nothing about the app, and
+		// letting it feed the streak would switch the query off before the
+		// day worth having was ever asked for.
+		evs, err := s.fetchSubscriptions(ctx, a, day, observed, st, day == settled)
+		events = append(events, evs...)
+		if err != nil {
+			return events, err
+		}
+	}
+	return events, nil
+}
+
+// subsDays lists the settled days to ask an app for, oldest first.
+//
+// An app that has never produced a snapshot is asked for the newest settled
+// day alone: if that one has nothing, older ones have nothing either, and
+// asking is how the never-had-subscriptions streak gets its answer. An app
+// that has reported before and then went quiet — an outage, a restart, a
+// missed poll — catches up on the days it missed, capped at [maxSubsDays].
+// Counting back from settled rather than forward from last is what bounds the
+// walk even when a corrupt state blob carries an unparsable day.
+func subsDays(last, settled string) []string {
+	if settled == "" || last == settled {
+		return nil
+	}
+	if last == "" {
+		return []string{settled}
+	}
+	out := make([]string, 0, maxSubsDays)
+	for i := maxSubsDays - 1; i >= 0; i-- {
+		day := addDays(settled, -i)
+		if day <= last {
+			continue
+		}
+		out = append(out, day)
+	}
+	return out
+}
+
 // fetchSubscriptions asks for one settled day of subscription counts, tracking
-// the streak of empty answers that eventually switches the query off. An
-// account with no subscription add-ons never has any, and asking four times a
-// day forever is noise.
-func (s *Source) fetchSubscriptions(ctx context.Context, a app, date string, observed time.Time, st *state) ([]core.Event, error) {
+// the streak of empty answers that eventually switches the query off. An app
+// with no subscription add-ons never has any, and asking four times a day
+// forever is noise.
+func (s *Source) fetchSubscriptions(ctx context.Context, a app, date string, observed time.Time, st *state, track bool) ([]core.Event, error) {
 	q := url.Values{}
 	q.Set("applicationId", a.ID)
 	q.Set("startDate", date)
@@ -332,7 +402,9 @@ func (s *Source) fetchSubscriptions(ctx context.Context, a app, date string, obs
 	switch {
 	case err == nil:
 	case errors.Is(err, errNoData):
-		s.markSubsUnavailable(st, date)
+		if track {
+			s.markSubsUnavailable(st, a.ID, date)
+		}
 		return nil, nil
 	default:
 		// A credentials or network failure is worth surfacing, but it must not
@@ -345,34 +417,50 @@ func (s *Source) fetchSubscriptions(ctx context.Context, a app, date string, obs
 		return nil, err
 	}
 	if len(events) == 0 {
-		s.markSubsUnavailable(st, date)
+		if track {
+			s.markSubsUnavailable(st, a.ID, date)
+		}
 		return nil, nil
 	}
 
-	st.SubsUnavailableStreak = 0
-	st.SubsDisabledSince = ""
+	// A real answer re-arms the whole mechanism for this app, so a week of
+	// silence followed by a sale does not leave the query half switched off.
+	delete(st.SubsUnavailable, a.ID)
+	delete(st.SubsDisabled, a.ID)
 	st.SubsDay[a.ID] = date
 	return events, nil
 }
 
-func (s *Source) markSubsUnavailable(st *state, date string) {
-	st.SubsUnavailableStreak++
-	if st.SubsUnavailableStreak == maxSubsUnavailable {
-		st.SubsDisabledSince = date
-		s.logger().Info("microsoftstore: no subscription data; assuming this account has no subscription add-ons and checking again in a week",
-			"day", date, "tries", st.SubsUnavailableStreak)
+// markSubsUnavailable records one empty or refused answer for an app. The
+// threshold is crossed once and stamped once: testing for >= rather than ==,
+// and only stamping when the day is not already set, is what stops a streak
+// that overshoots the threshold from leaving SubsDisabled empty — which is the
+// state in which wantSubscriptions would keep asking forever.
+func (s *Source) markSubsUnavailable(st *state, storeID, date string) {
+	if st.SubsUnavailable == nil {
+		st.SubsUnavailable = map[string]int{}
+	}
+	if st.SubsDisabled == nil {
+		st.SubsDisabled = map[string]string{}
+	}
+	st.SubsUnavailable[storeID]++
+	if st.SubsUnavailable[storeID] >= maxSubsUnavailable && st.SubsDisabled[storeID] == "" {
+		st.SubsDisabled[storeID] = date
+		s.logger().Info("microsoftstore: no subscription data; assuming this app has no subscription add-ons and checking again in a week",
+			"store_id", storeID, "day", date, "tries", st.SubsUnavailable[storeID])
 	}
 }
 
-// wantSubscriptions reports whether to ask for subscription counts at all.
-func (s *Source) wantSubscriptions(st state, day string) bool {
-	if st.SubsUnavailableStreak < maxSubsUnavailable {
+// wantSubscriptions reports whether to ask this app for subscription counts.
+func (s *Source) wantSubscriptions(st state, storeID, day string) bool {
+	if st.SubsUnavailable[storeID] < maxSubsUnavailable {
 		return true
 	}
-	if st.SubsDisabledSince == "" {
+	since := st.SubsDisabled[storeID]
+	if since == "" {
 		return true
 	}
-	return day >= addDays(st.SubsDisabledSince, subsRecheckDays)
+	return day >= addDays(since, subsRecheckDays)
 }
 
 // appList is the set of apps to poll: the configured Store IDs, or every app
@@ -499,6 +587,12 @@ func decodeState(raw []byte) state {
 	}
 	if st.SubsDay == nil {
 		st.SubsDay = map[string]string{}
+	}
+	if st.SubsUnavailable == nil {
+		st.SubsUnavailable = map[string]int{}
+	}
+	if st.SubsDisabled == nil {
+		st.SubsDisabled = map[string]string{}
 	}
 	return st
 }

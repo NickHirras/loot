@@ -165,6 +165,14 @@ day is picked up on a later poll rather than being lost. A `NO_DATA` metric
 status (a snap with no installs yet) is treated the same way. Neither is an
 error and neither lights up `last_error`.
 
+The cursor advances only to the end of the **contiguous run** of published days,
+not to the newest day with data anywhere in the response. Given a published
+Monday, an unpublished Tuesday and a published Wednesday, the cursor stops at
+Monday — Wednesday's events are still emitted, and Tuesday is asked for again
+until it lands. (Days the store has no bucket for at all are a different thing:
+it truncates the range to what it has rather than padding it with nulls, so a
+missing bucket is not treated as a hole.)
+
 ### Per-country installs are derived, and they undercount
 
 This is the important one. `installed_base_by_country` is a **base**, not an

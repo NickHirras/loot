@@ -80,6 +80,15 @@ class LootState {
   chestError = $state('')
 
   #chestsLoaded = false
+  /**
+   * True once infinite scroll has fetched at least one older page. From then
+   * on the feed is no longer just "the newest N drops": trimming its tail
+   * would open a gap between the oldest card on screen and `nextBefore`, and
+   * the next page would load into the middle of a hole. Anyone who has not
+   * scrolled back — which is everyone watching the live feed — still gets the
+   * MAX_DROPS cap.
+   */
+  #paged = false
   #queue: Drop[] = []
   #shown = new Set<string>()
   #queued = new Set<string>()
@@ -192,8 +201,7 @@ class LootState {
         fetchSources(),
         fetchChests(),
       ])
-      this.drops = page.drops
-      this.nextBefore = page.next_before
+      this.#mergeHead(page.drops, page.next_before)
       this.stats = stats
       this.sources = sources
       this.#setChests(chests)
@@ -208,13 +216,49 @@ class LootState {
       const [stats, sources] = await Promise.all([fetchStats(), fetchSources()])
       this.stats = stats
       this.sources = sources
-      // The chest list rides the websocket; only re-read it when a cascade is
-      // not in flight, so a late poll cannot resurrect a chest being opened.
-      if (!this.chestBusy) this.#setChests(await fetchChests())
     } catch {
       // A failed background refresh is not worth surfacing; the websocket
       // status already tells the user whether the server is reachable.
+      return
     }
+    // The chest list rides the websocket; only re-read it when a cascade is
+    // not in flight, so a late poll cannot resurrect a chest being opened.
+    if (this.chestBusy) return
+    await this.#refreshChests()
+  }
+
+  /**
+   * Re-reads the chest list. The busy check is repeated after the fetch as
+   * well as before it: a chest can start opening while the request is in the
+   * air, and a reply from before the open would put the opened chest back.
+   */
+  async #refreshChests(): Promise<void> {
+    try {
+      const chests = await fetchChests()
+      if (!this.chestBusy) this.#setChests(chests)
+    } catch {
+      // The badge keeps its last known value, which beats zeroing it.
+    }
+  }
+
+  /**
+   * Folds a freshly fetched first page into the feed. A reconnect (or any
+   * other catch-up refresh) must not throw away pages the user scrolled back
+   * to load, so unseen drops are prepended and the existing tail — and the
+   * cursor that continues it — are left alone.
+   */
+  #mergeHead(head: Drop[], nextBefore: string): void {
+    if (this.drops.length === 0) {
+      this.drops = head
+      this.nextBefore = nextBefore
+      return
+    }
+    const known = new Set(this.drops.map((d) => d.id))
+    const unseen = head.filter((d) => !known.has(d.id))
+    if (unseen.length) this.drops = [...unseen, ...this.drops]
+    // `nextBefore` is left as it is on purpose: it already points past
+    // everything still loaded, which a fresh head page cannot improve on, and
+    // an empty one means the whole hoard is in hand.
   }
 
   /** Fetches the next page of older drops for infinite scroll. */
@@ -225,6 +269,7 @@ class LootState {
       const page = await fetchDrops(100, this.nextBefore)
       this.drops = [...this.drops, ...page.drops]
       this.nextBefore = page.next_before
+      this.#paged = true
     } catch (err) {
       this.error = err instanceof Error ? err.message : String(err)
     } finally {
@@ -315,7 +360,9 @@ class LootState {
     if (this.drops.some((d) => d.id === drop.id)) return
 
     const fresh: FeedDrop = { ...drop, fresh: true }
-    this.drops = [fresh, ...this.drops].slice(0, MAX_DROPS)
+    const next = [fresh, ...this.drops]
+    // Only trim a feed still sitting on its first page; see `#paged`.
+    this.drops = this.#paged ? next : next.slice(0, MAX_DROPS)
     this.#bumpStats(drop)
     // Money that landed changes what the vault would answer.
     if (drop.amount_base || drop.amount) vault.markStale()
@@ -403,12 +450,17 @@ class LootState {
       return
     }
 
-    this.#setChests(result.chests)
+    // A reply without a `chests` field says nothing about what is left, so the
+    // badge keeps its value and the truth is fetched instead of assumed.
+    if (result.chests) this.#setChests(result.chests)
     if (result.count === 0 || result.drops.length === 0) {
       this.chestError = 'That chest is already open.'
       this.chestPhase = 'idle'
+      if (!result.chests) void this.#refreshChests()
       return
     }
+    // A cascade is starting, so the refetch waits: `#finish` refreshes once
+    // the reveal is over, when a chest list can safely be believed again.
 
     this.chestDate = result.opened
     this.chestExpected = result.drops

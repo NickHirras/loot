@@ -511,17 +511,18 @@ func TestVaultSummaryEndpoint(t *testing.T) {
 	if totals["units"].(float64) != 12 {
 		t.Fatalf("units = %v, want 12", totals["units"])
 	}
-	// Only the settlement drop for a first-ever country is visible; the
-	// summary drop is still shut inside its chest.
-	if totals["drops"].(float64) != 1 {
-		t.Fatalf("drops = %v, want just the settlement while the chest is shut", totals["drops"])
+	// Nothing is visible yet: the summary drop is shut inside its chest, and
+	// so is the settlement, because the row that revealed the country was a
+	// silent ledger row — backfilled history, not live news.
+	if totals["drops"].(float64) != 0 {
+		t.Fatalf("drops = %v, want none while the chest is shut", totals["drops"])
 	}
 
 	h.post(t, "/api/chest/open", `{}`)
 	_, body = h.get(t, "/api/vault/summary?range=7d")
 	totals, _ = body["totals"].(map[string]any)
 	if totals["drops"].(float64) != 2 {
-		t.Fatalf("drops = %v after opening the chest, want 2", totals["drops"])
+		t.Fatalf("drops = %v after opening the chest, want the summary and its settlement", totals["drops"])
 	}
 
 	bySource, _ := body["by_source"].([]any)
@@ -624,9 +625,112 @@ func TestHearthEndpoint(t *testing.T) {
 		t.Fatalf("tier ladder = %v", body["tiers"])
 	}
 
-	// The settlement drops carry countries; the countryless fake does not.
-	recent, _ := body["recent"].([]any)
-	if len(recent) != 2 {
-		t.Fatalf("recent = %d drops, want the two settlements", len(recent))
+	// Both settlements were found in silent ledger rows, so they are waiting
+	// in today's chest rather than on the arrivals ticker.
+	if recent, _ := body["recent"].([]any); len(recent) != 0 {
+		t.Fatalf("recent = %d drops, want none while the chest is shut", len(recent))
+	}
+
+	// They are really there: today's chest holds the two settlements and the
+	// two sales days. (The Hearth aggregate is memoized for a few seconds, so
+	// this asks the chest rather than re-reading the globe.)
+	_, opened := h.post(t, "/api/chest/open", `{}`)
+	if n, _ := opened["count"].(float64); n != 4 {
+		t.Fatalf("chest held %v drops, want the two settlements and the two sales days", opened["count"])
+	}
+}
+
+// An unknown path under /api/ or /hooks/ is a missing endpoint, not a page of
+// the app. Falling through to the SPA handed a fetch() a chunk of HTML and the
+// caller reported it as a JSON parse error somewhere else entirely.
+func TestUnknownAPIPathsAnswer404JSON(t *testing.T) {
+	h := newHarness(t, false)
+
+	for _, path := range []string{"/api/nope", "/api/vault/nope", "/hooks/nope/deeper"} {
+		resp, body := h.get(t, path)
+		if resp.StatusCode != http.StatusNotFound {
+			t.Errorf("GET %s = %d, want 404", path, resp.StatusCode)
+		}
+		if ct := resp.Header.Get("Content-Type"); !strings.HasPrefix(ct, "application/json") {
+			t.Errorf("GET %s content-type = %q, want JSON", path, ct)
+		}
+		if body["error"] == nil {
+			t.Errorf("GET %s body = %v, want an error message", path, body)
+		}
+	}
+
+	// A real app route still gets the app (or, with no frontend embedded, the
+	// "not built" page) rather than a 404.
+	resp, _ := h.get(t, "/vault")
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("GET /vault = %d, want the SPA", resp.StatusCode)
+	}
+}
+
+// The page-size ceiling has to be applied where next_before is decided. Asking
+// for more than the maximum returned a full page that did not equal the
+// requested limit, so no cursor was issued and the feed stopped after one page.
+func TestDropsLimitIsClampedConsistently(t *testing.T) {
+	h := newHarness(t, true)
+
+	// Three drops, then ask for a page of two: there is another page.
+	for i := 0; i < 3; i++ {
+		h.post(t, "/api/dev/fake", `{"rarity":"common"}`)
+	}
+	_, body := h.get(t, "/api/drops?limit=2")
+	drops, _ := body["drops"].([]any)
+	if len(drops) != 2 {
+		t.Fatalf("limit=2 returned %d drops", len(drops))
+	}
+	if body["next_before"] == "" {
+		t.Error("a full page issued no next_before cursor")
+	}
+
+	// An absurd limit is clamped, and because the handler clamps to the same
+	// number the query does, a short page correctly reports no next page.
+	_, body = h.get(t, "/api/drops?limit=100000")
+	drops, _ = body["drops"].([]any)
+	if len(drops) != 3 {
+		t.Fatalf("limit=100000 returned %d drops, want all 3", len(drops))
+	}
+	if body["next_before"] != "" {
+		t.Errorf("next_before = %v on a page shorter than the clamped limit", body["next_before"])
+	}
+}
+
+// Opening a chest that is already open still has to say what is left waiting:
+// that is exactly the case where the caller's badge is out of date.
+func TestChestOpenAlwaysReportsWhatIsLeft(t *testing.T) {
+	h := newHarness(t, true)
+
+	h.post(t, "/api/dev/fake", `{"kind":"sales_day","day":"2026-08-16","amount":10,"currency":"USD","quantity":2}`)
+	h.post(t, "/api/dev/fake", `{"kind":"sales_day","day":"2026-08-17","amount":20,"currency":"USD","quantity":4}`)
+
+	_, opened := h.post(t, "/api/chest/open", `{"date":"2026-08-16"}`)
+	if opened["opened"] != "2026-08-16" {
+		t.Fatalf("opened = %v", opened["opened"])
+	}
+	if chests, _ := opened["chests"].([]any); len(chests) != 1 {
+		t.Fatalf("chests = %v, want the 17th still waiting", opened["chests"])
+	}
+
+	// Open it again: nothing comes out, but the response still describes the
+	// world — including the chest that is genuinely still shut.
+	_, again := h.post(t, "/api/chest/open", `{"date":"2026-08-16"}`)
+	if again["count"].(float64) != 0 {
+		t.Errorf("re-opening handed out %v drops", again["count"])
+	}
+	if again["opened"] != "" {
+		t.Errorf("opened = %v, want empty", again["opened"])
+	}
+	chests, ok := again["chests"].([]any)
+	if !ok {
+		t.Fatalf("the response left `chests` out entirely: %v", again)
+	}
+	if len(chests) != 1 {
+		t.Fatalf("chests = %v, want the 17th still waiting", chests)
+	}
+	if drops, ok := again["drops"].([]any); !ok || len(drops) != 0 {
+		t.Errorf("drops = %v, want an empty list", again["drops"])
 	}
 }

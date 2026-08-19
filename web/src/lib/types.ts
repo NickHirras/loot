@@ -121,11 +121,11 @@ export function flagEmoji(iso2: string): string {
 }
 
 /** Compact relative time, e.g. "just now", "4m", "3h", "2d". */
-export function timeAgo(iso: string): string {
+export function timeAgo(iso: string, now = Date.now()): string {
   const then = new Date(iso).getTime()
   if (Number.isNaN(then)) return ''
 
-  const seconds = Math.floor((Date.now() - then) / 1000)
+  const seconds = Math.floor((now - then) / 1000)
   if (seconds < 10) return 'just now'
   if (seconds < 60) return `${seconds}s`
   const minutes = Math.floor(seconds / 60)

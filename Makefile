@@ -4,6 +4,9 @@ VERSION     ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo 
 LDFLAGS     := -s -w -X main.version=$(VERSION)
 CONFIG      ?= configs/loot.example.yaml
 NPM         ?= npm
+DIST        := dist
+PLATFORMS   ?= darwin/arm64 darwin/amd64 linux/amd64 linux/arm64 windows/amd64
+SHA256      := $(shell command -v sha256sum >/dev/null 2>&1 && echo sha256sum || echo "shasum -a 256")
 
 .DEFAULT_GOAL := help
 
@@ -74,6 +77,36 @@ fmt: ## Format the Go code
 .PHONY: ci
 ci: check test build ## Everything CI should run
 
+## ---------------------------------------------------------------- release
+
+.PHONY: dist
+dist: web ## Cross-compile release archives for every platform into dist/
+	@rm -rf $(DIST) && mkdir -p $(DIST)
+	@set -e; for platform in $(PLATFORMS); do \
+	  os=$${platform%/*}; arch=$${platform#*/}; \
+	  name=loot_$(VERSION)_$${os}_$${arch}; \
+	  stage=$(DIST)/$$name; \
+	  ext=; if [ "$$os" = windows ]; then ext=.exe; fi; \
+	  printf '  %-16s' "$$os/$$arch"; \
+	  mkdir -p $$stage; \
+	  CGO_ENABLED=0 GOOS=$$os GOARCH=$$arch \
+	    go build -trimpath -ldflags "$(LDFLAGS)" -o $$stage/loot$$ext $(PKG); \
+	  cp LICENSE README.md configs/loot.example.yaml $$stage/; \
+	  if [ "$$os" = windows ]; then \
+	    (cd $(DIST) && zip -qr $$name.zip $$name); \
+	  else \
+	    tar -czf $$stage.tar.gz -C $(DIST) $$name; \
+	  fi; \
+	  rm -rf $$stage; \
+	  echo ok; \
+	done
+	@cd $(DIST) && $(SHA256) *.tar.gz *.zip > checksums.txt
+	@echo
+	@ls -1sh $(DIST)
+
+.PHONY: release-snapshot
+release-snapshot: dist ## Alias for `make dist` — a full release build, published nowhere
+
 ## ---------------------------------------------------------------- docker
 
 .PHONY: docker
@@ -88,5 +121,5 @@ docker-run: docker ## Run the Docker image with a local data volume
 
 .PHONY: clean
 clean: ## Remove build output (keeps your database)
-	rm -rf bin web/dist
+	rm -rf bin web/dist $(DIST)
 	@mkdir -p web/dist && touch web/dist/.gitkeep

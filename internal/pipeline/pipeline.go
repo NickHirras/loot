@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/nickhirras/loot/internal/bus"
@@ -81,6 +82,36 @@ type Pipeline struct {
 
 	// Now is the clock, swappable in tests.
 	Now func() time.Time
+
+	// noCurrency remembers which sources have already been warned about money
+	// with no currency on it, so the log says it once per source rather than
+	// once per row. It is a pointer so the struct stays copyable — demo mode
+	// copies a Pipeline to bind it to a transaction.
+	noCurrency *warnedSources
+}
+
+// warnedSources is a set of source names that have already produced a given
+// warning. It is safe for concurrent use: webhooks and polls ingest at once.
+type warnedSources struct {
+	mu   sync.Mutex
+	seen map[string]bool
+}
+
+// first reports whether this is the first time source has been seen.
+func (w *warnedSources) first(source string) bool {
+	if w == nil {
+		return true
+	}
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if w.seen[source] {
+		return false
+	}
+	if w.seen == nil {
+		w.seen = map[string]bool{}
+	}
+	w.seen[source] = true
+	return true
 }
 
 // New returns a pipeline with chests disabled and no currency conversion;
@@ -96,6 +127,7 @@ func New(st *store.Store, engine *rules.Engine, b *bus.Bus, log *slog.Logger) *P
 		Logger:          log,
 		DisplayCurrency: "USD",
 		Now:             func() time.Time { return time.Now().UTC() },
+		noCurrency:      &warnedSources{},
 	}
 }
 
@@ -179,21 +211,35 @@ func (p *Pipeline) Normalize(ev *core.Event) {
 		ev.Day = core.DayOf(ev.OccurredAt)
 	}
 	if ev.Amount != 0 && ev.AmountBase == 0 {
-		if base, ok := p.toBase(ev.Amount, ev.Currency); ok {
+		if ev.Currency == "" {
+			// Money with no currency on it is not money in the display
+			// currency, it is money of unknown denomination. Guessing meant a
+			// report that omitted the column silently added its figures to the
+			// vault at par — plausible, wrong, and invisible. AmountBase stays
+			// zero, so the amount is stored and shown on the drop but never
+			// summed into revenue, and the operator is told once.
+			if p.noCurrency.first(ev.Source) {
+				p.Logger.Warn("source reported an amount with no currency; it will not reach the vault",
+					"source", ev.Source, "kind", ev.Kind, "dedupe_key", ev.DedupeKey)
+			}
+		} else if base, ok := p.toBase(ev.Amount, ev.Currency); ok {
 			ev.AmountBase = base
 		}
 	}
 }
 
-// toBase converts into the display currency. An empty currency is taken to
-// mean the display currency: a source that reports money without saying which
-// money is reporting in the currency the dashboard already shows.
+// toBase converts into the display currency. Callers must have established
+// that currency is set; see Normalize on why an empty one is not assumed to be
+// the display currency.
 func (p *Pipeline) toBase(amount float64, currency string) (float64, bool) {
 	display := p.DisplayCurrency
 	if display == "" {
 		display = "USD"
 	}
-	if currency == "" || strings.EqualFold(currency, display) {
+	if currency == "" {
+		return 0, false
+	}
+	if strings.EqualFold(currency, display) {
 		return amount, true
 	}
 	if p.FX == nil {
@@ -276,7 +322,16 @@ func (p *Pipeline) settle(ctx context.Context, ev core.Event) error {
 		Day:        ev.Day,
 		// A settlement inherits the chest hint of the event that revealed it,
 		// so a ledger backfill does not spray flags across the live feed.
-		Chest:     ev.Chest,
+		//
+		// Silent counts as a chest hint too, and that is the important half:
+		// the country-bearing rows of a financial report are *silent* ledger
+		// detail with Chest false, so without this a 30 day App Store backfill
+		// would mint forty immediate rare drops the moment it landed. A
+		// settlement found in a silent row belongs in that row's own day's
+		// chest. Realtime events (a RevenueCat purchase) are neither silent
+		// nor chest-hinted, so they still settle live, which is the whole
+		// point of watching the feed.
+		Chest:     ev.Chest || ev.Silent,
 		DedupeKey: settlementSource + ":" + settlementKind + ":" + country,
 		Payload:   payload,
 	}

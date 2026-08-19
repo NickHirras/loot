@@ -2,10 +2,13 @@
   import DropCard from './DropCard.svelte'
   import { loot } from './state.svelte'
 
-  // Re-render relative timestamps once a minute without touching the data.
-  let tick = $state(0)
+  // Relative timestamps need a clock, not a rebuild. Keying the list on a tick
+  // re-created every card once a minute: arrival animations replayed and the
+  // scroll position jumped. Instead the current time is handed down as a prop,
+  // so a tick only re-runs the one `$derived` that formats "3m".
+  let now = $state(Date.now())
   $effect(() => {
-    const id = setInterval(() => (tick += 1), 60_000)
+    const id = setInterval(() => (now = Date.now()), 60_000)
     return () => clearInterval(id)
   })
 
@@ -39,15 +42,13 @@
       </p>
     </div>
   {:else}
-    {#key tick}
-      <ul class="list">
-        {#each loot.drops as drop, i (drop.id)}
-          <li>
-            <DropCard {drop} index={i} />
-          </li>
-        {/each}
-      </ul>
-    {/key}
+    <ul class="list">
+      {#each loot.drops as drop, i (drop.id)}
+        <li>
+          <DropCard {drop} index={i} {now} />
+        </li>
+      {/each}
+    </ul>
 
     <div class="sentinel" bind:this={sentinel}></div>
 

@@ -158,10 +158,20 @@ and reads nothing newer. On 18 August the newest day it will touch is the 15th.
 It also re-reads the last three settled days on every poll, in case a row
 arrived late: rows are aggregated onto their dedupe key *before* anything is
 emitted, so a re-read that finds nothing new produces byte-identical events and
-the pipeline's dedupe swallows all of them.
+the pipeline's dedupe swallows all of them. Free acquisitions have their money
+cleared before they are grouped, not after, so two free rows that differ only
+in whether the API reported a `localCurrencyCode` fold into one group with one
+key rather than into two groups that collide on the same key at emit time.
 
 The persisted state is one cursor per Store ID (`last_settled_day`), so adding
-an app later backfills only that app.
+an app later backfills only that app. That cursor moves **only when the app
+acquisitions call actually succeeded**. Partner Center answers "no data for
+this query" and "no such app" with the same 404, so a mistyped Store ID or a
+lapsed Entra association would otherwise read as a very quiet month while the
+cursor walked straight past it; instead the app's cursor stays put, the error
+lands in `last_error`, and the other apps carry on. The add-on
+(`inappacquisitions`) call is the exception — most apps have no add-ons, and
+its 404 is the normal answer.
 
 The first poll reads `backfill_days` (30 by default) of history, capped at a
 year, and turns every settled day into a chest. `loot serve --since 2026-01-01`
@@ -207,8 +217,12 @@ at the cost of missing a small upward revision of an already-counted group.
 add-on, so its money already arrived as an `iap` row from `inappacquisitions`.
 Loot reads only the counts from `analytics/subscriptions`
 (`totalActiveCount`, new, renewed, churned), which is what the vault's
-`subscriptions.active` reports. An account with no subscription add-ons stops
-being asked after three empty answers, and is asked again a week later.
+`subscriptions.active` reports. An **app** with no subscription add-ons stops
+being asked after three empty answers, and is asked again a week later — the
+streak is per Store ID, so one app without subscriptions cannot switch the
+query off for one that has them. An app that has reported before and then
+missed some polls catches up on the settled days it skipped, up to a week of
+them; only the newest settled day counts towards the empty-answer streak.
 
 **Desktop (MSIX/Win32) apps.** These endpoints cover Store apps and games. The
 Windows Desktop Application program has its own installs and errors endpoints,

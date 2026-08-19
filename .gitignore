@@ -27,3 +27,4 @@ coverage.out
 .idea/
 .vscode/
 *.swp
+/dist/

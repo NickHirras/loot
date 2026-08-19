@@ -123,15 +123,31 @@ func runServe(args []string) error {
 		log.Info("rules loaded", "path", cfg.RulesPath)
 	}
 
+	// Demo mode is pinned to the embedded rate snapshot: no fetch, no cache,
+	// no network. Two things depend on it. A demo is reproducible — the same
+	// seed has to build the same world, and a world whose amount_base came
+	// from whatever the ECB published this morning is a different world every
+	// day. And a demo is often shown on a laptop with no network at all, where
+	// "makes no outbound requests" is a promise worth keeping literally.
+	var rateCache fx.RateStore
+	if !cfg.Demo.Enabled {
+		rateCache = st
+	}
 	converter := fx.New(fx.Options{
 		Base:    cfg.DisplayCurrency,
-		Enabled: cfg.FXEnabled(),
-		Store:   st,
+		Enabled: cfg.FXEnabled() && !cfg.Demo.Enabled,
+		Store:   rateCache,
 		Logger:  log,
 	})
-	if err := converter.LoadCached(ctx); err != nil {
-		log.Warn("could not read cached fx rates", "error", err)
+	if !cfg.Demo.Enabled {
+		if err := converter.LoadCached(ctx); err != nil {
+			log.Warn("could not read cached fx rates", "error", err)
+		}
 	}
+	// Run is a no-op that simply waits for ctx when the converter is disabled,
+	// so this is safe to start either way — and in demo mode it is what
+	// guarantees the seed below runs against a converter that will never move
+	// under it.
 	go converter.Run(ctx)
 
 	b := bus.New(256)

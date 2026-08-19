@@ -227,3 +227,25 @@ func IsWarning(err error) bool {
 	var w Warning
 	return errors.As(err, &w)
 }
+
+// sourceDisplayNames maps source identifiers to the names people use.
+var sourceDisplayNames = map[string]string{
+	"appstore":       "App Store",
+	"googleplay":     "Google Play",
+	"microsoftstore": "Microsoft Store",
+	"snapcraft":      "Snapcraft",
+	"flathub":        "Flathub",
+	"revenuecat":     "RevenueCat",
+	"github":         "GitHub",
+	"webhook":        "webhook",
+	"loot":           "Loot",
+	"dev":            "dev",
+}
+
+// SourceDisplayName returns the human name for a source id, or the id itself.
+func SourceDisplayName(id string) string {
+	if n, ok := sourceDisplayNames[id]; ok {
+		return n
+	}
+	return id
+}

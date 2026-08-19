@@ -340,9 +340,20 @@ JOIN events e ON e.id = d.event_id`
 // immediate drop has no chest_date at all, so it is always visible.
 const unrevealed = `(d.chest_date <> '' AND d.revealed_at IS NULL)`
 
+// Drop page sizes. DefaultDropLimit is what a request that asks for nothing
+// gets; MaxDropLimit is the ceiling. They are exported so the HTTP handler
+// clamps to exactly the same numbers the query does — a handler that computed
+// its "next page" cursor from a limit the store had already overruled paged
+// the feed wrongly.
+const (
+	DefaultDropLimit = 100
+	MaxDropLimit     = 500
+)
+
 // DropQuery parameterizes ListDrops.
 type DropQuery struct {
-	// Limit caps the page; 0 means 100, and anything over 500 is clamped.
+	// Limit caps the page; 0 means DefaultDropLimit, and anything larger than
+	// MaxDropLimit is clamped to it.
 	Limit int
 	// Before returns only drops older than this drop id (ULIDs sort by time).
 	Before string
@@ -354,10 +365,7 @@ type DropQuery struct {
 // ListDrops returns the most recent drops, newest first. Drops held in an
 // unopened chest are excluded unless q.IncludeUnrevealed is set.
 func (s *Store) ListDrops(ctx context.Context, q DropQuery) ([]DropView, error) {
-	limit := q.Limit
-	if limit <= 0 || limit > 500 {
-		limit = 100
-	}
+	limit := ClampDropLimit(q.Limit)
 
 	where := []string{}
 	args := []any{}
@@ -387,6 +395,19 @@ func (s *Store) ListDrops(ctx context.Context, q DropQuery) ([]DropView, error) 
 		return nil, err
 	}
 	return out, nil
+}
+
+// ClampDropLimit applies the page-size rules. Callers that need to know how
+// big a page really was — to decide whether there is another one — must use
+// it rather than their own arithmetic.
+func ClampDropLimit(limit int) int {
+	if limit <= 0 {
+		return DefaultDropLimit
+	}
+	if limit > MaxDropLimit {
+		return MaxDropLimit
+	}
+	return limit
 }
 
 func scanDrops(rows *sql.Rows, capacity int) ([]DropView, error) {
@@ -546,32 +567,54 @@ func (s *Store) RevealChest(ctx context.Context, chestDate string, now time.Time
 		chestDate = oldest
 	}
 
-	// Select before update: once revealed_at is stamped the rows no longer
-	// match "unrevealed", and we still need to hand them back in order.
-	rows, err := s.q.QueryContext(ctx, dropSelect+`
-        WHERE `+unrevealed+` AND d.chest_date = ?
-        ORDER BY `+revealOrder+`, d.created_at ASC, d.id ASC`, chestDate)
+	// Claim the chest and read back exactly what this call claimed, in one
+	// statement. Selecting first and updating afterwards left a window in
+	// which two callers — the UI button and the auto-open sweep, or two
+	// browsers — both saw the same unopened drops, both returned them, and
+	// both cascaded them onto the feed. Whoever loses the race here gets no
+	// rows at all, which is what "opening an already-open chest returns no
+	// drops and no error" is supposed to mean.
+	claimed, err := s.q.QueryContext(ctx, `
+        UPDATE drops SET revealed_at = ?
+        WHERE chest_date = ? AND chest_date <> '' AND revealed_at IS NULL
+        RETURNING id`, now.UTC().UnixMilli(), chestDate)
 	if err != nil {
 		return nil, fmt.Errorf("reveal chest: %w", err)
 	}
-	drops, err := scanDrops(rows, 32)
-	rows.Close()
-	if err != nil {
-		return nil, err
+	var ids []string
+	for claimed.Next() {
+		var id string
+		if err := claimed.Scan(&id); err != nil {
+			claimed.Close()
+			return nil, fmt.Errorf("scan revealed drop id: %w", err)
+		}
+		ids = append(ids, id)
 	}
-	if len(drops) == 0 {
+	err = claimed.Err()
+	claimed.Close()
+	if err != nil {
+		return nil, fmt.Errorf("mark chest revealed: %w", err)
+	}
+	if len(ids) == 0 {
 		return nil, nil
 	}
 
-	stamp := now.UTC()
-	if _, err := s.q.ExecContext(ctx, `
-        UPDATE drops SET revealed_at = ?
-        WHERE chest_date = ? AND revealed_at IS NULL`, stamp.UnixMilli(), chestDate); err != nil {
-		return nil, fmt.Errorf("mark chest revealed: %w", err)
+	// Now read them back in cascade order. They are addressed by id because
+	// they no longer match "unrevealed" — that is the point.
+	args := make([]any, 0, len(ids))
+	for _, id := range ids {
+		args = append(args, id)
 	}
-	for i := range drops {
-		t := stamp
-		drops[i].RevealedAt = &t
+	rows, err := s.q.QueryContext(ctx, dropSelect+`
+        WHERE d.id IN (`+placeholders(len(ids))+`)
+        ORDER BY `+revealOrder+`, d.created_at ASC, d.id ASC`, args...)
+	if err != nil {
+		return nil, fmt.Errorf("read revealed chest: %w", err)
+	}
+	drops, err := scanDrops(rows, len(ids))
+	rows.Close()
+	if err != nil {
+		return nil, err
 	}
 	return drops, nil
 }

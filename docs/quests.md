@@ -28,7 +28,9 @@ A quest is a **metric**, a **target** and a **window of days**. Nothing else. Pr
 | `stars` | GitHub stars |
 | `xp` | the XP of visible drops |
 
-**The install rule.** Sources disagree about how to report installs. Google Play publishes an *overview* row for the whole app *and* a row per country for the same day; Flathub publishes one row per app per day with no country at all. Summing everything would count Play twice; summing only country rows would lose Flathub. So, per `(source, app, day)`: **if any row carries no country, those rows are the day; otherwise the country rows are added up.** One rule, no source-specific special cases, and no double counting.
+**The install rule.** Sources disagree about how to report installs. Google Play publishes an *overview* row for the whole app *and* a row per country for the same day; Flathub and Snapcraft publish one row per app per day with no country at all. Summing everything would count Play twice; summing only country rows would lose Flathub. So, per `(source, app, day)`: **if any row carries no country, those rows are the day; otherwise the country rows are added up.** One rule, no source-specific special cases, and no double counting.
+
+The same rule governs the Hearth. A country's population is its own install rows; **unknown lands get the day's total minus what the country rows placed**, never less than zero. So a Play day of 100 installs covered by its country file puts 100 people on the map and none in unknown lands; a Flathub day puts all of them in unknown lands, because Flathub never says where; and a Play day whose country file has not been read yet sits in unknown lands until it is.
 
 Every metric can optionally be narrowed to one `app`, one `source`, or both.
 

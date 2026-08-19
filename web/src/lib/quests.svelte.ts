@@ -1,3 +1,4 @@
+import { untrack } from 'svelte'
 import { createQuest, deleteQuest, dismissMystery, fetchMysteries, fetchQuests, solveMystery } from './api'
 import type { Casebook, Mystery, NewQuest, Quest, QuestBoard } from './types'
 
@@ -42,17 +43,24 @@ class QuestsState {
     return this.casebook.open.length
   }
 
-  /** Called by the page while it is mounted: loads now, then polls. */
+  /**
+   * Called by the page while it is mounted: loads now, then polls. `#loading`
+   * is the in-flight guard rather than the reactive `loading`, and the body is
+   * untracked on top of that, so calling this from an `$effect` can never
+   * subscribe that effect to state the load itself writes.
+   */
   activate(): () => void {
-    this.#active = true
-    void this.load()
-    this.#timer = setInterval(() => void this.load(), REFRESH_MS)
-    return () => {
-      this.#active = false
-      if (this.#timer) clearInterval(this.#timer)
-      if (this.#staleTimer) clearTimeout(this.#staleTimer)
-      this.#timer = this.#staleTimer = null
-    }
+    return untrack(() => {
+      this.#active = true
+      void this.load()
+      this.#timer = setInterval(() => void this.load(), REFRESH_MS)
+      return () => {
+        this.#active = false
+        if (this.#timer) clearInterval(this.#timer)
+        if (this.#staleTimer) clearTimeout(this.#staleTimer)
+        this.#timer = this.#staleTimer = null
+      }
+    })
   }
 
   /**

@@ -325,6 +325,109 @@ func TestPollStepsOverAnOldEmptyDay(t *testing.T) {
 	}
 }
 
+// Stepping over a missing old day is a guess, not a fact — Apple answers "not
+// generated yet" and "you sold nothing" with the same 404. The day is written
+// down and asked for again over the following days, so a report that turns up
+// late is still ingested instead of being lost with its revenue.
+func TestPollRetriesAStepOverDayUntilItAnswers(t *testing.T) {
+	fake := &fakeASC{sales: map[string][]byte{}}
+	src := newTestSource(t, fake, 10)
+
+	// Day one: nothing at all. The old days are stepped over and recorded.
+	_, state, err := src.Poll(context.Background(), nil)
+	if err != nil {
+		t.Fatalf("first poll: %v", err)
+	}
+	skipped := decodeSkipped(t, state)
+	if got, ok := skipped["2026-08-12"]; !ok || got.Attempts != 1 {
+		t.Fatalf("skipped_days = %+v, want the 12th recorded once", skipped)
+	}
+
+	// A later poll on the same day does not burn a second attempt: the five
+	// tries are meant to span days, not one morning's hourly polls.
+	_, state, err = src.Poll(context.Background(), state)
+	if err != nil {
+		t.Fatalf("same-day poll: %v", err)
+	}
+	if got := decodeSkipped(t, state)["2026-08-12"]; got.Attempts != 1 {
+		t.Fatalf("a second poll on the same day counted attempt %d", got.Attempts)
+	}
+
+	// The next day Apple publishes the missing report after all.
+	fake.mu.Lock()
+	fake.sales["2026-08-12"] = readFixture(t, salesFixture)
+	fake.mu.Unlock()
+	src.Now = func() time.Time { return time.Date(2026, 8, 19, 9, 0, 0, 0, time.UTC) }
+
+	events, state, err := src.Poll(context.Background(), state)
+	if err != nil {
+		t.Fatalf("next-day poll: %v", err)
+	}
+	var found bool
+	for _, ev := range events {
+		if ev.Day == "2026-08-12" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("the late report was never ingested; a day of revenue was lost")
+	}
+	if _, still := decodeSkipped(t, state)["2026-08-12"]; still {
+		t.Error("a day that answered is still on the retry list")
+	}
+}
+
+// Five tries and it really was an empty day. The retry list must not grow
+// forever, and the poll must not keep asking about 2019.
+func TestPollWritesOffAStepOverDayAfterFiveTries(t *testing.T) {
+	fake := &fakeASC{sales: map[string][]byte{}}
+	src := newTestSource(t, fake, 10)
+
+	var state []byte
+	for i := 0; i < maxSkipTries; i++ {
+		src.Now = func() time.Time { return time.Date(2026, 8, 18+i, 9, 0, 0, 0, time.UTC) }
+		var err error
+		if _, state, err = src.Poll(context.Background(), state); err != nil {
+			t.Fatalf("poll %d: %v", i+1, err)
+		}
+	}
+
+	if rec, still := decodeSkipped(t, state)["2026-08-12"]; still {
+		t.Errorf("the 12th is still being retried after %d attempts: %+v", maxSkipTries, rec)
+	}
+
+	// And it is not asked for again.
+	fake.mu.Lock()
+	before := len(fake.requests)
+	fake.mu.Unlock()
+	src.Now = func() time.Time { return time.Date(2026, 8, 24, 9, 0, 0, 0, time.UTC) }
+	if _, _, err := src.Poll(context.Background(), state); err != nil {
+		t.Fatalf("final poll: %v", err)
+	}
+	fake.mu.Lock()
+	asked := fake.requests[before:]
+	fake.mu.Unlock()
+	for _, r := range asked {
+		if strings.HasSuffix(r, ":2026-08-12") {
+			t.Error("a written-off day was asked for again")
+		}
+	}
+}
+
+// maxSkipTries mirrors the source's own maxSkipAttempts, which is unexported.
+const maxSkipTries = 5
+
+func decodeSkipped(t *testing.T, state []byte) map[string]appstore.SkippedDay {
+	t.Helper()
+	var st struct {
+		SkippedDays map[string]appstore.SkippedDay `json:"skipped_days"`
+	}
+	if err := json.Unmarshal(state, &st); err != nil {
+		t.Fatalf("decode state: %v", err)
+	}
+	return st.SkippedDays
+}
+
 func TestPollGivesUpOnTheSubscriptionReport(t *testing.T) {
 	fixture := readFixture(t, salesFixture)
 	fake := &fakeASC{

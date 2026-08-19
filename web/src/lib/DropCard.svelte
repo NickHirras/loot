@@ -2,8 +2,18 @@
   import type { FeedDrop } from './state.svelte'
   import { flagEmoji, isFlashy, money, timeAgo } from './types'
 
-  let { drop, index = 0 }: { drop: FeedDrop; index?: number } = $props()
+  let {
+    drop,
+    index = 0,
+    /**
+     * The feed's clock, bumped once a minute. Reading it here — rather than
+     * keying the whole list on it — is what keeps "3m" honest while leaving
+     * every card's DOM, and its arrival animation, untouched.
+     */
+    now = Date.now(),
+  }: { drop: FeedDrop; index?: number; now?: number } = $props()
 
+  const ago = $derived(timeAgo(drop.created_at, now))
   const flashy = $derived(isFlashy(drop.rarity))
   const amount = $derived(money(drop.amount, drop.currency))
   const flag = $derived(flagEmoji(drop.country))
@@ -40,7 +50,7 @@
       <span class="spacer"></span>
       <span class="xp">+{drop.xp} XP</span>
       <time class="ago" datetime={drop.created_at} title={new Date(drop.created_at).toLocaleString()}>
-        {timeAgo(drop.created_at)}
+        {ago}
       </time>
     </div>
 

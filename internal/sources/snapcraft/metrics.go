@@ -353,13 +353,20 @@ func (p dayPayload) raw() json.RawMessage {
 }
 
 // EventsFromMetrics turns one snap's metrics response into events for every
-// completed day strictly after floor and strictly before today, and reports the
-// newest day it actually saw data for so the caller can advance its cursor.
+// completed day strictly after floor and strictly before today, and reports how
+// far the caller may advance its cursor.
 //
 // Metric availability lags the calendar by a day or two and the store fills the
 // gap with nulls; a day whose daily_device_change is entirely null is left
-// alone (no events, no cursor movement) so the next poll picks it up once the
-// figures land.
+// alone (no events) so the next poll picks it up once the figures land.
+//
+// The cursor therefore advances only to the end of the *contiguous* run of
+// published days — not to the newest day with data anywhere in the window.
+// Given an unpublished Tuesday between a published Monday and a published
+// Wednesday, the old rule moved the cursor to Wednesday and Tuesday was never
+// read again once its figures landed. Events for the days beyond the gap are
+// still emitted (their dedupe keys make the re-read free); it is only the
+// cursor that waits.
 func EventsFromMetrics(snap, snapID string, resp MetricsResponse, floor, today string, observed time.Time) ([]core.Event, string) {
 	change, ok := resp.Metric(metricDailyDeviceChange)
 	if !ok {
@@ -377,6 +384,13 @@ func EventsFromMetrics(snap, snapID string, resp MetricsResponse, floor, today s
 	var (
 		events []core.Event
 		newest string
+		// broken records that an unpublished day has been passed, which is
+		// where the contiguous run — and therefore the cursor — stops. Days
+		// the store simply does not carry a bucket for are not holes: it
+		// truncates the range to what it has rather than padding it, so
+		// treating a missing bucket as a hole would stall the cursor forever
+		// on a snap younger than the backfill window.
+		broken bool
 	)
 	for _, day := range days {
 		if day >= today || (floor != "" && day <= floor) {
@@ -387,10 +401,13 @@ func EventsFromMetrics(snap, snapID string, resp MetricsResponse, floor, today s
 		continued, hasContinued := change.at(seriesContinued, i)
 		lost, hasLost := change.at(seriesLost, i)
 		if !hasNew && !hasContinued && !hasLost {
-			// Not published yet. Leave the cursor behind it.
+			// Not published yet. Leave the cursor behind it, and behind
+			// everything after it too.
+			broken = true
 			continue
 		}
-		if day > newest {
+		// Past a hole the day is still emitted, but the cursor stays behind it.
+		if !broken && day > newest {
 			newest = day
 		}
 

@@ -54,6 +54,10 @@ type fakePartner struct {
 	apiStatus int
 	apiBody   string
 
+	// notFound forces a 404 for one (path, applicationId) pair, which is how
+	// Partner Center answers both "no data" and "no such app".
+	notFound map[string]bool
+
 	tokenForms []url.Values
 	requests   []*url.URL
 	auth       []string
@@ -122,7 +126,7 @@ func (f *fakePartner) handler() http.Handler {
 		}
 
 		rows, ok := f.rows[r.URL.Path]
-		if !ok {
+		if !ok || f.notFound[r.URL.Path+"|"+r.URL.Query().Get("applicationId")] {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusNotFound)
 			_, _ = io.WriteString(w, `{"code":"NotFound","message":"resource not found"}`)
@@ -774,5 +778,176 @@ func TestPollHonoursSince(t *testing.T) {
 	}
 	if got := asked[0].Get("startDate"); got != "2026-08-10" {
 		t.Errorf("startDate = %q, want the --since date 2026-08-10", got)
+	}
+}
+
+// Partner Center answers "no data for this query" and "no such app" with the
+// same 404. Treating that as an empty window on the *app acquisitions* call
+// advanced the cursor over days Loot never read, so a mistyped Store ID or a
+// lapsed association read as a very quiet month instead of as a problem.
+func TestPollAppAcquisitions404DoesNotAdvanceTheCursor(t *testing.T) {
+	fake := newFake(t)
+	fake.notFound = map[string]bool{"/v1.0/my/analytics/appacquisitions|" + testStoreID: true}
+	src := newTestSource(t, fake, []string{testStoreID})
+
+	events, state, err := src.Poll(context.Background(), nil)
+	if err == nil {
+		t.Fatal("a 404 on app acquisitions was swallowed; last_error would stay clean")
+	}
+	if len(events) != 0 {
+		t.Errorf("events = %v, want none from a failed window", dedupeKeys(events))
+	}
+
+	var st struct {
+		LastSettledDay map[string]string `json:"last_settled_day"`
+	}
+	if err := json.Unmarshal(state, &st); err != nil {
+		t.Fatalf("decode state: %v", err)
+	}
+	if got := st.LastSettledDay[testStoreID]; got != "" {
+		t.Errorf("cursor advanced to %q despite the fetch failing", got)
+	}
+}
+
+// An add-on 404 is normal — most apps have none — and must not stop the app's
+// own acquisitions landing.
+func TestPollAddOn404IsTolerated(t *testing.T) {
+	fake := newFake(t)
+	fake.notFound = map[string]bool{"/v1.0/my/analytics/inappacquisitions|" + testStoreID: true}
+	src := newTestSource(t, fake, []string{testStoreID})
+
+	events, state, err := src.Poll(context.Background(), nil)
+	if err != nil {
+		t.Fatalf("an app with no add-ons is not a failure: %v", err)
+	}
+	if len(events) == 0 {
+		t.Fatal("the app's own acquisitions were lost with the add-on 404")
+	}
+
+	var st struct {
+		LastSettledDay map[string]string `json:"last_settled_day"`
+	}
+	if err := json.Unmarshal(state, &st); err != nil {
+		t.Fatalf("decode state: %v", err)
+	}
+	if got := st.LastSettledDay[testStoreID]; got != settledDay {
+		t.Errorf("cursor = %q, want %q", got, settledDay)
+	}
+}
+
+// One app failing must not stop the others, and must not move their cursors.
+func TestPollOneFailedAppLetsTheOthersProgress(t *testing.T) {
+	const otherID = "9NBLGGH4R999"
+	fake := newFake(t)
+	fake.notFound = map[string]bool{"/v1.0/my/analytics/appacquisitions|" + otherID: true}
+	src := newTestSource(t, fake, []string{testStoreID, otherID})
+
+	events, state, err := src.Poll(context.Background(), nil)
+	if err == nil {
+		t.Fatal("the failing app's error was not surfaced")
+	}
+	if len(events) == 0 {
+		t.Fatal("the healthy app produced nothing")
+	}
+
+	var st struct {
+		LastSettledDay map[string]string `json:"last_settled_day"`
+	}
+	if err := json.Unmarshal(state, &st); err != nil {
+		t.Fatalf("decode state: %v", err)
+	}
+	if st.LastSettledDay[testStoreID] != settledDay {
+		t.Errorf("the healthy app's cursor = %q, want %q", st.LastSettledDay[testStoreID], settledDay)
+	}
+	if got := st.LastSettledDay[otherID]; got != "" {
+		t.Errorf("the failing app's cursor advanced to %q", got)
+	}
+}
+
+// The subscription backoff is per app and re-arms properly: an app with no
+// subscription add-ons is switched off after maxSubsUnavailable empty answers
+// and stamped with the day it happened, while an app that has them keeps being
+// asked.
+func TestSubscriptionBackoffIsPerAppAndStamped(t *testing.T) {
+	const quietID = "9NBLGGH4R999"
+	fake := newFake(t)
+	src := newTestSource(t, fake, []string{testStoreID, quietID})
+
+	var state []byte
+	for i := 0; i < 3; i++ {
+		var err error
+		if _, state, err = src.Poll(context.Background(), state); err != nil {
+			t.Fatalf("poll %d: %v", i+1, err)
+		}
+	}
+
+	var st struct {
+		SubsDay         map[string]string `json:"subs_day"`
+		SubsUnavailable map[string]int    `json:"subs_unavailable"`
+		SubsDisabled    map[string]string `json:"subs_disabled_day"`
+	}
+	if err := json.Unmarshal(state, &st); err != nil {
+		t.Fatalf("decode state: %v", err)
+	}
+
+	if st.SubsUnavailable[quietID] < 3 {
+		t.Errorf("quiet app streak = %d, want at least 3", st.SubsUnavailable[quietID])
+	}
+	if st.SubsDisabled[quietID] != settledDay {
+		t.Errorf("quiet app was never stamped as disabled (got %q); it would be asked forever",
+			st.SubsDisabled[quietID])
+	}
+	if st.SubsUnavailable[testStoreID] != 0 || st.SubsDisabled[testStoreID] != "" {
+		t.Errorf("the app that *does* report subscriptions was penalised: %d / %q",
+			st.SubsUnavailable[testStoreID], st.SubsDisabled[testStoreID])
+	}
+	if st.SubsDay[testStoreID] != settledDay {
+		t.Errorf("subs_day = %q, want %q", st.SubsDay[testStoreID], settledDay)
+	}
+
+	// Now that the quiet app is stamped, it is left alone entirely.
+	before := len(fake.asked("/v1.0/my/analytics/subscriptions"))
+	if _, _, err := src.Poll(context.Background(), state); err != nil {
+		t.Fatalf("fourth poll: %v", err)
+	}
+	after := fake.asked("/v1.0/my/analytics/subscriptions")
+	for _, q := range after[before:] {
+		if q.Get("applicationId") == quietID {
+			t.Error("a disabled app was asked for subscriptions again inside the recheck window")
+		}
+	}
+}
+
+// After a gap — an outage, a restart, a missed poll — an app that has reported
+// subscriptions before catches up on the settled days it missed rather than
+// only taking the newest one.
+func TestSubscriptionsCatchUpOnMissedDays(t *testing.T) {
+	fake := newFake(t)
+	src := newTestSource(t, fake, []string{testStoreID})
+
+	state, err := json.Marshal(map[string]any{
+		"last_settled_day": map[string]string{testStoreID: settledDay},
+		"subs_day":         map[string]string{testStoreID: "2026-08-12"},
+		"seeded":           true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := src.Poll(context.Background(), state); err != nil {
+		t.Fatalf("poll: %v", err)
+	}
+
+	var days []string
+	for _, q := range fake.asked("/v1.0/my/analytics/subscriptions") {
+		days = append(days, q.Get("startDate"))
+	}
+	want := []string{"2026-08-13", "2026-08-14", "2026-08-15"}
+	if len(days) != len(want) {
+		t.Fatalf("asked for %v, want %v", days, want)
+	}
+	for i := range want {
+		if days[i] != want[i] {
+			t.Fatalf("asked for %v, want %v", days, want)
+		}
 	}
 }

@@ -1,0 +1,148 @@
+name: Release
+
+# Two things happen here:
+#
+#   push to main  ->  ghcr.io/nickhirras/loot:edge
+#   push of v*    ->  :latest, :<semver>, :<major.minor>, plus release archives
+#
+# The edge tag is what makes `docker run ghcr.io/nickhirras/loot:edge` work
+# before the project has ever been tagged.
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+
+env:
+  IMAGE: ghcr.io/nickhirras/loot
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  image:
+    name: container image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v7
+
+      # A tag builds itself; anything else is an edge build off main.
+      - name: Work out the version
+        id: version
+        run: |
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            echo "version=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=edge-$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+          fi
+
+      # linux/arm64 is emulated on the amd64 runner. The build is pure Go with
+      # CGO_ENABLED=0, so this is slow but not fragile.
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v4
+        with:
+          platforms: arm64
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # flavor latest=auto gives :latest to a non-prerelease semver tag only,
+      # so v1.2.3 moves it and v1.2.3-rc1 does not. Pushes to main get :edge
+      # and nothing else.
+      - name: Image tags
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.IMAGE }}
+          flavor: latest=auto
+          tags: |
+            type=raw,value=edge,enable={{is_default_branch}}
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+          labels: |
+            org.opencontainers.image.title=Loot
+            org.opencontainers.image.description=A self-hosted, gamified dashboard for indie app developers
+            org.opencontainers.image.licenses=MIT
+
+      - name: Build and push
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: VERSION=${{ steps.version.outputs.version }}
+          provenance: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Summary
+        run: |
+          {
+            echo "### Pushed"
+            echo '```'
+            echo "${{ steps.meta.outputs.tags }}"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  binaries:
+    name: release archives
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      # `make dist` would fall back to `npm install`; a release should build
+      # the frontend from the lockfile and nothing else. Doing it here also
+      # satisfies make's node_modules rule, so it does not run install again.
+      - name: Install frontend dependencies
+        working-directory: web
+        run: npm ci
+
+      # Builds the frontend, then cross-compiles all five platforms with the
+      # SPA embedded — exactly what `make dist` does on a laptop.
+      - name: Cross-compile
+        run: make dist VERSION=${{ github.ref_name }}
+
+      - name: Checksums
+        run: cat dist/checksums.txt
+
+      - name: Publish the release
+        uses: softprops/action-gh-release@v3
+        with:
+          files: |
+            dist/*.tar.gz
+            dist/*.zip
+            dist/checksums.txt
+          generate_release_notes: true
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-') }}

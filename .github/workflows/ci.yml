@@ -1,0 +1,96 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+# A new push to a branch makes the run in flight for that branch pointless.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: build & test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: web
+        run: npm ci
+
+      - name: Type-check the frontend
+        working-directory: web
+        run: npm run check
+
+      # The Go build embeds web/dist, so the frontend is built first. Every Go
+      # step below therefore compiles against the real SPA, not the .gitkeep
+      # placeholder.
+      - name: Build the frontend
+        working-directory: web
+        run: npm run build
+
+      - name: gofmt
+        run: |
+          unformatted="$(gofmt -l cmd internal web/embed.go)"
+          if [ -n "$unformatted" ]; then
+            echo "::error::gofmt would reformat these files; run 'make fmt'"
+            echo "$unformatted"
+            exit 1
+          fi
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: go test
+        run: go test ./... -count=1
+
+      - name: Build the binary
+        run: go build -trimpath -o /tmp/loot ./cmd/loot
+
+      # Proves the binary runs and that the SPA really was embedded, rather
+      # than the .gitkeep placeholder sneaking into a release.
+      - name: Smoke test
+        run: |
+          /tmp/loot version
+          test -s web/dist/index.html
+
+  docker:
+    name: docker build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v4
+
+      # Build only — no registry credentials are involved on a PR. This exists
+      # to catch the Dockerfile drifting away from the source tree.
+      - name: Build the image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: false
+          load: false
+          build-args: VERSION=ci-${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

@@ -1,3 +1,4 @@
+import { untrack } from 'svelte'
 import { fetchHearth } from './api'
 import { loot } from './state.svelte'
 import type { Drop, Hearth, HearthCountry, HearthDrop } from './types'
@@ -25,6 +26,15 @@ class HearthState {
 
   #active = false
   #again = false
+  /**
+   * The in-flight guard, deliberately *not* `$state`. `activate()` is called
+   * straight out of an `$effect`, so anything reactive that `load()` reads on
+   * its synchronous path becomes a dependency of that effect — and `loading`
+   * is written when the fetch settles, which would re-run the effect, restart
+   * the poller and fetch again, forever. `loading` stays reactive for the UI;
+   * only this shadow decides whether a load is already running.
+   */
+  #loading = false
   #timer: ReturnType<typeof setInterval> | null = null
   #staleTimer: ReturnType<typeof setTimeout> | null = null
   #unsubscribe: (() => void) | null = null
@@ -60,28 +70,36 @@ class HearthState {
     return Math.max(0, era.next_xp - this.totalXP)
   }
 
-  /** Called by the page while it is mounted: loads now, then polls. */
+  /**
+   * Called by the page while it is mounted: loads now, then polls. The whole
+   * body is untracked so that calling this from an `$effect` never subscribes
+   * that effect to anything touched during setup — the caller gets a plain
+   * teardown function and nothing else.
+   */
   activate(): () => void {
-    this.#active = true
-    void this.load()
-    this.#timer = setInterval(() => void this.load(), REFRESH_MS)
-    this.#unsubscribe = loot.onDrop((drop) => this.#applyDrop(drop))
+    return untrack(() => {
+      this.#active = true
+      void this.load()
+      this.#timer = setInterval(() => void this.load(), REFRESH_MS)
+      this.#unsubscribe = loot.onDrop((drop) => this.#applyDrop(drop))
 
-    return () => {
-      this.#active = false
-      if (this.#timer) clearInterval(this.#timer)
-      if (this.#staleTimer) clearTimeout(this.#staleTimer)
-      this.#unsubscribe?.()
-      this.#timer = this.#staleTimer = null
-      this.#unsubscribe = null
-    }
+      return () => {
+        this.#active = false
+        if (this.#timer) clearInterval(this.#timer)
+        if (this.#staleTimer) clearTimeout(this.#staleTimer)
+        this.#unsubscribe?.()
+        this.#timer = this.#staleTimer = null
+        this.#unsubscribe = null
+      }
+    })
   }
 
   async load(): Promise<void> {
-    if (this.loading) {
+    if (this.#loading) {
       this.#again = true
       return
     }
+    this.#loading = true
     this.loading = true
     try {
       this.data = await fetchHearth()
@@ -90,6 +108,7 @@ class HearthState {
       this.error = err instanceof Error ? err.message : String(err)
     } finally {
       this.loading = false
+      this.#loading = false
       if (this.#again) {
         this.#again = false
         void this.load()
@@ -123,6 +142,13 @@ class HearthState {
       kind: drop.kind,
       created_at: drop.created_at,
     }
+    // An aggregate with nothing in it yet answers with empty lists — but a
+    // server (or a proxy) that omits them entirely must not take the globe
+    // down with a TypeError on the first live drop.
+    if (!data.recent) data.recent = []
+    if (!data.countries) data.countries = []
+    if (!data.tiers) data.tiers = []
+
     if (!data.recent.some((d) => d.id === drop.id)) {
       data.recent = [arrival, ...data.recent].slice(0, MAX_RECENT)
     }

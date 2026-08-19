@@ -3,6 +3,9 @@ import type {
   ChestSummary,
   Drop,
   Hearth,
+  HearthCountry,
+  HearthDrop,
+  HearthTier,
   Mystery,
   NewQuest,
   Quest,
@@ -74,7 +77,12 @@ export interface ChestOpenResult {
   opened: string
   count: number
   drops: Drop[]
-  chests: ChestSummary[]
+  /**
+   * What is left unopened. `null` means the server said nothing about it —
+   * which is not the same as "nothing left", so the caller must refetch rather
+   * than believe an empty list it was never given.
+   */
+  chests: ChestSummary[] | null
 }
 
 /** Opens a chest. An empty date opens the oldest one, which is the default. */
@@ -85,7 +93,7 @@ export async function openChest(date = ''): Promise<ChestOpenResult> {
     opened: data.opened ?? '',
     count: data.count ?? 0,
     drops: data.drops ?? [],
-    chests: data.chests ?? [],
+    chests: data.chests ?? null,
   }
 }
 
@@ -114,9 +122,26 @@ export function websocketURL(): string {
   return `${proto}//${location.host}/ws`
 }
 
-/** The globe: settlements, era, capital and the recent arrivals ticker. */
-export function fetchHearth(): Promise<Hearth> {
-  return getJSON<Hearth>('/api/hearth')
+/**
+ * The globe: settlements, era, capital and the recent arrivals ticker.
+ *
+ * Go marshals an empty slice as `null`, so every list the page iterates is
+ * defaulted here rather than guarded at each of its half-dozen call sites.
+ */
+export async function fetchHearth(): Promise<Hearth> {
+  const data = await getJSON<
+    Omit<Hearth, 'countries' | 'tiers' | 'recent'> & {
+      countries: HearthCountry[] | null
+      tiers: HearthTier[] | null
+      recent: HearthDrop[] | null
+    }
+  >('/api/hearth')
+  return {
+    ...data,
+    countries: data.countries ?? [],
+    tiers: data.tiers ?? [],
+    recent: data.recent ?? [],
+  }
 }
 
 // ---------------------------------------------------------------- quests

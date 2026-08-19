@@ -48,6 +48,40 @@ CASE
     ELSE 0
 END`
 
+// hearthPopulationNoInstalls is hearthPopulation with the install branch taken
+// out. It exists for the unknown-lands bucket, whose install population cannot
+// be a plain sum — see hearthUnknownInstalls.
+const hearthPopulationNoInstalls = `
+CASE
+    WHEN e.is_ledger = 1 AND e.kind IN ('sale', 'iap', 'subscription', 'download') AND e.quantity > 0 THEN e.quantity
+    WHEN e.source = 'revenuecat' AND e.kind = 'purchase' THEN 1
+    ELSE 0
+END`
+
+// hearthUnknownInstalls is how many of a day's installs could not be placed on
+// the map, summed over every (source, app, day).
+//
+// Google Play reports its installs *twice*: once as an overview row with no
+// country, and once per country. Adding both up gave every Play install a
+// citizen in a country and a second one in unknown lands, so a hundred
+// installs read as two hundred people and the unknown bucket grew as fast as
+// the map did.
+//
+// The day's real total is installValue — the same rule quests and the mystery
+// detector use: an overview row, where there is one, *is* the day, otherwise
+// the country rows are it. Unknown lands then get the remainder the country
+// rows could not account for, never less than nothing. A Flathub day (one
+// row, no country) is therefore entirely unknown, a Play day covered by its
+// country file is entirely placed, and a Play day whose country file has not
+// arrived yet is unknown until it does.
+const hearthUnknownInstalls = `
+SELECT COALESCE(SUM(MAX(day_total - placed, 0)), 0) FROM (
+    SELECT ` + installValue + ` AS day_total,
+           COALESCE(SUM(CASE WHEN e.country <> '' AND e.quantity > 0 THEN e.quantity ELSE 0 END), 0) AS placed
+    FROM events e
+    WHERE e.kind = 'install'
+    GROUP BY e.source, e.app, e.day)`
+
 // maxHearthRecent is how many recent country-bearing drops the ticker gets.
 const maxHearthRecent = 30
 
@@ -119,6 +153,9 @@ func (s *Store) Hearth(ctx context.Context, homeCountry, displayCurrency string)
 		Tiers:           core.Tiers,
 		Recent:          []HearthDrop{},
 	}
+	if out.Tiers == nil {
+		out.Tiers = []core.Tier{}
+	}
 
 	countries, events, unknown, err := s.hearthCountries(ctx)
 	if err != nil {
@@ -161,7 +198,13 @@ func (s *Store) Hearth(ctx context.Context, homeCountry, displayCurrency string)
 		}
 		return a.Country < b.Country
 	})
-	out.Countries = countries
+	// hearthCountries returns nil for a database with no events at all, and a
+	// nil slice serializes as JSON `null` rather than `[]` — which a client
+	// that maps over it has to special-case. Every list on this struct is a
+	// list, empty or not.
+	if countries != nil {
+		out.Countries = countries
+	}
 
 	out.Capital = pickCapital(homeCountry, countries, events)
 
@@ -205,6 +248,7 @@ func (s *Store) hearthCountries(ctx context.Context) ([]HearthCountry, map[strin
 	rows, err := s.q.QueryContext(ctx, `
         SELECT e.country,
                COALESCE(SUM(`+hearthPopulation+`), 0),
+               COALESCE(SUM(`+hearthPopulationNoInstalls+`), 0),
                COALESCE(SUM(CASE WHEN `+ledgerRows+` THEN e.amount_base ELSE 0 END), 0),
                MIN(e.day), MAX(e.day), COUNT(*)
         FROM events e
@@ -220,17 +264,19 @@ func (s *Store) hearthCountries(ctx context.Context) ([]HearthCountry, map[strin
 	)
 	for rows.Next() {
 		var (
-			c                  HearthCountry
-			first, last        sql.NullString
-			eventCount, popCol int
-			revenue            float64
-			country            string
+			c                             HearthCountry
+			first, last                   sql.NullString
+			eventCount, popCol, popNoInst int
+			revenue                       float64
+			country                       string
 		)
-		if err := rows.Scan(&country, &popCol, &revenue, &first, &last, &eventCount); err != nil {
+		if err := rows.Scan(&country, &popCol, &popNoInst, &revenue, &first, &last, &eventCount); err != nil {
 			return nil, nil, unknown, fmt.Errorf("scan hearth country: %w", err)
 		}
 		if country == "" {
-			unknown.Population = popCol
+			// Installs are added back below, after the double counting a
+			// plain sum would cause has been resolved.
+			unknown.Population = popNoInst
 			unknown.RevenueBase = round2(revenue)
 			continue
 		}
@@ -245,6 +291,16 @@ func (s *Store) hearthCountries(ctx context.Context) ([]HearthCountry, map[strin
 	if err := rows.Err(); err != nil {
 		return nil, nil, unknown, fmt.Errorf("iterate hearth countries: %w", err)
 	}
+	// Close the cursor before the next query: SQLite is opened with a single
+	// connection, so an open result set would block it.
+	rows.Close()
+
+	var unplaced int
+	if err := s.q.QueryRowContext(ctx, hearthUnknownInstalls).Scan(&unplaced); err != nil {
+		return nil, nil, unknown, fmt.Errorf("hearth unknown installs: %w", err)
+	}
+	unknown.Population += unplaced
+
 	return out, events, unknown, nil
 }
 

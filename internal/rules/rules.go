@@ -200,9 +200,11 @@ type tmplData struct {
 	AmountFmt     string
 	AmountBaseFmt string
 	QuantityFmt   string
-	Flag          string
-	BaseTitle     string
-	Payload       map[string]any
+	// SourceName is the human name of the source ("Google Play"), for titles.
+	SourceName string
+	Flag       string
+	BaseTitle  string
+	Payload    map[string]any
 }
 
 // Classify picks a rarity, title and XP for ev and returns the resulting Drop.
@@ -406,6 +408,7 @@ func (e *Engine) render(ruleName, field, text string, data tmplData) string {
 func (e *Engine) buildTmplData(ev core.Event, payload map[string]any) tmplData {
 	d := tmplData{
 		Source:      ev.Source,
+		SourceName:  core.SourceDisplayName(ev.Source),
 		Kind:        ev.Kind,
 		App:         ev.App,
 		Day:         ev.Day,
@@ -419,10 +422,10 @@ func (e *Engine) buildTmplData(ev core.Event, payload map[string]any) tmplData {
 		Payload:     payload,
 	}
 	if ev.Amount > 0 {
-		d.AmountFmt = strings.TrimSpace(fmt.Sprintf("%.2f %s", ev.Amount, ev.Currency))
+		d.AmountFmt = FormatAmount(ev.Amount, ev.Currency)
 	}
 	if ev.AmountBase > 0 {
-		d.AmountBaseFmt = strings.TrimSpace(fmt.Sprintf("%.2f %s", ev.AmountBase, e.displayCurrency))
+		d.AmountBaseFmt = FormatAmount(ev.AmountBase, e.displayCurrency)
 	}
 	return d
 }
@@ -491,4 +494,20 @@ func containsFold(list []string, want string) bool {
 		}
 	}
 	return false
+}
+
+// zeroDecimalCurrencies are the ISO 4217 currencies with no minor unit, so
+// "5028 JPY" rather than "5028.31 JPY".
+var zeroDecimalCurrencies = map[string]bool{
+	"JPY": true, "KRW": true, "VND": true, "CLP": true, "ISK": true, "HUF": true,
+	"TWD": true, "PYG": true, "UGX": true, "RWF": true, "XAF": true, "XOF": true,
+	"IDR": true, "COP": true,
+}
+
+// FormatAmount renders an amount with the decimals its currency actually has.
+func FormatAmount(amount float64, currency string) string {
+	if zeroDecimalCurrencies[strings.ToUpper(currency)] {
+		return strings.TrimSpace(fmt.Sprintf("%.0f %s", amount, currency))
+	}
+	return strings.TrimSpace(fmt.Sprintf("%.2f %s", amount, currency))
 }

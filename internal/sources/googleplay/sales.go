@@ -224,8 +224,12 @@ func (s *Source) rowEvent(r SaleRow, day string, observed time.Time) core.Event 
 	}
 
 	payload, _ := json.Marshal(map[string]any{
-		"order_number":     r.OrderNumber,
-		"package":          r.Package,
+		"order_number": r.OrderNumber,
+		"package":      r.Package,
+		// The human name lives in the payload, not in Event.App: App is the
+		// identity every aggregate groups on, and a product title is a display
+		// string that Play lets you change on any given Tuesday.
+		"title":            r.ProductTitle,
 		"product_title":    r.ProductTitle,
 		"product_type":     r.ProductType,
 		"sku":              r.SKU,
@@ -242,10 +246,13 @@ func (s *Source) rowEvent(r SaleRow, day string, observed time.Time) core.Event 
 	})
 
 	return core.Event{
-		ID:         core.NewIDAt(occurred),
-		Source:     Name,
-		Kind:       r.Kind(),
-		App:        r.AppName(),
+		ID:     core.NewIDAt(occurred),
+		Source: Name,
+		Kind:   r.Kind(),
+		// App is the package name, exactly as the install statistics use it.
+		// Booking sales under the product title and installs under the package
+		// split one app into two rows in every by-app breakdown.
+		App:        r.AppKey(),
 		OccurredAt: occurred,
 		ObservedAt: observed,
 		Day:        day,
@@ -377,7 +384,11 @@ func (d *dayTotals) topCountry() string {
 // as take-home pay.
 type SalesDayPayload struct {
 	core.SalesDaySummary
-	Package       string             `json:"package"`
+	Package string `json:"package"`
+	// Title is the product title the report carried, kept here because
+	// Event.App is the package name: the identity aggregates group on has to
+	// be stable, and a display name is not.
+	Title         string             `json:"title,omitempty"`
 	Date          string             `json:"date"`
 	Rows          int                `json:"rows"`
 	IAPUnits      int                `json:"iap_units"`
@@ -412,11 +423,6 @@ func (s *Source) summaryEvent(d *dayTotals, observed time.Time) core.Event {
 		occurred = t
 	}
 
-	app := d.appName
-	if app == "" {
-		app = d.pkg
-	}
-
 	payload, _ := json.Marshal(SalesDayPayload{
 		SalesDaySummary: core.SalesDaySummary{
 			Units:      d.units,
@@ -428,6 +434,7 @@ func (s *Source) summaryEvent(d *dayTotals, observed time.Time) core.Event {
 			BySKU:      bySKU,
 		},
 		Package:       d.pkg,
+		Title:         d.appName,
 		Date:          d.day,
 		Rows:          d.rows,
 		IAPUnits:      d.iapUnits,
@@ -443,7 +450,7 @@ func (s *Source) summaryEvent(d *dayTotals, observed time.Time) core.Event {
 		ID:         core.NewIDAt(occurred),
 		Source:     Name,
 		Kind:       "sales_day",
-		App:        app,
+		App:        d.pkg,
 		OccurredAt: occurred,
 		ObservedAt: observed,
 		Day:        d.day,
@@ -470,11 +477,20 @@ func (s *Source) pollSales(ctx context.Context, st *state, months []string, now 
 		wanted[m] = true
 	}
 
+	// A day is only summarized once the report has stopped moving under it:
+	// the monthly file is rewritten daily and late rows arrive for a day or
+	// two. Rows for an unsettled day are still stored — the vault sums rows,
+	// not summaries — they just do not get a chest yet.
+	cutoff := now.In(s.location()).AddDate(0, 0, -1).Format(core.DayLayout)
+
 	var (
 		events []core.Event
 		totals = map[string]*dayTotals{} // package + "\x00" + day
 		order  []string
 		seen   = map[string]bool{}
+		// unsettled records, per object, which of its days were still moving
+		// when it was read, so a settled leftover can be collected later.
+		unsettled = map[string]map[string]bool{}
 	)
 
 	for _, obj := range objects {
@@ -484,8 +500,16 @@ func (s *Source) pollSales(ctx context.Context, st *state, months []string, now 
 		}
 		seen[obj.Name] = true
 		if prev, ok := st.SalesFiles[obj.Name]; ok && prev != "" && prev == obj.MD5Hash {
-			s.Log.Debug("googleplay: sales report unchanged", "object", obj.Name)
-			continue
+			// The file has not changed — but a day it carried may have settled
+			// since it was last read, and nothing else will ever bring that
+			// day a summary. This is the last days of a month: by the time
+			// they settle, the month is over and the file has stopped moving.
+			if !settledSince(st.PendingSalesDays[obj.Name], cutoff) {
+				s.Log.Debug("googleplay: sales report unchanged", "object", obj.Name)
+				continue
+			}
+			s.Log.Debug("googleplay: re-reading an unchanged sales report for days that have since settled",
+				"object", obj.Name, "pending", st.PendingSalesDays[obj.Name])
 		}
 
 		raw, err := s.Download(ctx, obj.Name)
@@ -519,6 +543,18 @@ func (s *Source) pollSales(ctx context.Context, st *state, months []string, now 
 				order = append(order, key)
 			}
 			t.add(r)
+
+			if day >= cutoff {
+				if unsettled[obj.Name] == nil {
+					unsettled[obj.Name] = map[string]bool{}
+				}
+				unsettled[obj.Name][day] = true
+			}
+		}
+		if unsettled[obj.Name] == nil {
+			// Read, and nothing left over: record that explicitly so the
+			// carry-forward below does not keep an old list alive.
+			unsettled[obj.Name] = map[string]bool{}
 		}
 		st.SalesFiles[obj.Name] = obj.MD5Hash
 	}
@@ -531,11 +567,28 @@ func (s *Source) pollSales(ctx context.Context, st *state, months []string, now 
 		}
 	}
 
-	// A day is only summarized once the report has stopped moving under it:
-	// the monthly file is rewritten daily and late rows arrive for a day or
-	// two. Rows for an unsettled day are still stored — the vault sums rows,
-	// not summaries — they just do not get a chest yet.
-	cutoff := now.In(s.location()).AddDate(0, 0, -1).Format(core.DayLayout)
+	// Carry forward what was left over in the files this poll did not re-read,
+	// and replace it for the ones it did. Objects that have fallen out of the
+	// window are simply forgotten along with their sales_files entry.
+	pending := make(map[string][]string, len(st.PendingSalesDays))
+	for name, days := range st.PendingSalesDays {
+		if seen[name] {
+			pending[name] = days
+		}
+	}
+	for name, days := range unsettled {
+		if len(days) == 0 {
+			delete(pending, name)
+			continue
+		}
+		out := make([]string, 0, len(days))
+		for day := range days {
+			out = append(out, day)
+		}
+		sort.Strings(out)
+		pending[name] = out
+	}
+	st.PendingSalesDays = pending
 
 	sort.Strings(order)
 	advanced := map[string]string{}
@@ -558,6 +611,17 @@ func (s *Source) pollSales(ctx context.Context, st *state, months []string, now 
 		}
 	}
 	return events, nil
+}
+
+// settledSince reports whether any of the days a file was known to still be
+// moving over has settled by now.
+func settledSince(pending []string, cutoff string) bool {
+	for _, day := range pending {
+		if day < cutoff {
+			return true
+		}
+	}
+	return false
 }
 
 // round2 trims the floating point dust that summing hundreds of prices

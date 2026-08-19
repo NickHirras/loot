@@ -27,8 +27,24 @@ const notBuiltPage = `<!doctype html>
 
 // spaHandler serves the embedded single-page app with history fallback: any
 // path that is not a real file returns index.html so client-side routing works.
+// apiPrefixes are the paths that belong to the API rather than to the app. A
+// request under one of them that reached the catch-all is a request for
+// something that does not exist, and the honest answer is 404 — not a page of
+// HTML that a fetch() will try to parse as JSON and report as a syntax error
+// somewhere in the client.
+var apiPrefixes = []string{"/api/", "/hooks/"}
+
 func (s *Server) spaHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		for _, prefix := range apiPrefixes {
+			if strings.HasPrefix(r.URL.Path, prefix) {
+				writeJSON(w, http.StatusNotFound, map[string]any{
+					"error": "no such endpoint: " + r.Method + " " + r.URL.Path,
+				})
+				return
+			}
+		}
+
 		if s.Static == nil || !hasIndex(s.Static) {
 			w.Header().Set("Content-Type", "text/html; charset=utf-8")
 			w.WriteHeader(http.StatusOK)

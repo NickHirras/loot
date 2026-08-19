@@ -152,7 +152,7 @@ func (s *Store) VaultSummary(ctx context.Context, from, to, displayCurrency, tod
 	if out.BySource, out.ByApp, out.ByCountry, err = s.vaultBreakdowns(ctx, from, to, out.Totals.RevenueBase); err != nil {
 		return out, err
 	}
-	if out.Subscriptions, err = s.vaultSubscriptions(ctx); err != nil {
+	if out.Subscriptions, err = s.vaultSubscriptions(ctx, today); err != nil {
 		return out, err
 	}
 	if out.Realtime, err = s.vaultRealtime(ctx, today); err != nil {
@@ -324,19 +324,33 @@ func (s *Store) vaultBreakdowns(ctx context.Context, from, to string, totalReven
 	return bySource, byApp, byCountry, nil
 }
 
-// vaultSubscriptions sums the newest subscription_snapshot per (source, app).
-// Snapshots are absolute counts, not deltas, so the newest one per app wins
-// and the apps are added together.
-func (s *Store) vaultSubscriptions(ctx context.Context) (VaultSubscriptions, error) {
+// subscriptionRecencyDays is how stale a subscription snapshot may be and
+// still be counted. Snapshots are levels rather than flows, so the newest one
+// is normally the answer — but "newest" with no floor means an app that
+// stopped reporting last spring keeps contributing its final subscriber count
+// to the headline forever, and the number quietly stops being true.
+const subscriptionRecencyDays = 14
+
+// vaultSubscriptions sums the newest subscription_snapshot per (source, app),
+// ignoring any that has gone stale. Snapshots are absolute counts, not deltas,
+// so the newest one per (source, app) wins and the apps are added together.
+func (s *Store) vaultSubscriptions(ctx context.Context, today string) (VaultSubscriptions, error) {
+	// An unparsable "today" (there is no such caller, but a nil answer here
+	// would be a worse failure than a missing floor) simply drops the bound.
+	floor := ""
+	if t, err := time.Parse(core.DayLayout, today); err == nil {
+		floor = core.DayOf(t.AddDate(0, 0, -(subscriptionRecencyDays - 1)))
+	}
+
 	rows, err := s.q.QueryContext(ctx, `
         SELECT e.quantity, e.day
         FROM events e
         JOIN (
             SELECT source, app, MAX(day) AS day
-            FROM events WHERE kind = 'subscription_snapshot'
+            FROM events WHERE kind = 'subscription_snapshot' AND day >= ?
             GROUP BY source, app
         ) latest ON latest.source = e.source AND latest.app = e.app AND latest.day = e.day
-        WHERE e.kind = 'subscription_snapshot'`)
+        WHERE e.kind = 'subscription_snapshot'`, floor)
 	if err != nil {
 		return VaultSubscriptions{}, fmt.Errorf("vault subscriptions: %w", err)
 	}

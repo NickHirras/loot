@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from 'svelte'
   import MysteryCard from './MysteryCard.svelte'
   import QuestCard from './QuestCard.svelte'
   import { questsState } from './quests.svelte'
@@ -7,8 +8,10 @@
   import { METRICS, METRIC_LABEL, dayLabel, timeAgo } from './types'
   import { vault } from './vault.svelte'
 
-  // The page owns the polling: mounting starts it, leaving stops it.
-  $effect(() => questsState.activate())
+  // The page owns the polling: mounting starts it, leaving stops it. The
+  // store already untracks its own setup; untracking here as well means a
+  // future edit to either side cannot turn this into a fetch loop.
+  $effect(() => untrack(() => questsState.activate()))
 
   const code = $derived(loot.stats?.display_currency ?? 'USD')
   const board = $derived(questsState.board)

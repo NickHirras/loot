@@ -15,6 +15,15 @@
 // Only installs_per_day is used for events: it is the one field with a date to
 // dedupe on. installs_per_country carries no timestamps, so it cannot be turned
 // into events without double counting.
+//
+// # What is emitted per (app, completed day)
+//
+//	install       silent   Quantity = installs — counted, never a drop
+//	installs_day  chest    Quantity = installs — the day's one drop
+//
+// This is the same shape Snapcraft and Google Play use for daily aggregates,
+// and it is what keeps a 180 day backfill filling chests instead of spraying
+// six months of install counts across the live feed.
 package flathub
 
 import (
@@ -146,7 +155,13 @@ func (s *Source) Poll(ctx context.Context, raw []byte) ([]core.Event, []byte, er
 		// The cursor advances to the newest completed day the API reported,
 		// even for days the floor suppressed, so a backfill window is not
 		// re-evaluated on the next poll.
-		newest := st.LastDate[app]
+		//
+		// It starts at the floor rather than at the empty string, which is
+		// what makes seeding safe: an app whose first successful fetch carried
+		// no installs_per_day at all (a brand new app, or a stats outage)
+		// would otherwise be marked seeded with no cursor, and the next poll
+		// would replay its whole ~180 day window into the feed.
+		newest := floor
 		for day := range stats.InstallsPerDay {
 			if day < today && day > newest {
 				newest = day
@@ -183,26 +198,49 @@ func (s *Source) firstRunFloor(now time.Time) string {
 	return now.AddDate(0, 0, -(days + 1)).Format(dateLayout)
 }
 
-func buildEvent(app, day string, count int, observed time.Time) (core.Event, error) {
+// buildEvents turns one completed day into the two events every daily-aggregate
+// source emits, matching the shape snapcraft and Google Play already use:
+//
+//	install       silent   Quantity = installs — what the vault and quests count
+//	installs_day  chest    Quantity = installs — the day's one drop
+//
+// Splitting them is what keeps a backfill sane. Before, one non-silent
+// `install` event was both the counter and the drop, so a 180 day backfill
+// sprayed six months of install counts across the live feed. The silent row
+// keeps the historical dedupe key ("flathub:<app>:<day>") so an existing
+// database does not re-emit its whole history when Loot is upgraded; the
+// headline gets a new key of its own.
+func buildEvents(app, day string, count int, observed time.Time) ([]core.Event, error) {
 	d, err := time.ParseInLocation(dateLayout, day, time.UTC)
 	if err != nil {
-		return core.Event{}, err
+		return nil, err
 	}
 	payload, _ := json.Marshal(map[string]any{"app": app, "date": day, "installs": count})
-	return core.Event{
-		ID:         core.NewIDAt(d),
-		Source:     Name,
-		Kind:       "install",
-		App:        app,
-		OccurredAt: d,
-		ObservedAt: observed,
-		Country:    "",
-		Amount:     0,
-		Currency:   "",
-		Quantity:   count,
-		DedupeKey:  fmt.Sprintf("flathub:%s:%s", app, day),
-		IsLedger:   false,
-		Payload:    payload,
+
+	mk := func(kind, key string, silent, chest bool) core.Event {
+		return core.Event{
+			ID:         core.NewIDAt(d),
+			Source:     Name,
+			Kind:       kind,
+			App:        app,
+			OccurredAt: d,
+			ObservedAt: observed,
+			Day:        day,
+			Country:    "",
+			Amount:     0,
+			Currency:   "",
+			Quantity:   count,
+			DedupeKey:  key,
+			IsLedger:   false,
+			Silent:     silent,
+			Chest:      chest,
+			Payload:    payload,
+		}
+	}
+
+	return []core.Event{
+		mk("install", fmt.Sprintf("flathub:%s:%s", app, day), true, false),
+		mk("installs_day", fmt.Sprintf("flathub:installs_day:%s:%s", app, day), false, true),
 	}, nil
 }
 
@@ -265,8 +303,8 @@ func EventsFromStats(app string, stats Stats, floor string, now time.Time) []cor
 		if count <= 0 {
 			continue
 		}
-		if ev, err := buildEvent(app, day, count, now); err == nil {
-			events = append(events, ev)
+		if evs, err := buildEvents(app, day, count, now); err == nil {
+			events = append(events, evs...)
 		}
 	}
 	return events

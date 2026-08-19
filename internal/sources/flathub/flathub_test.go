@@ -68,9 +68,11 @@ func TestEventsFromStats(t *testing.T) {
 		t.Fatalf("parse: %v", err)
 	}
 
+	// Two days survive the floor, and each one is a silent row plus a
+	// chest-bound headline.
 	events := flathub.EventsFromStats("org.gnome.Calculator", stats, "2026-08-15", fixtureToday)
-	if len(events) != 2 {
-		t.Fatalf("got %d events, want 2 (16th and 17th)", len(events))
+	if len(events) != 4 {
+		t.Fatalf("got %d events, want 4 (a row and a headline for the 16th and 17th)", len(events))
 	}
 
 	first := events[0]
@@ -86,14 +88,40 @@ func TestEventsFromStats(t *testing.T) {
 	if first.DedupeKey != "flathub:org.gnome.Calculator:2026-08-16" {
 		t.Errorf("dedupe_key = %q", first.DedupeKey)
 	}
+	if first.Day != "2026-08-16" {
+		t.Errorf("day = %q, want the report day", first.Day)
+	}
 	if first.Country != "" || first.Amount != 0 || first.IsLedger {
 		t.Errorf("flathub events carry no country/amount and are not a ledger: %+v", first)
+	}
+	if !first.Silent || first.Chest {
+		t.Errorf("the install row must be silent and never chest-bound: %+v", first)
 	}
 	if !first.OccurredAt.Equal(time.Date(2026, 8, 16, 0, 0, 0, 0, time.UTC)) {
 		t.Errorf("occurred_at = %v", first.OccurredAt)
 	}
+
+	// The headline is the day's one drop, and it goes into that day's chest
+	// rather than onto the live feed.
+	head := events[1]
+	if head.Kind != "installs_day" {
+		t.Fatalf("second event kind = %q, want installs_day", head.Kind)
+	}
+	if head.Silent || !head.Chest {
+		t.Errorf("installs_day must be a chest-bound drop: %+v", head)
+	}
+	if head.Quantity != 587 {
+		t.Errorf("headline quantity = %d, want 587", head.Quantity)
+	}
+	if head.DedupeKey != "flathub:installs_day:org.gnome.Calculator:2026-08-16" {
+		t.Errorf("headline dedupe_key = %q", head.DedupeKey)
+	}
+	if head.Day != "2026-08-16" {
+		t.Errorf("headline day = %q", head.Day)
+	}
+
 	// Events must be ordered oldest first so the feed reads chronologically.
-	if !events[0].OccurredAt.Before(events[1].OccurredAt) {
+	if !events[0].OccurredAt.Before(events[2].OccurredAt) {
 		t.Errorf("events are not in chronological order")
 	}
 
@@ -116,8 +144,8 @@ func TestEventsFromStatsExcludesToday(t *testing.T) {
 	// be emitted, or its partial count would be frozen forever.
 	now := time.Date(2026, 8, 17, 12, 0, 0, 0, time.UTC)
 	events := flathub.EventsFromStats("org.gnome.Calculator", stats, "2026-08-15", now)
-	if len(events) != 1 {
-		t.Fatalf("got %d events, want only the 16th", len(events))
+	if len(events) != 2 {
+		t.Fatalf("got %d events, want only the 16th (row + headline)", len(events))
 	}
 	if events[0].DedupeKey != "flathub:org.gnome.Calculator:2026-08-16" {
 		t.Fatalf("dedupe_key = %q", events[0].DedupeKey)
@@ -157,10 +185,10 @@ func TestPollFirstRunHonoursBackfillWindow(t *testing.T) {
 	if err != nil {
 		t.Fatalf("poll: %v", err)
 	}
-	if len(events) != 3 {
-		t.Fatalf("first run emitted %d events, want 3 (backfill_days)", len(events))
+	if len(events) != 6 {
+		t.Fatalf("first run emitted %d events, want 6 (3 days x row + headline)", len(events))
 	}
-	if events[len(events)-1].DedupeKey != "flathub:org.gnome.Calculator:2026-08-17" {
+	if events[len(events)-1].DedupeKey != "flathub:installs_day:org.gnome.Calculator:2026-08-17" {
 		t.Fatalf("last event = %q", events[len(events)-1].DedupeKey)
 	}
 	if len(state) == 0 {
@@ -214,8 +242,8 @@ func TestPollSinceOverridesBackfill(t *testing.T) {
 	if err != nil {
 		t.Fatalf("poll: %v", err)
 	}
-	if len(events) != 2 {
-		t.Fatalf("--since 2026-08-16 emitted %d events, want 2", len(events))
+	if len(events) != 4 {
+		t.Fatalf("--since 2026-08-16 emitted %d events, want 4 (2 days x row + headline)", len(events))
 	}
 	if events[0].DedupeKey != "flathub:org.gnome.Calculator:2026-08-16" {
 		t.Fatalf("first event = %q, want the since date inclusive", events[0].DedupeKey)
@@ -231,8 +259,63 @@ func TestPollResumesFromCursor(t *testing.T) {
 	if err != nil {
 		t.Fatalf("poll: %v", err)
 	}
-	if len(events) != 3 {
-		t.Fatalf("got %d events, want 3 (15th, 16th, 17th)", len(events))
+	if len(events) != 6 {
+		t.Fatalf("got %d events, want 6 (15th, 16th, 17th, each a row + a headline)", len(events))
+	}
+}
+
+// A first fetch that carried no installs_per_day at all must still seed the
+// cursor. Without it the app was marked seeded with an empty LastDate, and the
+// next poll — against a stats response that had filled in by then — replayed
+// the whole ~180 day window into the feed.
+func TestPollSeedsCursorWhenFirstFetchIsEmpty(t *testing.T) {
+	ctx := context.Background()
+
+	var body []byte
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write(body)
+	}))
+	defer srv.Close()
+
+	s := flathub.New([]string{"org.gnome.Calculator"}, 0, "", quietLogger())
+	s.BaseURL = srv.URL
+	s.Client = srv.Client()
+	s.Now = func() time.Time { return fixtureToday }
+
+	// A brand new app: the endpoint answers, but with no daily installs yet.
+	body = []byte(`{"id":"org.gnome.Calculator","installs_total":0,"installs_per_day":{}}`)
+	events, state, err := s.Poll(ctx, nil)
+	if err != nil {
+		t.Fatalf("first poll: %v", err)
+	}
+	if len(events) != 0 {
+		t.Fatalf("an empty stats response emitted %d events", len(events))
+	}
+
+	var decoded struct {
+		LastDate map[string]string `json:"last_date"`
+		Seeded   map[string]bool   `json:"seeded"`
+	}
+	if err := json.Unmarshal(state, &decoded); err != nil {
+		t.Fatalf("decode state: %v", err)
+	}
+	if !decoded.Seeded["org.gnome.Calculator"] {
+		t.Fatal("app was not marked as seeded")
+	}
+	if got := decoded.LastDate["org.gnome.Calculator"]; got != "2026-08-17" {
+		t.Fatalf("cursor = %q, want the first-run floor 2026-08-17", got)
+	}
+
+	// The stats now carry the full window. Only days after the seeded floor
+	// may be emitted — which, with backfill_days 0, is none of them.
+	body = loadFixture(t)
+	events, _, err = s.Poll(ctx, state)
+	if err != nil {
+		t.Fatalf("second poll: %v", err)
+	}
+	if len(events) != 0 {
+		t.Fatalf("second poll replayed %d events; the backfill window escaped", len(events))
 	}
 }
 

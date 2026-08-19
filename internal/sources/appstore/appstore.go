@@ -48,6 +48,14 @@ const (
 	// forever on it.
 	assumeEmptyAfterDays = 3
 
+	// maxSkipAttempts is how many times a stepped-over day is asked for again
+	// before it is written off as genuinely empty. Moving the cursor past a
+	// missing day is a guess, and the cheap way to check the guess is to ask
+	// again tomorrow: a report Apple published late — which happens after an
+	// outage on their side — would otherwise be lost for good, and a day of
+	// real revenue would simply never appear in the vault.
+	maxSkipAttempts = 5
+
 	// maxSubsUnavailable is how many consecutive 404s it takes before Loot
 	// stops asking for the subscription report. An account with no
 	// subscriptions never has one, and asking daily forever is noise.
@@ -88,12 +96,25 @@ func reportLocation() *time.Location {
 // the next poll will attempt: it is written when a day's report is not ready
 // yet, so the state file explains a stalled cursor without needing the logs.
 type state struct {
-	LastCompleteDay       string   `json:"last_complete_day,omitempty"`
-	PendingDays           []string `json:"pending_days,omitempty"`
-	SubsUnavailableStreak int      `json:"subs_unavailable_streak,omitempty"`
-	SubsDisabledSince     string   `json:"subs_disabled_since,omitempty"`
-	SubsDay               string   `json:"subs_day,omitempty"`
-	Seeded                bool     `json:"seeded"`
+	LastCompleteDay string   `json:"last_complete_day,omitempty"`
+	PendingDays     []string `json:"pending_days,omitempty"`
+	// SkippedDays are report days the cursor was moved past without a report,
+	// keyed by day. They are asked for again on later polls until Apple
+	// answers or maxSkipAttempts is used up.
+	SkippedDays           map[string]SkippedDay `json:"skipped_days,omitempty"`
+	SubsUnavailableStreak int                   `json:"subs_unavailable_streak,omitempty"`
+	SubsDisabledSince     string                `json:"subs_disabled_since,omitempty"`
+	SubsDay               string                `json:"subs_day,omitempty"`
+	Seeded                bool                  `json:"seeded"`
+}
+
+// SkippedDay records one stepped-over report day: how many times it has been
+// asked for, and on which calendar day it was last tried. The last-try day is
+// what spreads the attempts across days rather than burning all five inside
+// one morning's polls.
+type SkippedDay struct {
+	Attempts int    `json:"attempts"`
+	LastTry  string `json:"last_try,omitempty"`
 }
 
 // Source implements core.Source over the App Store Connect sales reports.
@@ -242,11 +263,13 @@ func (s *Source) Poll(ctx context.Context, raw []byte) ([]core.Event, []byte, er
 		if err != nil {
 			if errors.Is(err, errNotReady) {
 				// Old enough that "not generated yet" is no longer credible:
-				// the day was simply empty, so step over it.
+				// the day was probably empty, so step over it — but write it
+				// down and ask again over the next few days, because "probably"
+				// is not the same as "certainly" and a late report is a day of
+				// revenue that would otherwise never arrive.
 				if day < addDays(yesterday, -assumeEmptyAfterDays) {
-					s.log().Debug("appstore: no report for an old day, assuming it was empty",
-						"day", day)
 					st.LastCompleteDay = maxDay(st.LastCompleteDay, day)
+					s.recordSkipped(&st, day, today)
 					continue
 				}
 				s.log().Debug("appstore: report not ready yet", "day", day, "error", err)
@@ -269,7 +292,10 @@ func (s *Source) Poll(ctx context.Context, raw []byte) ([]core.Event, []byte, er
 		}
 		events = append(events, dayEvents...)
 		st.LastCompleteDay = maxDay(st.LastCompleteDay, day)
-		newest = day
+		// A day that was stepped over and has now answered is settled: stop
+		// asking about it.
+		delete(st.SkippedDays, day)
+		newest = maxDay(newest, day)
 	}
 
 	st.Seeded = true
@@ -336,28 +362,76 @@ func (s *Source) fetchSubscriptions(ctx context.Context, day string, observed ti
 	return events, nil
 }
 
+// recordSkipped notes one more failed attempt at a stepped-over day, or writes
+// the day off once the attempts are used up. At most one attempt is counted
+// per calendar day, so the five tries are spread over five days rather than
+// spent in five consecutive hourly polls.
+func (s *Source) recordSkipped(st *state, day, today string) {
+	if st.SkippedDays == nil {
+		st.SkippedDays = map[string]SkippedDay{}
+	}
+	rec := st.SkippedDays[day]
+	if rec.LastTry == today && rec.Attempts > 0 {
+		return
+	}
+	rec.Attempts++
+	rec.LastTry = today
+
+	if rec.Attempts >= maxSkipAttempts {
+		delete(st.SkippedDays, day)
+		s.log().Info("appstore: still no report for this day after several tries; treating it as an empty day",
+			"day", day, "attempts", rec.Attempts)
+		return
+	}
+	st.SkippedDays[day] = rec
+	s.log().Debug("appstore: no report for an old day; will ask again",
+		"day", day, "attempts", rec.Attempts)
+}
+
 // daysToFetch lists the report days this poll should try, oldest first: the
-// pending days from last time, plus everything from the cursor to yesterday.
+// pending days from last time, everything from the cursor to yesterday, and
+// any stepped-over day that is due for another attempt.
 func (s *Source) daysToFetch(st state, today string) []string {
 	yesterday := addDays(today, -1)
+	retention := addDays(today, -maxBackfillDays)
 
 	start := s.firstRunFloor(today)
 	if st.Seeded && st.LastCompleteDay != "" {
 		start = maxDay(start, addDays(st.LastCompleteDay, 1))
 	}
 	// Never reach past Apple's retention window, however long Loot was off.
-	if floor := addDays(today, -maxBackfillDays); start < floor {
-		start = floor
+	if start < retention {
+		start = retention
 	}
 	for _, p := range st.PendingDays {
-		if p < start && p >= addDays(today, -maxBackfillDays) {
+		if p < start && p >= retention {
 			start = p
 		}
 	}
 
+	seen := map[string]bool{}
 	var days []string
-	for day := start; day <= yesterday; day = addDays(day, 1) {
+	add := func(day string) {
+		if seen[day] {
+			return
+		}
+		seen[day] = true
 		days = append(days, day)
+	}
+
+	// Retries first: they are older than the cursor, and the per-poll cap must
+	// not be spent on the forward window before they get a look in.
+	for day, rec := range st.SkippedDays {
+		if rec.Attempts >= maxSkipAttempts || rec.LastTry == today {
+			continue
+		}
+		if day > yesterday || day < retention {
+			continue
+		}
+		add(day)
+	}
+	for day := start; day <= yesterday; day = addDays(day, 1) {
+		add(day)
 		if len(days) >= maxDaysPerPoll {
 			break
 		}
@@ -389,10 +463,14 @@ func (s *Source) firstRunFloor(today string) string {
 func decodeState(raw []byte) state {
 	var st state
 	if len(raw) == 0 {
+		st.SkippedDays = map[string]SkippedDay{}
 		return st
 	}
 	if err := json.Unmarshal(raw, &st); err != nil {
-		return state{}
+		return state{SkippedDays: map[string]SkippedDay{}}
+	}
+	if st.SkippedDays == nil {
+		st.SkippedDays = map[string]SkippedDay{}
 	}
 	return st
 }

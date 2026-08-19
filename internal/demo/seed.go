@@ -742,8 +742,9 @@ func (d *Demo) playInstalls(ctx context.Context, pipe *pipeline.Pipeline, p dayP
 	})
 }
 
-// flathubDay emits the one install event Flathub reports per app per completed
-// day. It is not silent: on Flathub the day's install count *is* the news.
+// flathubDay emits what Flathub reports per app per completed day, in the same
+// two-event shape the real source uses: a silent `install` row carrying the
+// count, and a chest-bound `installs_day` headline.
 func (d *Demo) flathubDay(ctx context.Context, pipe *pipeline.Pipeline, p dayPlan, a app) error {
 	if a.Flatpak == "" || a.FlathubBase == 0 {
 		return nil
@@ -756,18 +757,32 @@ func (d *Demo) flathubDay(ctx context.Context, pipe *pipeline.Pipeline, p dayPla
 	if err != nil {
 		return fmt.Errorf("demo: encode flathub payload: %w", err)
 	}
-	return d.ingest(ctx, pipe, core.Event{
-		ID:         core.NewIDAt(p.day),
+
+	base := core.Event{
 		Source:     "flathub",
-		Kind:       "install",
 		App:        a.Flatpak,
 		OccurredAt: p.day,
 		ObservedAt: p.day,
 		Day:        p.date,
 		Quantity:   installs,
-		DedupeKey:  fmt.Sprintf("flathub:%s:%s", a.Flatpak, p.date),
 		Payload:    payload,
-	})
+	}
+
+	row := base
+	row.ID = core.NewIDAt(p.day)
+	row.Kind = "install"
+	row.Silent = true
+	row.DedupeKey = fmt.Sprintf("flathub:%s:%s", a.Flatpak, p.date)
+	if err := d.ingest(ctx, pipe, row); err != nil {
+		return err
+	}
+
+	headline := base
+	headline.ID = core.NewIDAt(p.day)
+	headline.Kind = "installs_day"
+	headline.Chest = true
+	headline.DedupeKey = fmt.Sprintf("flathub:installs_day:%s:%s", a.Flatpak, p.date)
+	return d.ingest(ctx, pipe, headline)
 }
 
 // revenueCatDay replays the day's real-time subscription traffic: the

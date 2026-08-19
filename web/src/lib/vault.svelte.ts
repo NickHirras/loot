@@ -1,3 +1,4 @@
+import { untrack } from 'svelte'
 import { fetchVaultSummary } from './api'
 import type { VaultRange, VaultSummary } from './types'
 import { VAULT_RANGES } from './types'
@@ -32,20 +33,37 @@ class VaultState {
   #active = false
   /** Set when a load was asked for while one was already in flight. */
   #again = false
+  /**
+   * The in-flight guard, deliberately *not* `$state`. `activate()` is called
+   * straight out of an `$effect`, so anything reactive that `load()` reads on
+   * its synchronous path becomes a dependency of that effect — and `loading`
+   * is written when the fetch settles, which would re-run the effect, restart
+   * the poller and fetch again, forever. `loading` stays reactive for the UI;
+   * only this shadow decides whether a load is already running.
+   */
+  #loading = false
   #timer: ReturnType<typeof setInterval> | null = null
   #staleTimer: ReturnType<typeof setTimeout> | null = null
 
-  /** Called by the page while it is mounted: loads now, then polls. */
+  /**
+   * Called by the page while it is mounted: loads now, then polls. The whole
+   * body is untracked so that calling this from an `$effect` never subscribes
+   * that effect to anything touched during setup — notably `range`, which the
+   * load reads — and the caller gets a plain teardown function and nothing
+   * else.
+   */
   activate(): () => void {
-    this.#active = true
-    void this.load()
-    this.#timer = setInterval(() => void this.load(), REFRESH_MS)
-    return () => {
-      this.#active = false
-      if (this.#timer) clearInterval(this.#timer)
-      if (this.#staleTimer) clearTimeout(this.#staleTimer)
-      this.#timer = this.#staleTimer = null
-    }
+    return untrack(() => {
+      this.#active = true
+      void this.load()
+      this.#timer = setInterval(() => void this.load(), REFRESH_MS)
+      return () => {
+        this.#active = false
+        if (this.#timer) clearInterval(this.#timer)
+        if (this.#staleTimer) clearTimeout(this.#staleTimer)
+        this.#timer = this.#staleTimer = null
+      }
+    })
   }
 
   setRange(range: VaultRange): void {
@@ -71,12 +89,13 @@ class VaultState {
   }
 
   async load(): Promise<void> {
-    if (this.loading) {
+    if (this.#loading) {
       this.#again = true
       return
     }
+    this.#loading = true
     this.loading = true
-    const wanted = this.range
+    const wanted = untrack(() => this.range)
     try {
       const summary = await fetchVaultSummary(wanted)
       // A range change mid-flight must not overwrite the newer request.
@@ -87,6 +106,7 @@ class VaultState {
       this.error = err instanceof Error ? err.message : String(err)
     } finally {
       this.loading = false
+      this.#loading = false
       if (this.#again) {
         this.#again = false
         void this.load()

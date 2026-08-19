@@ -636,18 +636,30 @@ func TestSettlementEmittedOncePerCountryIncludingSilentEvents(t *testing.T) {
 		t.Fatalf("ingest row: %v", err)
 	}
 
-	drops := listDrops(t, st)
-	if len(drops) != 1 {
-		t.Fatalf("got %d drops, want just the settlement", len(drops))
+	// The settlement is real, but it belongs to the report day's chest rather
+	// than to the live feed: a silent ledger row is backfilled history.
+	if drops := listDrops(t, st); len(drops) != 0 {
+		t.Fatalf("a backfilled settlement leaked into the feed: %+v", drops)
 	}
-	if drops[0].Kind != "settlement" || drops[0].Country != "JP" {
-		t.Fatalf("drop = %+v, want a JP settlement", drops[0])
+	chests, err := st.ListChest(ctx)
+	if err != nil {
+		t.Fatalf("list chest: %v", err)
 	}
-	if drops[0].Rarity != core.Rare {
-		t.Fatalf("settlement rarity = %s, want rare", drops[0].Rarity)
+	if len(chests) != 1 || len(chests[0].Drops) != 1 {
+		t.Fatalf("chest = %+v, want exactly the settlement", chests)
 	}
-	if !strings.Contains(drops[0].Subtitle, "appstore") {
-		t.Fatalf("subtitle = %q, want the source that found the country", drops[0].Subtitle)
+	held := chests[0].Drops[0]
+	if chests[0].Date != "2026-08-17" {
+		t.Fatalf("settlement filed under %s, want the row's own day", chests[0].Date)
+	}
+	if held.Kind != "settlement" || held.Country != "JP" {
+		t.Fatalf("drop = %+v, want a JP settlement", held)
+	}
+	if held.Rarity != core.Rare {
+		t.Fatalf("settlement rarity = %s, want rare", held.Rarity)
+	}
+	if !strings.Contains(held.Subtitle, "appstore") {
+		t.Fatalf("subtitle = %q, want the source that found the country", held.Subtitle)
 	}
 
 	// A second event from the same country settles nothing new.
@@ -657,8 +669,67 @@ func TestSettlementEmittedOncePerCountryIncludingSilentEvents(t *testing.T) {
 	if _, err := p.Ingest(ctx, row2); err != nil {
 		t.Fatalf("ingest second row: %v", err)
 	}
-	if drops := listDrops(t, st); len(drops) != 1 {
-		t.Fatalf("got %d drops, want the settlement to stay unique", len(drops))
+	chests, err = st.ListChest(ctx)
+	if err != nil {
+		t.Fatalf("list chest: %v", err)
+	}
+	if len(chests) != 1 || chests[0].Count != 1 {
+		t.Fatalf("chest = %+v, want the settlement to stay unique", chests)
+	}
+}
+
+// A silent ledger row is a backfill, so the settlement it reveals is
+// chest-bound under the row's own day — this is the bug that turned a 30 day
+// App Store backfill into forty immediate rare drops. A realtime event is not
+// silent, so its settlement still lands live.
+func TestSettlementFromSilentRowIsChestBoundButRealtimeStaysLive(t *testing.T) {
+	ctx := context.Background()
+	p, st, _ := newPipeline(t)
+
+	silent := core.Event{
+		Source:    "appstore",
+		Kind:      "sale",
+		App:       "com.example.app",
+		Day:       "2026-07-04",
+		Country:   "SE",
+		Amount:    3,
+		Currency:  "USD",
+		Quantity:  1,
+		IsLedger:  true,
+		Silent:    true,
+		DedupeKey: "appstore:2026-07-04:se:1",
+	}
+	if _, err := p.Ingest(ctx, silent); err != nil {
+		t.Fatalf("ingest silent row: %v", err)
+	}
+	if drops := listDrops(t, st); len(drops) != 0 {
+		t.Fatalf("silent-row settlement went straight to the feed: %+v", drops)
+	}
+	chests, err := st.ListChest(ctx)
+	if err != nil {
+		t.Fatalf("list chest: %v", err)
+	}
+	if len(chests) != 1 || chests[0].Date != "2026-07-04" {
+		t.Fatalf("chests = %+v, want one for the row's day", chests)
+	}
+
+	// A live RevenueCat purchase from a new country is news right now.
+	live := purchase("rc:se-live")
+	live.Country = "PT"
+	if _, err := p.Ingest(ctx, live); err != nil {
+		t.Fatalf("ingest realtime: %v", err)
+	}
+	var settled bool
+	for _, d := range listDrops(t, st) {
+		if d.Kind == "settlement" && d.Country == "PT" {
+			if d.ChestDate != "" {
+				t.Fatalf("realtime settlement was held for chest %s", d.ChestDate)
+			}
+			settled = true
+		}
+	}
+	if !settled {
+		t.Fatal("a realtime purchase from a new country did not settle live")
 	}
 }
 
@@ -681,5 +752,70 @@ func TestSettlementInheritsTheChestHint(t *testing.T) {
 	}
 	if len(chests) != 1 || chests[0].Count != 2 {
 		t.Fatalf("chest = %+v, want the summary and its settlement", chests)
+	}
+}
+
+// A source that reports an amount without saying which currency it is in is
+// reporting money of unknown denomination, not money in the display currency.
+// Assuming the latter quietly added a foreign report's figures to the vault at
+// par: plausible, wrong, and invisible.
+func TestAmountWithNoCurrencyDoesNotReachTheVault(t *testing.T) {
+	ctx := context.Background()
+	p, st, _ := newPipeline(t)
+
+	ev := core.Event{
+		Source:    "webhook",
+		Kind:      "sale",
+		App:       "com.example.app",
+		Day:       "2026-08-17",
+		Amount:    42,
+		Currency:  "",
+		Quantity:  1,
+		IsLedger:  true,
+		DedupeKey: "webhook:nocurrency:1",
+	}
+	if _, err := p.Ingest(ctx, ev); err != nil {
+		t.Fatalf("ingest: %v", err)
+	}
+
+	drops := listDrops(t, st)
+	if len(drops) != 1 {
+		t.Fatalf("got %d drops, want 1", len(drops))
+	}
+	if drops[0].Amount != 42 {
+		t.Errorf("amount = %v, want the reported 42 kept as-is", drops[0].Amount)
+	}
+	if drops[0].AmountBase != 0 {
+		t.Errorf("amount_base = %v, want 0: nobody said what currency this is", drops[0].AmountBase)
+	}
+
+	vault, err := st.VaultSummary(ctx, "2026-08-01", "2026-08-31", "USD", "2026-08-31")
+	if err != nil {
+		t.Fatalf("vault summary: %v", err)
+	}
+	if vault.Totals.RevenueBase != 0 {
+		t.Errorf("vault revenue = %v, want 0", vault.Totals.RevenueBase)
+	}
+	// The units are still counted: something was sold, we just do not know
+	// what it was worth.
+	if vault.Totals.Units != 1 {
+		t.Errorf("vault units = %d, want 1", vault.Totals.Units)
+	}
+
+	// And an amount that *does* name its currency still converts.
+	priced := ev
+	priced.ID = ""
+	priced.Currency = "EUR"
+	priced.DedupeKey = "webhook:eur:1"
+	priced.Amount = 8
+	if _, err := p.Ingest(ctx, priced); err != nil {
+		t.Fatalf("ingest priced: %v", err)
+	}
+	vault, err = st.VaultSummary(ctx, "2026-08-01", "2026-08-31", "USD", "2026-08-31")
+	if err != nil {
+		t.Fatalf("vault summary: %v", err)
+	}
+	if vault.Totals.RevenueBase != 10 {
+		t.Errorf("vault revenue = %v, want 10 (8 EUR at 0.8)", vault.Totals.RevenueBase)
 	}
 }

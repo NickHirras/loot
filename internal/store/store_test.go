@@ -3,6 +3,8 @@ package store_test
 import (
 	"context"
 	"path/filepath"
+	"strconv"
+	"sync"
 	"testing"
 	"time"
 
@@ -309,5 +311,125 @@ func TestMigrationsAreIdempotent(t *testing.T) {
 
 	if n, err := st2.EventCount(ctx, ""); err != nil || n != 1 {
 		t.Fatalf("after reopen: %d events, %v; want 1", n, err)
+	}
+}
+
+// chestDrop stores one event and one chest-bound drop for it.
+func chestDrop(t *testing.T, st *store.Store, chestDate, dedupe string, rarity core.Rarity, xp int) core.Drop {
+	t.Helper()
+	ctx := context.Background()
+
+	ev := sampleEvent(dedupe)
+	ev.Chest = true
+	ev.Day = chestDate
+	if _, err := st.InsertEvent(ctx, ev); err != nil {
+		t.Fatalf("insert event %s: %v", dedupe, err)
+	}
+	d := core.Drop{
+		ID:        core.NewID(),
+		EventID:   ev.ID,
+		Rarity:    rarity,
+		Title:     "held " + dedupe,
+		XP:        xp,
+		CreatedAt: time.Now().UTC(),
+		ChestDate: chestDate,
+	}
+	if err := st.InsertDrop(ctx, d); err != nil {
+		t.Fatalf("insert drop %s: %v", dedupe, err)
+	}
+	return d
+}
+
+// A chest opens exactly once. Selecting the drops and stamping them in two
+// statements left a window where two openers — the button and the auto-open
+// sweep, or two browsers — both got the whole chest and both cascaded it onto
+// the feed.
+func TestRevealChestHandsOutItsDropsExactlyOnce(t *testing.T) {
+	ctx := context.Background()
+	st := newStore(t)
+
+	chestDrop(t, st, "2026-08-17", "chest:1", core.Common, 10)
+	chestDrop(t, st, "2026-08-17", "chest:2", core.Legendary, 1000)
+	chestDrop(t, st, "2026-08-17", "chest:3", core.Cursed, 5)
+
+	now := time.Now().UTC()
+	first, err := st.RevealChest(ctx, "2026-08-17", now)
+	if err != nil {
+		t.Fatalf("first reveal: %v", err)
+	}
+	if len(first) != 3 {
+		t.Fatalf("first reveal returned %d drops, want 3", len(first))
+	}
+	// Cascade order: cursed first, best news last.
+	if first[0].Rarity != core.Cursed || first[len(first)-1].Rarity != core.Legendary {
+		t.Errorf("cascade order = %s..%s, want cursed..legendary",
+			first[0].Rarity, first[len(first)-1].Rarity)
+	}
+	for _, d := range first {
+		if d.RevealedAt == nil {
+			t.Errorf("drop %s came back without a revealed_at", d.ID)
+		}
+	}
+
+	second, err := st.RevealChest(ctx, "2026-08-17", now.Add(time.Second))
+	if err != nil {
+		t.Fatalf("second reveal: %v", err)
+	}
+	if len(second) != 0 {
+		t.Fatalf("opening an already-open chest handed out %d drops again", len(second))
+	}
+
+	if chests, err := st.ChestSummaries(ctx); err != nil {
+		t.Fatal(err)
+	} else if len(chests) != 0 {
+		t.Errorf("chest %v is still listed as unopened", chests)
+	}
+}
+
+// The same guarantee under concurrency. Loot opens SQLite with one connection,
+// so the goroutines serialize at the pool — which is exactly the case that
+// used to interleave a SELECT and an UPDATE.
+func TestRevealChestIsAtomicUnderConcurrentOpens(t *testing.T) {
+	ctx := context.Background()
+	st := newStore(t)
+
+	const held = 5
+	for i := 0; i < held; i++ {
+		chestDrop(t, st, "2026-08-17", "race:"+strconv.Itoa(i), core.Rare, 100)
+	}
+
+	const openers = 8
+	var (
+		wg    sync.WaitGroup
+		mu    sync.Mutex
+		total int
+		errs  []error
+	)
+	start := make(chan struct{})
+	now := time.Now().UTC()
+
+	for i := 0; i < openers; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-start
+			drops, err := st.RevealChest(ctx, "2026-08-17", now)
+			mu.Lock()
+			defer mu.Unlock()
+			if err != nil {
+				errs = append(errs, err)
+				return
+			}
+			total += len(drops)
+		}()
+	}
+	close(start)
+	wg.Wait()
+
+	for _, err := range errs {
+		t.Errorf("concurrent reveal: %v", err)
+	}
+	if total != held {
+		t.Fatalf("%d openers handed out %d drops between them, want exactly %d", openers, total, held)
 	}
 }

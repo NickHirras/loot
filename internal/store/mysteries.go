@@ -242,6 +242,31 @@ func (s *Store) ListMysteries(ctx context.Context, q MysteryQuery) ([]core.Myste
 	return out, nil
 }
 
+// OpenMysteriesOfKind returns every still-open mystery of one kind, newest
+// flagged day first. The silence detector uses it to ask a question once per
+// quiet (source, app) rather than once per quiet day.
+func (s *Store) OpenMysteriesOfKind(ctx context.Context, kind string) ([]core.Mystery, error) {
+	rows, err := s.q.QueryContext(ctx, `SELECT `+mysteryColumns+` FROM mysteries
+        WHERE kind = ? AND status = ? ORDER BY day DESC, id DESC`, kind, core.MysteryOpen)
+	if err != nil {
+		return nil, fmt.Errorf("open mysteries of kind %s: %w", kind, err)
+	}
+	defer rows.Close()
+
+	out := []core.Mystery{}
+	for rows.Next() {
+		m, err := scanMystery(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, m)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate open mysteries of kind %s: %w", kind, err)
+	}
+	return out, nil
+}
+
 // GetMystery returns one mystery by id, or ErrMysteryNotFound.
 func (s *Store) GetMystery(ctx context.Context, id string) (core.Mystery, error) {
 	rows, err := s.q.QueryContext(ctx, `SELECT `+mysteryColumns+` FROM mysteries WHERE id = ?`, id)

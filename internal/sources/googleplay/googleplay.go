@@ -125,7 +125,24 @@ type state struct {
 	// summary for. Late rows for an earlier day are still stored; they just do
 	// not mint a second summary, because the vault sums the rows.
 	SummarizedDays map[string]string `json:"summarized_days"`
-	// InstallsCursor maps a package to the newest statistics day emitted.
+	// PendingSalesDays maps a monthly sales object to the days it carried rows
+	// for that were not settled yet when it was last read.
+	//
+	// A day is only summarized once the report has stopped moving under it, so
+	// the newest day or two of a file are always left over. Normally the next
+	// poll re-reads the file anyway — Play rewrites the month daily and the
+	// md5 changes — but the last days of a month are the exception: by the
+	// time they settle, the month is over and the file has stopped changing,
+	// so the md5 skip meant the 31st never got its chest at all. Remembering
+	// what was left over lets one deliberate re-download collect it.
+	PendingSalesDays map[string][]string `json:"pending_sales_days,omitempty"`
+	// InstallsCursor maps "<package>|<dimension>" to the newest statistics day
+	// emitted from that report. It is keyed per dimension, not per package,
+	// because the overview and country files for a month are separate objects
+	// with separate md5s: a poll that read the overview and skipped the
+	// unchanged country file would otherwise advance the package's cursor
+	// past days whose country rows had never been read, and those settlements
+	// would never arrive.
 	InstallsCursor map[string]string `json:"installs_cursor"`
 	// InstallsFiles is the md5 skip list for the statistics CSVs, the same
 	// trick as SalesFiles.
@@ -145,13 +162,38 @@ func decodeState(raw []byte) state {
 	if st.SummarizedDays == nil {
 		st.SummarizedDays = map[string]string{}
 	}
+	if st.PendingSalesDays == nil {
+		st.PendingSalesDays = map[string][]string{}
+	}
 	if st.InstallsCursor == nil {
 		st.InstallsCursor = map[string]string{}
 	}
 	if st.InstallsFiles == nil {
 		st.InstallsFiles = map[string]string{}
 	}
+	migrateInstallsCursor(&st)
 	return st
+}
+
+// installsCursorKey is how the statistics cursor is keyed: one per (package,
+// report dimension).
+func installsCursorKey(pkg, dimension string) string { return pkg + "|" + dimension }
+
+// migrateInstallsCursor upgrades a state blob written when the cursor was one
+// entry per package. Each legacy entry seeds both dimensions, so an existing
+// install neither replays its whole window nor loses its place.
+func migrateInstallsCursor(st *state) {
+	for key, day := range st.InstallsCursor {
+		if strings.Contains(key, "|") {
+			continue
+		}
+		for _, dimension := range installsDimensions {
+			if k := installsCursorKey(key, dimension); st.InstallsCursor[k] < day {
+				st.InstallsCursor[k] = day
+			}
+		}
+		delete(st.InstallsCursor, key)
+	}
 }
 
 // Poll reads the sales and statistics reports for the months in the backfill

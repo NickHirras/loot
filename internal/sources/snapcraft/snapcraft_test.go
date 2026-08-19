@@ -233,6 +233,42 @@ func TestEventsFromMetricsRespectsFloor(t *testing.T) {
 	}
 }
 
+// A day the store has not published yet sits between two days it has. The
+// cursor must stop *before* the hole, or that day's figures are never read
+// once they land — the events past the hole are still emitted, because their
+// dedupe keys make re-reading them free.
+func TestEventsFromMetricsCursorStopsAtAnUnpublishedDay(t *testing.T) {
+	f := func(v float64) *float64 { return &v }
+	resp := MetricsResponse{Metrics: []Metric{{
+		Status:     "OK",
+		SnapID:     testSnapID,
+		MetricName: metricDailyDeviceChange,
+		Buckets:    []string{"2026-08-12", "2026-08-13", "2026-08-14", "2026-08-15"},
+		Series: []Series{
+			{Name: seriesNew, Values: []*float64{f(10), f(11), nil, f(13)}},
+			{Name: seriesContinued, Values: []*float64{f(100), f(101), nil, f(103)}},
+			{Name: seriesLost, Values: []*float64{f(1), f(1), nil, f(1)}},
+		},
+	}}}
+
+	events, newest := EventsFromMetrics("tide-clock", testSnapID, resp,
+		"2026-08-11", "2026-08-16", fixtureToday)
+	if newest != "2026-08-13" {
+		t.Fatalf("cursor = %q, want 2026-08-13: the 14th was never published", newest)
+	}
+
+	days := map[string]bool{}
+	for _, e := range events {
+		days[e.Day] = true
+	}
+	if days["2026-08-14"] {
+		t.Error("an unpublished day produced events")
+	}
+	if !days["2026-08-15"] {
+		t.Error("the day after the hole was dropped; only the cursor should wait")
+	}
+}
+
 func keysOf(m map[string]core.Event) []string {
 	out := make([]string, 0, len(m))
 	for k := range m {

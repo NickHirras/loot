@@ -207,6 +207,27 @@ func (a Acquisition) sku() string {
 	}
 }
 
+// normalizeDownloads zeroes the money on free acquisitions *before* they are
+// grouped, which is the only place it can safely be done.
+//
+// A download is units and a country, never money: a stray price on a free
+// acquisition would otherwise book revenue nobody was paid. But the currency
+// is part of the dedupe key, so zeroing it after grouping meant two groups
+// that differed only in whether the API had reported a localCurrencyCode
+// collapsed onto one key at emit time — and the pipeline, doing exactly what
+// it is told, dropped the second as a duplicate along with its units.
+// Normalizing first makes those two rows one group, summed, with one key.
+func normalizeDownloads(rows []Acquisition) []Acquisition {
+	out := make([]Acquisition, 0, len(rows))
+	for _, row := range rows {
+		if kindFor(row) == KindDownload {
+			row.Amount, row.Currency, row.Gross = 0, "", false
+		}
+		out = append(out, row)
+	}
+	return out
+}
+
 // group folds rows onto their dedupe key, summing quantities and money, and
 // returns them sorted by that key. Grouping *before* emitting is what makes a
 // re-sweep of an already-ingested day a no-op instead of a pile of near
@@ -309,7 +330,7 @@ func newDayAggregate(storeID string) *dayAggregate {
 // storeID and appName name the app when a row does not (grouped responses omit
 // applicationName unless it is in the groupby).
 func BuildEvents(storeID, appName string, rows []Acquisition, from, to string, observed time.Time) ([]core.Event, error) {
-	grouped := group(rows)
+	grouped := group(normalizeDownloads(rows))
 
 	var (
 		events     = make([]core.Event, 0, len(grouped)+1)
@@ -333,11 +354,6 @@ func BuildEvents(storeID, appName string, rows []Acquisition, from, to string, o
 			return nil, fmt.Errorf("microsoftstore: bad acquisition date %q: %w", row.Date, err)
 		}
 		kind := kindFor(row)
-		if kind == KindDownload {
-			// A download is units and a country, never money: a stray price on
-			// a free acquisition would otherwise book revenue nobody was paid.
-			row.Amount, row.Currency, row.Gross = 0, "", false
-		}
 
 		agg, ok := aggregates[row.Date]
 		if !ok {

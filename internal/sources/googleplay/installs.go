@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -14,6 +15,11 @@ import (
 
 // installsPrefix is the bucket folder holding the statistics reports.
 const installsPrefix = "stats/installs/"
+
+// installsDimensions are the two report dimensions Loot reads. Play publishes
+// a dozen more (device, os_version, carrier, language, app_version, tablets…);
+// none carries a fact Loot has a use for, and every one is a lot of bytes.
+var installsDimensions = []string{"overview", "country"}
 
 // installsObjectRe splits stats/installs/installs_<package>_YYYYMM_<dimension>.csv.
 // Package names contain dots and sometimes underscores, so the six-digit month
@@ -106,9 +112,11 @@ func (s *Source) pollInstalls(ctx context.Context, st *state, months []string, n
 	}
 	today := now.UTC().Format(core.DayLayout)
 
-	// The cursor is read from a snapshot and written once at the end: an
-	// overview file that advanced it must not hide the country file's rows for
-	// the same days, which arrive later in the same poll.
+	// The cursor is read from a snapshot and written once at the end, and it is
+	// keyed per (package, dimension): the overview and country files for a
+	// month are separate objects with separate md5s, so one of them can be
+	// skipped as unchanged while the other is re-read, and a shared cursor
+	// would then hide the skipped file's rows forever.
 	start := make(map[string]string, len(st.InstallsCursor))
 	for k, v := range st.InstallsCursor {
 		start[k] = v
@@ -130,10 +138,7 @@ func (s *Source) pollInstalls(ctx context.Context, st *state, months []string, n
 			continue
 		}
 		pkg, month, dimension := m[1], m[2], m[3]
-		// Play publishes a dozen dimensions (device, os_version, carrier,
-		// language, app_version, tablets…). Only two carry facts Loot has a
-		// use for; the rest would be a lot of bytes for no drops.
-		if dimension != "overview" && dimension != "country" {
+		if !slices.Contains(installsDimensions, dimension) {
 			continue
 		}
 		if !wanted[month] || !s.wantPackage(pkg) {
@@ -164,11 +169,12 @@ func (s *Source) pollInstalls(ctx context.Context, st *state, months []string, n
 			if !s.wantPackage(rowPkg) {
 				continue
 			}
-			if r.Date >= today || r.Date <= start[rowPkg] {
+			cursor := installsCursorKey(rowPkg, dimension)
+			if r.Date >= today || r.Date <= start[cursor] {
 				continue
 			}
-			if r.Date > advanced[rowPkg] {
-				advanced[rowPkg] = r.Date
+			if r.Date > advanced[cursor] {
+				advanced[cursor] = r.Date
 			}
 			if dimension == "country" {
 				events = append(events, s.countryInstallEvents(r, rowPkg, now)...)
@@ -184,9 +190,9 @@ func (s *Source) pollInstalls(ctx context.Context, st *state, months []string, n
 			delete(st.InstallsFiles, name)
 		}
 	}
-	for pkg, day := range advanced {
-		if day > st.InstallsCursor[pkg] {
-			st.InstallsCursor[pkg] = day
+	for cursor, day := range advanced {
+		if day > st.InstallsCursor[cursor] {
+			st.InstallsCursor[cursor] = day
 		}
 	}
 	return events, nil

@@ -237,8 +237,17 @@ func TestPollSalesRows(t *testing.T) {
 	if paid.Source != "googleplay" {
 		t.Errorf("source = %q", paid.Source)
 	}
-	if paid.App != "Dungeon Ledger" {
-		t.Errorf("app = %q, want the product title", paid.App)
+	// App is the package name on sales as well as on installs, so one app is
+	// one row in every by-app breakdown; the title travels in the payload.
+	if paid.App != "com.example.app" {
+		t.Errorf("app = %q, want the package name", paid.App)
+	}
+	var paidPayload map[string]any
+	if err := json.Unmarshal(paid.Payload, &paidPayload); err != nil {
+		t.Fatalf("row payload: %v", err)
+	}
+	if paidPayload["title"] != "Dungeon Ledger" {
+		t.Errorf("payload title = %v, want the product title", paidPayload["title"])
 	}
 	if !paid.Silent || !paid.IsLedger || paid.Chest {
 		t.Errorf("row flags: silent=%v ledger=%v chest=%v, want true/true/false",
@@ -383,6 +392,12 @@ func TestPollSalesDaySummaries(t *testing.T) {
 	if payload.Package != "com.example.app" {
 		t.Errorf("package = %q", payload.Package)
 	}
+	if day.App != "com.example.app" {
+		t.Errorf("summary app = %q, want the package name (installs use it too)", day.App)
+	}
+	if payload.Title != "Dungeon Ledger" {
+		t.Errorf("summary title = %q, want the product title in the payload", payload.Title)
+	}
 	if payload.IAPUnits != 1 || payload.SubUnits != 1 {
 		t.Errorf("iap/sub units = %d/%d, want 1/1", payload.IAPUnits, payload.SubUnits)
 	}
@@ -416,8 +431,12 @@ func TestPollSalesDaySummaries(t *testing.T) {
 	if _, ok := st.SalesFiles["sales/salesreport_202601.zip"]; ok {
 		t.Error("a month outside the backfill window was read")
 	}
-	if st.InstallsCursor["com.example.app"] != "2026-08-16" {
-		t.Errorf("installs_cursor = %v, want the 16th", st.InstallsCursor)
+	// The cursor is per (package, dimension): the overview and country files
+	// are separate objects and are skipped independently when unchanged.
+	for _, dimension := range []string{"overview", "country"} {
+		if got := st.InstallsCursor["com.example.app|"+dimension]; got != "2026-08-16" {
+			t.Errorf("installs_cursor[%s] = %q, want the 16th (%v)", dimension, got, st.InstallsCursor)
+		}
 	}
 }
 
@@ -487,6 +506,88 @@ func TestPollInstalls(t *testing.T) {
 	}
 }
 
+// The overview and country files for a month are separate objects with
+// separate md5s, so Play can rewrite one and not the other. A single cursor
+// per package meant the overview file's days hid the country file's rows for
+// the same days — and per-country installs are what found settlements, so
+// those countries never appeared on the map at all.
+func TestPollInstallsCountryFileArrivingLateIsStillRead(t *testing.T) {
+	f := newFakeGCS(t)
+	f.put("stats/installs/installs_com.example.app_202608_overview.csv",
+		readFixture(t, "installs_com.example.app_202608_overview.csv"))
+	src := newSource(f, "com.example.app")
+
+	first, state, err := src.Poll(context.Background(), nil)
+	if err != nil {
+		t.Fatalf("first poll: %v", err)
+	}
+	if _, ok := byDedupe(first)["play:installs:com.example.app:2026-08-15"]; !ok {
+		t.Fatal("the overview file produced no install event")
+	}
+	for key := range byDedupe(first) {
+		if strings.HasSuffix(key, ":US") {
+			t.Fatalf("a country row appeared before the country file existed: %s", key)
+		}
+	}
+
+	// The country file for the same month turns up on a later poll.
+	f.put("stats/installs/installs_com.example.app_202608_country.csv",
+		readFixture(t, "installs_com.example.app_202608_country.csv"))
+
+	second, _, err := src.Poll(context.Background(), state)
+	if err != nil {
+		t.Fatalf("second poll: %v", err)
+	}
+	got := byDedupe(second)
+	us, ok := got["play:installs:com.example.app:2026-08-15:US"]
+	if !ok {
+		t.Fatalf("the late country file's rows were hidden by the overview cursor; keys: %v", keys(got))
+	}
+	if us.Country != "US" || us.Quantity != 72 {
+		t.Errorf("US country row = %+v", summarize(us))
+	}
+}
+
+// A state blob written before the cursor was split per dimension must keep its
+// place rather than replaying the window.
+func TestInstallsCursorMigratesFromThePerPackageForm(t *testing.T) {
+	f := newFakeGCS(t)
+	seed(t, f)
+	src := newSource(f, "com.example.app")
+
+	legacy, err := json.Marshal(map[string]any{
+		"installs_cursor": map[string]string{"com.example.app": "2026-08-16"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	events, state, err := src.Poll(context.Background(), legacy)
+	if err != nil {
+		t.Fatalf("poll: %v", err)
+	}
+	for key := range byDedupe(events) {
+		if strings.HasPrefix(key, "play:installs") || strings.HasPrefix(key, "play:active") {
+			t.Errorf("a legacy cursor at the 16th replayed %s", key)
+		}
+	}
+
+	var st struct {
+		InstallsCursor map[string]string `json:"installs_cursor"`
+	}
+	if err := json.Unmarshal(state, &st); err != nil {
+		t.Fatalf("decode state: %v", err)
+	}
+	if _, stale := st.InstallsCursor["com.example.app"]; stale {
+		t.Errorf("the legacy key survived the migration: %v", st.InstallsCursor)
+	}
+	for _, dimension := range []string{"overview", "country"} {
+		if got := st.InstallsCursor["com.example.app|"+dimension]; got != "2026-08-16" {
+			t.Errorf("installs_cursor[%s] = %q, want the migrated 16th", dimension, got)
+		}
+	}
+}
+
 func TestPollSkipsUnchangedFilesAndAdvancesCursor(t *testing.T) {
 	f := newFakeGCS(t)
 	seed(t, f)
@@ -524,8 +625,81 @@ func TestPollSkipsUnchangedFilesAndAdvancesCursor(t *testing.T) {
 		t.Fatalf("decode state: %v", err)
 	}
 	if st.SummarizedDays["com.example.app"] != "2026-08-16" ||
-		st.InstallsCursor["com.example.app"] != "2026-08-16" {
+		st.InstallsCursor["com.example.app|overview"] != "2026-08-16" ||
+		st.InstallsCursor["com.example.app|country"] != "2026-08-16" {
 		t.Errorf("cursors moved on an empty poll: %+v", st)
+	}
+}
+
+// The last days of a month settle after the month is over, by which time Play
+// has stopped rewriting the file — so the md5 skip meant they never got a
+// summary and never filled a chest. A settled leftover is worth exactly one
+// deliberate re-download.
+func TestPollSummarizesDaysThatSettleAfterTheFileStopsChanging(t *testing.T) {
+	f := newFakeGCS(t)
+	seed(t, f)
+	src := newSource(f, "com.example.app")
+
+	first, state, err := src.Poll(context.Background(), nil)
+	if err != nil {
+		t.Fatalf("first poll: %v", err)
+	}
+	if _, ok := byDedupe(first)["play:sales_day:com.example.app:2026-08-18"]; ok {
+		t.Fatal("the 18th was summarized while the report was still moving under it")
+	}
+
+	var st struct {
+		PendingSalesDays map[string][]string `json:"pending_sales_days"`
+	}
+	if err := json.Unmarshal(state, &st); err != nil {
+		t.Fatalf("decode state: %v", err)
+	}
+	pending := st.PendingSalesDays["sales/salesreport_202608.zip"]
+	if len(pending) != 1 || pending[0] != "2026-08-18" {
+		t.Fatalf("pending_sales_days = %v, want just the 18th", st.PendingSalesDays)
+	}
+
+	// Two days pass. Nothing in the bucket changed — same file, same md5 —
+	// but the 18th has settled.
+	downloads := f.totalDownloads()
+	src.Now = func() time.Time { return fixtureNow.AddDate(0, 0, 2) }
+
+	second, state, err := src.Poll(context.Background(), state)
+	if err != nil {
+		t.Fatalf("second poll: %v", err)
+	}
+	day, ok := byDedupe(second)["play:sales_day:com.example.app:2026-08-18"]
+	if !ok {
+		t.Fatalf("the 18th never got a summary; keys: %v", keys(byDedupe(second)))
+	}
+	if !day.Chest || day.Quantity != 1 {
+		t.Errorf("summary for the 18th = %+v", summarize(day))
+	}
+	if f.totalDownloads() <= downloads {
+		t.Error("the settled day was summarized without re-reading its report")
+	}
+
+	var after struct {
+		PendingSalesDays map[string][]string `json:"pending_sales_days"`
+	}
+	if err := json.Unmarshal(state, &after); err != nil {
+		t.Fatalf("decode state: %v", err)
+	}
+	if got := after.PendingSalesDays["sales/salesreport_202608.zip"]; len(got) != 0 {
+		t.Errorf("pending_sales_days = %v, want nothing left over", got)
+	}
+
+	// And it is not summarized twice, nor re-downloaded again for nothing.
+	downloads = f.totalDownloads()
+	third, _, err := src.Poll(context.Background(), state)
+	if err != nil {
+		t.Fatalf("third poll: %v", err)
+	}
+	if _, ok := byDedupe(third)["play:sales_day:com.example.app:2026-08-18"]; ok {
+		t.Error("the 18th was summarized a second time")
+	}
+	if f.totalDownloads() != downloads {
+		t.Error("an unchanged report with nothing left over was downloaded again")
 	}
 }
 

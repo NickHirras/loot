@@ -17,7 +17,7 @@
 # into the raw source payload.
 #
 # Title and subtitle are Go templates over:
-#   .Source .Kind .App .Day .Country .Flag .Amount .AmountFmt .Currency
+#   .Source .SourceName .Kind .App .Day .Country .Flag .Amount .AmountFmt .Currency
 #   .AmountBase .AmountBaseFmt (display currency) .Quantity .QuantityFmt
 #   .Payload .BaseTitle (floor rules only)
 
@@ -107,7 +107,7 @@ rules:
       record_high: true
     then:
       rarity: epic
-      title: "Best day ever on {{.Source}}"
+      title: "Best day ever on {{.SourceName}}"
       subtitle: "{{.QuantityFmt}} sales · {{.AmountFmt}}{{if .App}} · {{.App}}{{end}}"
       xp: 300
 
@@ -118,7 +118,7 @@ rules:
     then:
       rarity: rare
       title: "{{.QuantityFmt}} sales · {{.AmountFmt}}"
-      subtitle: "a big day{{if .App}} for {{.App}}{{end}} on {{.Source}}"
+      subtitle: "a big day{{if .App}} for {{.App}}{{end}} on {{.SourceName}}"
       xp: 120
 
   - name: sales-day
@@ -127,20 +127,43 @@ rules:
     then:
       rarity: common
       title: "{{.QuantityFmt}} sales · {{.AmountFmt}}"
-      subtitle: "{{if .App}}{{.App}} · {{end}}{{.Source}}"
+      subtitle: "{{if .App}}{{.App}} · {{end}}{{.SourceName}}"
       xp: 10
 
   # ------------------------------------------------------- Install day totals
-  # Sources that report installs a whole day at a time (Google Play) emit one
-  # `installs_day` per app per day. Matched on kind alone, so any source that
-  # adopts the same event gets these for free.
+  # Sources that report installs a whole day at a time (Google Play, Flathub,
+  # Snapcraft) emit one `installs_day` per app per day, alongside a silent
+  # `install` row that carries the count. The generic rules below are matched
+  # on kind alone, so any source that adopts the same event gets them for free;
+  # the Flathub pair sits first only to call the store by its own name.
+  - name: flathub-record-day
+    match:
+      source: flathub
+      kind: installs_day
+      record_high: true
+    then:
+      rarity: epic
+      title: "Best day ever on Flathub"
+      subtitle: "{{.QuantityFmt}} installs of {{.App}}"
+      xp: 300
+
+  - name: flathub-installs
+    match:
+      source: flathub
+      kind: installs_day
+    then:
+      rarity: common
+      title: "{{.QuantityFmt}} installs on Flathub"
+      subtitle: "{{.App}}"
+      xp: 10
+
   - name: installs-day-record
     match:
       kind: installs_day
       record_high: true
     then:
       rarity: epic
-      title: "Best install day on {{.Source}}"
+      title: "Best install day on {{.SourceName}}"
       subtitle: "{{.QuantityFmt}} installs{{if .App}} · {{.App}}{{end}}"
       xp: 300
 
@@ -149,7 +172,7 @@ rules:
       kind: installs_day
     then:
       rarity: common
-      title: "{{.QuantityFmt}} installs on {{.Source}}"
+      title: "{{.QuantityFmt}} installs on {{.SourceName}}"
       subtitle: "{{.App}}"
       xp: 10
 
@@ -206,29 +229,6 @@ rules:
       title: "Mystery solved"
       subtitle: "{{.Payload.title}}"
       xp: 75
-
-  # ------------------------------------------------------------------- Flathub
-  - name: flathub-record-day
-    match:
-      source: flathub
-      kind: install
-      record_high: true
-    then:
-      rarity: epic
-      title: "Best day ever on Flathub"
-      subtitle: "{{.QuantityFmt}} installs of {{.App}}"
-      xp: 300
-
-  - name: flathub-installs
-    match:
-      source: flathub
-      kind: install
-    then:
-      rarity: common
-      title: "{{.QuantityFmt}} installs on Flathub"
-      subtitle: "{{.App}}"
-      xp: 10
-
 
   # -------------------------------------------------------------------- GitHub
   - name: github-release

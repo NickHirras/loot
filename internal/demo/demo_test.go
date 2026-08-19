@@ -3,6 +3,7 @@ package demo
 import (
 	"context"
 	"log/slog"
+	"math"
 	"os"
 	"path/filepath"
 	"testing"
@@ -46,6 +47,19 @@ func newDemo(t *testing.T, dir string, seed int64, days int) (*Demo, *store.Stor
 
 func quietLogger() *slog.Logger { return slog.New(slog.DiscardHandler) }
 
+// amountBaseTotal is the sum of every stored base amount, rounded so floating
+// point dust cannot make two identical worlds look different.
+func amountBaseTotal(t *testing.T, st *store.Store) float64 {
+	t.Helper()
+	var total float64
+	err := st.DB().QueryRowContext(context.Background(),
+		`SELECT COALESCE(SUM(amount_base), 0) FROM events`).Scan(&total)
+	if err != nil {
+		t.Fatalf("sum amount_base: %v", err)
+	}
+	return math.Round(total*100) / 100
+}
+
 // dedupeKeys returns every stored dedupe key in a stable order.
 func dedupeKeys(t *testing.T, st *store.Store) []string {
 	t.Helper()
@@ -87,6 +101,18 @@ func TestSeedIsDeterministic(t *testing.T) {
 	}
 	if a.Drops != b.Drops || a.XP != b.XP || a.Countries != b.Countries {
 		t.Errorf("same seed produced different worlds: %+v vs %+v", a, b)
+	}
+
+	// The money has to match too, not just the event count. amount_base is
+	// computed at ingest from the FX converter, so this is what would catch a
+	// demo that had gone back to reading live rates: two runs a moment apart
+	// would agree, but a run tomorrow would not, and the same assertion is the
+	// one that fails first when a converter is fetching in the background.
+	if a, b := amountBaseTotal(t, firstStore), amountBaseTotal(t, secondStore); a != b {
+		t.Errorf("same seed produced %.2f and %.2f of base revenue", a, b)
+	}
+	if amountBaseTotal(t, firstStore) == 0 {
+		t.Error("the seeded world converted nothing into the display currency")
 	}
 
 	keysA, keysB := dedupeKeys(t, firstStore), dedupeKeys(t, secondStore)
@@ -265,9 +291,15 @@ func TestSeededWorldFillsTheVaultAndTheHearth(t *testing.T) {
 	}
 	// Seeding is one transaction over ~20k events; on a laptop it lands around
 	// a second. The bound is loose enough for a busy CI box and tight enough
-	// to catch a query that has gone quadratic.
-	if res.Took > 5*time.Second {
-		t.Errorf("seeding 120 days took %s", res.Took)
+	// to catch a query that has gone quadratic — but the race detector costs
+	// roughly ten times the CPU, so under it the number measures the detector
+	// rather than the code.
+	budget := 5 * time.Second
+	if raceEnabled {
+		budget = 60 * time.Second
+	}
+	if res.Took > budget {
+		t.Errorf("seeding 120 days took %s (budget %s)", res.Took, budget)
 	}
 	if res.Events < 10000 {
 		t.Errorf("120 days produced only %d events", res.Events)

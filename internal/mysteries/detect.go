@@ -49,10 +49,13 @@ const (
 	// clusterSize is how many countries settled on one day makes a cluster.
 	clusterSize = 3
 	// silenceDays is how many completed days a source must miss to count as
-	// quiet, and silenceDensity how many of the seven days before that it must
-	// have reported on for the silence to mean anything.
+	// quiet *before its own settlement lag is added*, and silenceDensity how
+	// many of the seven days before that it must have reported on for the
+	// silence to mean anything.
 	silenceDays    = 2
 	silenceDensity = 5
+	// resumedNote is written on a silence mystery that answered itself.
+	resumedNote = "resumed"
 	// seriesPoints is how many days of context a mystery carries for its
 	// sparkline.
 	seriesPoints = 28
@@ -414,14 +417,63 @@ func (d *Detector) scanSettlements(ctx context.Context, from, to, detectFrom str
 	return out, nil
 }
 
+// settlementLagDays is how many days behind the calendar each source's newest
+// event day normally sits, because that is how long its store takes to settle
+// a day and publish it.
+//
+// These are not guesses: they are the settlement horizons the sources
+// themselves poll on. The Microsoft Store reads days three behind (Partner
+// Center revises acquisitions for a day or two), Google Play summarizes a day
+// once the report has stopped moving under it, and App Store Connect publishes
+// yesterday's report during the following morning. Without this, every one of
+// them looked "quiet" against a flat two-day rule on the day it was working
+// perfectly — a false alarm every single day, which is the fastest way to
+// teach somebody to ignore the board.
+//
+// A source not listed here reports in realtime and has no lag.
+var settlementLagDays = map[string]int{
+	"microsoftstore": 3,
+	"googleplay":     2,
+	"appstore":       1,
+}
+
+// silenceThreshold is how many completed days a source has to miss before the
+// gap is worth a question: the flat minimum, plus whatever its store's own
+// settlement lag makes normal.
+func silenceThreshold(source string) int {
+	return silenceDays + settlementLagDays[source]
+}
+
+// silenceScope is the (source, app) pair a silence mystery is asked about.
+// Silence is measured per source today — an app cannot lose its credentials
+// on its own — but the key carries the app so the dedupe generalizes if that
+// ever changes.
+func silenceScope(source, app string) string { return source + "|" + app }
+
 // scanSilence flags a source that reported reliably and then stopped. This is
 // the one mystery with a usual answer: an expired key, a rotated credential, a
 // bucket permission that lapsed. Loot cannot tell you which, but it can notice
 // that App Store Connect has not said anything since Tuesday.
+//
+// Two things keep it from crying wolf. Each source is measured against its own
+// settlement lag rather than a flat two days, so a store that is three days
+// behind by design is not reported broken every morning. And at most one
+// silence mystery is open per (source, app) at a time: a source that has been
+// quiet for a week is one question, not seven. When it starts reporting again
+// the open question answers itself and is dismissed with a note.
 func (d *Detector) scanSilence(ctx context.Context, from, to string) ([]core.Mystery, error) {
 	bySource, err := d.Store.EventsBySourceDay(ctx, from, to)
 	if err != nil {
 		return nil, err
+	}
+
+	openSilence, err := d.Store.OpenMysteriesOfKind(ctx, core.MysterySilence)
+	if err != nil {
+		return nil, err
+	}
+	alreadyAsked := make(map[string]core.Mystery, len(openSilence))
+	for _, m := range openSilence {
+		alreadyAsked[silenceScope(m.Source, m.App)] = m
 	}
 
 	sources := make([]string, 0, len(bySource))
@@ -451,8 +503,13 @@ func (d *Detector) scanSilence(ctx context.Context, from, to string) ([]core.Mys
 		if err != nil {
 			continue
 		}
+		scope := silenceScope(source, "")
 		missing := int(end.Sub(lastTime).Hours() / 24)
-		if missing < silenceDays {
+		threshold := silenceThreshold(source)
+		if missing < threshold {
+			// Reporting normally. If a question was open about this source,
+			// it has just been answered.
+			d.resumeSilence(ctx, alreadyAsked, scope)
 			continue
 		}
 		// Only a source that was *reliable* can go quiet: one that reports
@@ -466,6 +523,10 @@ func (d *Detector) scanSilence(ctx context.Context, from, to string) ([]core.Mys
 		if reported < silenceDensity {
 			continue
 		}
+		if _, asked := alreadyAsked[scope]; asked {
+			// Still quiet, and already on the board. One question is enough.
+			continue
+		}
 
 		firstSilent := core.DayOf(lastTime.AddDate(0, 0, 1))
 		series := make([]core.MysteryPoint, 0, seriesPoints)
@@ -473,11 +534,15 @@ func (d *Detector) scanSilence(ctx context.Context, from, to string) ([]core.Mys
 			day := core.DayOf(end.AddDate(0, 0, -i))
 			series = append(series, core.MysteryPoint{Day: day, Value: float64(days[day])})
 		}
+		why := fmt.Sprintf("%d completed days with no rows at all, after reporting on %d of the previous 7",
+			missing, reported)
+		if lag := settlementLagDays[source]; lag > 0 {
+			why += fmt.Sprintf(" — and that is already allowing for this store's %d day settlement lag", lag)
+		}
 		detail, err := json.Marshal(core.MysteryDetail{
 			Series: series,
 			Unit:   "count",
-			Why: fmt.Sprintf("%d completed days with no rows at all, after reporting on %d of the previous 7",
-				missing, reported),
+			Why:    why,
 		})
 		if err != nil {
 			return out, fmt.Errorf("silence detail: %w", err)
@@ -501,6 +566,29 @@ func (d *Detector) scanSilence(ctx context.Context, from, to string) ([]core.Mys
 		out = append(out, m)
 	}
 	return out, nil
+}
+
+// resumeSilence closes an open silence question about a source that has
+// started reporting again. It is dismissed rather than solved: nobody wrote
+// anything down, so there is nothing to pay a drop for, and a board full of
+// "it came back" entries is not a lab notebook.
+func (d *Detector) resumeSilence(ctx context.Context, asked map[string]core.Mystery, scope string) {
+	m, ok := asked[scope]
+	if !ok {
+		return
+	}
+	delete(asked, scope)
+	changed, err := d.Store.ResolveMystery(ctx, m.ID, core.MysteryDismissed, resumedNote, d.now())
+	if err != nil {
+		d.log().Error("could not close a resumed silence mystery", "error", err, "mystery", m.ID)
+		return
+	}
+	if changed {
+		d.log().Info("source resumed; silence question closed", "source", m.Source, "app", m.App)
+		if d.Bus != nil {
+			d.Bus.Publish(bus.Message{Type: "mysteries"})
+		}
+	}
 }
 
 // mysteryKey is the idempotence key: one mystery per kind, source, app, metric

@@ -181,20 +181,38 @@ func (d *Demo) runInstalls(ctx context.Context, rng *rand.Rand) {
 				d.log.Error("demo install payload", "error", err)
 				continue
 			}
-			ev := core.Event{
-				ID:         core.NewIDAt(now),
+			base := core.Event{
 				Source:     "flathub",
-				Kind:       "install",
 				App:        a.Flatpak,
 				OccurredAt: now,
 				ObservedAt: now,
 				Day:        core.DayOf(now),
 				Quantity:   installs,
-				DedupeKey:  fmt.Sprintf("flathub:%s:%s:%02d", a.Flatpak, core.DayOf(now), now.Hour()),
 				Payload:    payload,
 			}
-			if _, err := d.live.Ingest(ctx, ev); err != nil {
-				d.log.Error("demo install emit failed", "error", err)
+
+			// The same two-event shape the real source uses: a silent row
+			// that carries the count, and the headline that carries the drop.
+			// The headline is *not* chest-bound here, unlike the real
+			// source's: these are partial counts for a day that is still
+			// happening, so they belong in the live feed the way a realtime
+			// event does, not in tomorrow morning's chest.
+			row := base
+			row.ID = core.NewIDAt(now)
+			row.Kind = "install"
+			row.Silent = true
+			row.DedupeKey = fmt.Sprintf("flathub:%s:%s:%02d", a.Flatpak, core.DayOf(now), now.Hour())
+
+			headline := base
+			headline.ID = core.NewIDAt(now)
+			headline.Kind = "installs_day"
+			headline.DedupeKey = fmt.Sprintf("flathub:installs_day:%s:%s:%02d",
+				a.Flatpak, core.DayOf(now), now.Hour())
+
+			for _, ev := range []core.Event{row, headline} {
+				if _, err := d.live.Ingest(ctx, ev); err != nil {
+					d.log.Error("demo install emit failed", "error", err)
+				}
 			}
 		}
 	}

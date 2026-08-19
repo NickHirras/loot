@@ -2,6 +2,8 @@ package store_test
 
 import (
 	"context"
+	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 
@@ -216,6 +218,89 @@ func TestHearthEmpty(t *testing.T) {
 	}
 	if h.DisplayCurrency != "USD" {
 		t.Errorf("display currency = %q, want USD", h.DisplayCurrency)
+	}
+
+	// Every list has to serialize as a list. A nil slice becomes JSON `null`,
+	// which the globe would have to special-case before it could map over it.
+	raw, err := json.Marshal(h)
+	if err != nil {
+		t.Fatalf("marshal hearth: %v", err)
+	}
+	var decoded map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &decoded); err != nil {
+		t.Fatalf("decode hearth: %v", err)
+	}
+	for _, key := range []string{"countries", "recent", "tiers"} {
+		if got := string(decoded[key]); strings.HasPrefix(got, "null") {
+			t.Errorf("%s serialized as null on a fresh install", key)
+		}
+	}
+}
+
+// Google Play reports installs twice — an overview row with no country and a
+// row per country — so a plain sum gave every install a citizen on the map and
+// a second one in unknown lands. The day's total is the overview row; unknown
+// lands only get what the country rows could not place.
+func TestHearthUnknownLandsDoNotDoubleCountPlayInstalls(t *testing.T) {
+	ctx := context.Background()
+	st := newStore(t)
+
+	events := []core.Event{
+		// The overview file: 100 installs for the day, no country.
+		hearthEvent("googleplay", "install", "2026-08-04", "", 100, 0, false, "play:overview"),
+		// The country file for the same day, adding up to the same 100.
+		hearthEvent("googleplay", "install", "2026-08-04", "US", 60, 0, false, "play:us"),
+		hearthEvent("googleplay", "install", "2026-08-04", "DE", 40, 0, false, "play:de"),
+	}
+	for _, ev := range events {
+		if _, err := st.InsertEvent(ctx, ev); err != nil {
+			t.Fatalf("insert %s: %v", ev.DedupeKey, err)
+		}
+	}
+
+	h := hearthOf(t, st, "")
+	if h.Population != 100 {
+		t.Errorf("population = %d, want 100: the overview row is the same 100 people", h.Population)
+	}
+	if h.Unknown.Population != 0 {
+		t.Errorf("unknown population = %d, want 0: every install was placed on the map", h.Unknown.Population)
+	}
+	if got := settlement(t, h, "US").Population; got != 60 {
+		t.Errorf("US population = %d, want 60", got)
+	}
+	if got := settlement(t, h, "DE").Population; got != 40 {
+		t.Errorf("DE population = %d, want 40", got)
+	}
+}
+
+// The country file lags the overview file by a poll or two. Until it arrives,
+// the day's installs are real people who cannot be placed — unknown lands is
+// exactly where they belong.
+func TestHearthUnknownLandsKeepUnplacedInstalls(t *testing.T) {
+	ctx := context.Background()
+	st := newStore(t)
+
+	events := []core.Event{
+		hearthEvent("googleplay", "install", "2026-08-04", "", 100, 0, false, "play:overview"),
+		hearthEvent("googleplay", "install", "2026-08-04", "US", 30, 0, false, "play:us"),
+		// A different day whose country file has not been read at all.
+		hearthEvent("googleplay", "install", "2026-08-05", "", 50, 0, false, "play:overview2"),
+		// And Flathub, which never reports a country at all.
+		hearthEvent("flathub", "install", "2026-08-04", "", 587, 0, false, "fh:1"),
+	}
+	for _, ev := range events {
+		if _, err := st.InsertEvent(ctx, ev); err != nil {
+			t.Fatalf("insert %s: %v", ev.DedupeKey, err)
+		}
+	}
+
+	h := hearthOf(t, st, "")
+	if got := settlement(t, h, "US").Population; got != 30 {
+		t.Errorf("US population = %d, want 30", got)
+	}
+	// 70 unplaced on the 4th, 50 on the 5th, 587 from Flathub.
+	if h.Unknown.Population != 70+50+587 {
+		t.Errorf("unknown population = %d, want %d", h.Unknown.Population, 70+50+587)
 	}
 }
 

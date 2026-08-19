@@ -265,13 +265,15 @@ func TestEmptyCountrySkipsFloor(t *testing.T) {
 func TestFlathubRules(t *testing.T) {
 	ctx := context.Background()
 
+	// Flathub's drop-worthy event is the day headline; the `install` row
+	// beside it is silent and never reaches the rules engine at all.
 	install := core.Event{
 		ID:        core.NewID(),
 		Source:    "flathub",
-		Kind:      "install",
+		Kind:      "installs_day",
 		App:       "org.example.App",
 		Quantity:  1234,
-		DedupeKey: "flathub:org.example.App:2026-01-01",
+		DedupeKey: "flathub:installs_day:org.example.App:2026-01-01",
 	}
 
 	t.Run("ordinary day", func(t *testing.T) {
@@ -524,7 +526,7 @@ func TestSalesDayRules(t *testing.T) {
 			lookup:     fakeLookup{record: true},
 			event:      salesDay("com.example.app", 900, 2400, "USD"),
 			wantRarity: core.Epic,
-			wantTitle:  "Best day ever on appstore",
+			wantTitle:  "Best day ever on App Store",
 		},
 	}
 
