@@ -180,4 +180,48 @@ CREATE UNIQUE INDEX achievements_key_idx      ON achievements(key);
 CREATE INDEX        achievements_unlocked_idx ON achievements(unlocked_at);
 `,
 	},
+	{
+		// Quest 3: bosses. A crash cluster that broke away from its own
+		// baseline, given a name and a health bar.
+		//
+		// `key` is unique across the whole table rather than per status, and
+		// that is deliberate: a fight is one row for its whole life, from the
+		// cursed spawn through the epic kill, so history reads as "you fought
+		// this and won" rather than as a pile of near-identical monsters. A
+		// version that starts crashing again months later is a *new* fight
+		// only if it is a new version — which it usually is, because the key
+		// carries the version.
+		//
+		// hp and hp_max are floats for the same reason the vault's amounts
+		// are: a source may report a rate or a user count rather than a whole
+		// number of crashes, and rounding at the boundary loses the small
+		// fights entirely.
+		Name: "0005_bosses",
+		SQL: `
+CREATE TABLE bosses (
+    id             TEXT PRIMARY KEY,
+    key            TEXT    NOT NULL,
+    source         TEXT    NOT NULL DEFAULT '',
+    app            TEXT    NOT NULL DEFAULT '',
+    name           TEXT    NOT NULL DEFAULT '',
+    title          TEXT    NOT NULL DEFAULT '',
+    version        TEXT    NOT NULL DEFAULT '',
+    issue_id       TEXT    NOT NULL DEFAULT '',
+    hp_max         REAL    NOT NULL DEFAULT 0,
+    hp             REAL    NOT NULL DEFAULT 0,
+    users_affected INTEGER NOT NULL DEFAULT 0,
+    spawned_at     INTEGER NOT NULL,
+    spawned_day    TEXT    NOT NULL DEFAULT '',
+    last_hit_at    INTEGER,
+    status         TEXT    NOT NULL DEFAULT 'alive',
+    slain_at       INTEGER,
+    peak_day       TEXT    NOT NULL DEFAULT '',
+    detail         BLOB,
+    xp_awarded     INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE UNIQUE INDEX bosses_key_idx    ON bosses(key);
+CREATE INDEX        bosses_status_idx ON bosses(status, spawned_day);
+`,
+	},
 }

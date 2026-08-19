@@ -188,6 +188,9 @@ func (d *Demo) Seed(ctx context.Context) (Result, error) {
 				return err
 			}
 		}
+		if err := d.seedWonFights(ctx, tx, pipe, yesterday, span); err != nil {
+			return err
+		}
 		return d.revealPast(ctx, tx, core.DayOf(yesterday))
 	})
 	if err != nil {

@@ -70,6 +70,8 @@ export interface Stats {
   open_mysteries: number
   /** How many quests are running. */
   active_quests: number
+  /** How many bosses are still standing; drives the red Quests tab badge. */
+  bosses_alive: number
   display_currency: string
   dev: boolean
   /** True when this Loot is running on synthetic demo data. */
@@ -96,9 +98,10 @@ export interface SourceInfo {
  *   {"type":"quests"}                     the quest board changed — refetch
  *   {"type":"mysteries"}                  the casebook changed — refetch
  *   {"type":"codex"}                      an achievement unlocked — refetch
+ *   {"type":"bosses"}                     a boss spawned, drained or died — refetch
  */
 export interface WSMessage {
-  type: 'hello' | 'drop' | 'chest' | 'quests' | 'mysteries' | 'codex'
+  type: 'hello' | 'drop' | 'chest' | 'quests' | 'mysteries' | 'codex' | 'bosses'
   drop?: Pick<
     Drop,
     'id' | 'event_id' | 'rarity' | 'title' | 'subtitle' | 'xp' | 'created_at' | 'chest_date' | 'revealed_at'
@@ -768,4 +771,71 @@ export function monthLabel(period: RecapPeriod): string {
   const parsed = new Date(`${period.from}T00:00:00Z`)
   if (Number.isNaN(parsed.getTime())) return period.label
   return parsed.toLocaleDateString(undefined, { month: 'short', year: 'numeric', timeZone: 'UTC' })
+}
+
+// ---------------------------------------------------------------- boss types
+
+/**
+ * A boss is a crash cluster with a name and a health bar, mirroring
+ * internal/core. It is only ever `alive`, `slain` or `faded` — there is no
+ * "failed" and no "overdue", because a dashboard that spends a fortnight
+ * scolding you has already spent the feeling the kill was supposed to give.
+ */
+export type BossStatus = 'alive' | 'slain' | 'faded'
+
+/** Crashes and ANRs are told apart because the fix is usually a different one. */
+export type BossKind = 'crash' | 'anr'
+
+/** One day of a boss's sparkline. */
+export interface BossPoint {
+  day: string
+  value: number
+}
+
+/** One fight, as GET /api/bosses returns it. */
+export interface Boss {
+  id: string
+  /** `<source>:<app>:<version>|<issue>` — one fight per key, ever. */
+  key: string
+  source: string
+  app: string
+  /** The generated monster name, deterministic from `key`. */
+  name: string
+  /** The human line under it: the crash's own title, or "Crashes in v2.3.1". */
+  title: string
+  version: string
+  issue_id: string
+  /** Opening strength, and what the most recent completed day says. */
+  hp_max: number
+  hp: number
+  users_affected: number
+  spawned_at: string
+  spawned_day: string
+  last_hit_at?: string | null
+  status: BossStatus
+  slain_at?: string | null
+  peak_day: string
+  /** What the kill paid; 0 while the fight is still on. */
+  xp_awarded: number
+
+  /** hp / hp_max, clamped to 0..1: how full the bar is. */
+  pct: number
+  /** How far it has fallen from hp_max, 0..1 — the "−63%" line. */
+  down_pct: number
+  /** The spawn day counts as day one. */
+  days_alive: number
+  /** True when the fight got worse before it got better. Said once, quietly. */
+  enraged: boolean
+  /** What HP counts: "crashes" or "users". */
+  unit: string
+  url?: string
+  kind?: BossKind
+  /** The trailing fortnight, oldest first. */
+  series: BossPoint[]
+}
+
+/** The whole of GET /api/bosses. */
+export interface BossBoard {
+  alive: Boss[]
+  recent: Boss[]
 }

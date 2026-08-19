@@ -92,6 +92,51 @@ type Sources struct {
 	Snapcraft      Snapcraft      `yaml:"snapcraft"`
 	GitHub         GitHub         `yaml:"github"`
 	Webhook        Webhook        `yaml:"webhook"`
+	// Quest 3 sources: the three ways crashes reach Loot and become bosses.
+	PlayVitals PlayVitals `yaml:"playvitals"`
+	Sentry     Sentry     `yaml:"sentry"`
+	Crash      Crash      `yaml:"crash"`
+}
+
+// PlayVitals configures the Android vitals source: daily crash and ANR counts
+// per app version, read from the Google Play Developer Reporting API.
+//
+// It deliberately has no credentials of its own. The same service-account key
+// that reads the Play reporting bucket can read vitals, so pointing Loot at
+// two key files for one Play Console account would be a configuration trap
+// rather than a feature; sources.googleplay.service_account_json_path is the
+// one place a Play credential lives.
+type PlayVitals struct {
+	// Enabled turns the source on. It is off by default because it needs an
+	// extra API enabled in the Cloud project and an extra Play Console grant.
+	Enabled bool `yaml:"enabled"`
+	// Packages are the package names to watch. Empty falls back to
+	// sources.googleplay.packages, which is usually the same list.
+	Packages []string `yaml:"packages"`
+	// BackfillDays limits how far back the first run reads. Defaults to 30 —
+	// enough for a 28-day baseline to exist on the first poll.
+	BackfillDays int `yaml:"backfill_days"`
+}
+
+// Sentry configures the webhook receiver at /hooks/sentry. Loot verifies the
+// Sentry-Hook-Signature header against the internal integration's client
+// secret, so an unset secret means an unverified endpoint.
+type Sentry struct {
+	// Enabled mounts the receiver. Defaults to false.
+	Enabled bool `yaml:"enabled"`
+	// ClientSecret is the "Client Secret" of the Sentry internal integration
+	// that sends the webhooks.
+	ClientSecret string `yaml:"client_secret"`
+}
+
+// Crash configures the generic crash receiver at /hooks/crash: the escape
+// hatch for every crash reporter that is not Play vitals or Sentry, including
+// the Firebase Cloud Function relay for Crashlytics alerts.
+type Crash struct {
+	// Enabled mounts the receiver. Defaults to false.
+	Enabled bool `yaml:"enabled"`
+	// Secret, when set, is required as `Authorization: Bearer <secret>`.
+	Secret string `yaml:"secret"`
 }
 
 // MicrosoftStore configures the Partner Center analytics source (Microsoft
@@ -255,6 +300,7 @@ func Default() Config {
 			MicrosoftStore: MicrosoftStore{BackfillDays: 30},
 			Snapcraft:      Snapcraft{BackfillDays: 30},
 			GitHub:         GitHub{BackfillDays: 30},
+			PlayVitals:     PlayVitals{BackfillDays: 30},
 		},
 	}
 }
@@ -297,6 +343,9 @@ func Load(path string, explicit bool) (Config, error) {
 	}
 	if cfg.Sources.GooglePlay.BackfillMonths < 0 {
 		cfg.Sources.GooglePlay.BackfillMonths = 0
+	}
+	if cfg.Sources.PlayVitals.BackfillDays <= 0 {
+		cfg.Sources.PlayVitals.BackfillDays = 30
 	}
 	cfg.DisplayCurrency = strings.ToUpper(strings.TrimSpace(cfg.DisplayCurrency))
 	if cfg.DisplayCurrency == "" {
@@ -483,6 +532,29 @@ func applyEnv(cfg *Config) {
 			cfg.Sources.GooglePlay.BackfillMonths = n
 		}
 	}
+	if v := os.Getenv("LOOT_PLAYVITALS_ENABLED"); v != "" {
+		cfg.Sources.PlayVitals.Enabled = truthy(v)
+	}
+	if v := os.Getenv("LOOT_PLAYVITALS_PACKAGES"); v != "" {
+		cfg.Sources.PlayVitals.Packages = splitList(v)
+	}
+	if v := os.Getenv("LOOT_PLAYVITALS_BACKFILL_DAYS"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			cfg.Sources.PlayVitals.BackfillDays = n
+		}
+	}
+	if v := os.Getenv("LOOT_SENTRY_ENABLED"); v != "" {
+		cfg.Sources.Sentry.Enabled = truthy(v)
+	}
+	if v := os.Getenv("LOOT_SENTRY_CLIENT_SECRET"); v != "" {
+		cfg.Sources.Sentry.ClientSecret = v
+	}
+	if v := os.Getenv("LOOT_CRASH_ENABLED"); v != "" {
+		cfg.Sources.Crash.Enabled = truthy(v)
+	}
+	if v := os.Getenv("LOOT_CRASH_SECRET"); v != "" {
+		cfg.Sources.Crash.Secret = v
+	}
 }
 
 // splitList parses a comma separated env value into a trimmed list.
@@ -546,6 +618,26 @@ func (c Config) ChestEnabled() bool {
 		return true
 	}
 	return *c.Chest.Enabled
+}
+
+// PlayVitalsPackages is the package list the vitals source should watch: its
+// own if it has one, and otherwise Play's, because listing the same three
+// package names twice is a mistake waiting to happen.
+func (c Config) PlayVitalsPackages() []string {
+	if len(c.Sources.PlayVitals.Packages) > 0 {
+		return c.Sources.PlayVitals.Packages
+	}
+	return c.Sources.GooglePlay.Packages
+}
+
+// PlayVitalsConfigured reports whether the vitals source can run: switched on,
+// with a service-account key to authenticate with and at least one package to
+// ask about. Vitals are per app, so there is no "every app" shortcut — the API
+// has no such query.
+func (c Config) PlayVitalsConfigured() bool {
+	return c.Sources.PlayVitals.Enabled &&
+		c.Sources.GooglePlay.ServiceAccountJSONPath != "" &&
+		len(c.PlayVitalsPackages()) > 0
 }
 
 // ChestAutoOpenAfterHours returns the auto-open delay in hours, or 0 for never.

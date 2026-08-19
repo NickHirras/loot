@@ -297,6 +297,11 @@ func (d *Demo) generateDay(ctx context.Context, pipe *pipeline.Pipeline, p dayPl
 				return err
 			}
 		}
+		if a.CrashBase > 0 {
+			if err := d.crashDay(ctx, pipe, p, a); err != nil {
+				return err
+			}
+		}
 	}
 	return nil
 }

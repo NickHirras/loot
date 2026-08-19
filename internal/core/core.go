@@ -238,6 +238,9 @@ var sourceDisplayNames = map[string]string{
 	"revenuecat":     "RevenueCat",
 	"github":         "GitHub",
 	"webhook":        "webhook",
+	"playvitals":     "Play vitals",
+	"sentry":         "Sentry",
+	"crash":          "crash reports",
 	"loot":           "Loot",
 	"dev":            "dev",
 }

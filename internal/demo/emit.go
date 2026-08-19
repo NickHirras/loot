@@ -276,6 +276,7 @@ func Sources() []core.Source {
 	return []core.Source{
 		&Source{name: "appstore", interval: time.Hour},
 		&Source{name: "googleplay", interval: 6 * time.Hour},
+		&Source{name: "playvitals", interval: 6 * time.Hour},
 		&Source{name: "flathub", interval: time.Hour},
 		&Source{name: "revenuecat"},
 	}

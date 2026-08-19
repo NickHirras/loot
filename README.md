@@ -392,6 +392,9 @@ Each has its own guide with setup steps, config (YAML + env), what it emits, and
 | Snapcraft (Snap Store metrics, 6h) | [docs/sources/snapcraft.md](docs/sources/snapcraft.md) | new/active/lost devices per snap/day, derived per-country installs (settlements), `installs_day` chests |
 | GitHub (poll 10 min + `POST /hooks/github`) | [docs/sources/github.md](docs/sources/github.md) | stars, star milestones, forks, issues opened/closed ("a quest appears"), PRs, releases |
 | Generic webhook (`POST /hooks/webhook`) | [docs/sources/webhook.md](docs/sources/webhook.md) | anything: name your kind, rarity, title; batch posts; optional ledger amounts |
+| Play Vitals (Developer Reporting API, 6h) | [docs/sources/crashes.md](docs/sources/crashes.md) | daily crashes/ANRs per version — reuses the Play service account; feeds boss fights |
+| Sentry (`POST /hooks/sentry`) | [docs/sources/crashes.md](docs/sources/crashes.md) | issue created/regressed → crashes; resolved → slays the boss |
+| Crash webhook (`POST /hooks/crash`) | [docs/sources/crashes.md](docs/sources/crashes.md) | any crash reporter; includes a Firebase Cloud Function relaying Crashlytics velocity alerts |
 
 `loot check` validates all of them.
 
@@ -536,6 +539,10 @@ The **Quests** tab gives you goals worth chasing and puzzles worth poking at —
 
 - **Quests** are generated from your own history each week and month ("Beat last week's revenue · $1,240", "Settle 2 new countries this month", "Earn 10,900 XP this week"), plus custom ones you create. Completing one mints a rare (weekly) or epic (monthly) drop. An unmet quest quietly ends as "ended · 62%" — never red, never a broken streak.
 - **Mysteries** are anomalies Loot noticed in your data and turned into open questions: "Google Play installs tripled on Fri Aug 14 — why?", refund spikes, a cluster of new countries, or a source that has gone quiet (usually broken credentials — Loot allows for each store's normal reporting lag, asks once, and dismisses the question itself when data resumes). Each card has a 28-day sparkline; write a one-line explanation and **Solve** it for a drop, or dismiss it. Solved mysteries become a notebook of your own explanations.
+
+## Boss fights
+
+Crashes are the least fun data you have, so Loot makes them a fight you can win — see [docs/bosses.md](docs/bosses.md). When a day's crashes spike past 3× your baseline (or a Crashlytics velocity alert relays in), a named boss appears — *Torbrak the Off-By-One Gargoyle*, *The Segfault Hydra of v2.3.1* — as a cursed drop, with HP equal to that day's crashes. Every completed day the HP tracks the crash count for that version/issue, so it drains as your fix rolls out (and enrages if it gets worse). Two quiet days, a Sentry "resolved", or **Mark slain** ends it with an epic drop — legendary if it was big or lasted a week. A boss that just goes silent fades quietly; nothing is ever framed as your failure. Bosses live at the top of the **Quests** tab with a red badge while one is alive.
 
 ## Codex & season recap
 
@@ -709,7 +716,7 @@ Loot ships in quests.
 - **Quest 1 — First Blood** ✅ — the scaffold: event pipeline, SQLite store, rarity rules engine, RevenueCat webhooks, Flathub polling, live feed with synthesized sounds, `loot tail`.
 - **Quest 2 — The Vault Opens** ✅ — silent ledger events, the **daily chest** with its cascade, currency conversion and the vault API, settlement drops, `loot check` / `loot chest` / `loot fx`, and the dashboard's Vault page and chest-opening ritual.
 - **Quest 4 — The Hearth** ✅ — the globe: a settlement per country that grows with every customer, tiers from outpost to metropolis, eras from Camp to Dynasty, live arcs flying home to your capital, a real day/night terminator, and **ambient mode** for the spare monitor.
-- **Quest 3 — Know Thy Enemy** 🔨 *(next)* — Crashlytics and Sentry as *boss fights*: a crash spike spawns a named boss with a health bar that drains as you ship fixes and the crash-free rate recovers.
+- **Quest 3 — Know Thy Enemy** ✅ — Play Vitals, Sentry and a generic crash webhook (Crashlytics via a relay) as *boss fights*: a crash spike spawns a named boss whose HP drains as you ship the fix.
 - **Quest 5 — Quests & Mysteries** ✅ — auto-generated weekly/monthly goals from your own history plus custom quests, and anomaly detection surfaced as puzzles with a notebook of your explanations.
 - **Quest 6 — Codex & Season Recap** ✅ — the trophy wall, records, and a poster-style monthly/yearly recap with copyable summary.
 - **Quest 7 — More Worlds** ✅ — Microsoft Store, Snapcraft and GitHub as sources, plus a generic webhook so anything that can POST JSON can drop loot.

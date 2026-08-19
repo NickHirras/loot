@@ -12,7 +12,10 @@
 #   LOOT_APPSTORE_KEY_ID, LOOT_APPSTORE_ISSUER_ID, LOOT_APPSTORE_PRIVATE_KEY_PATH,
 #   LOOT_APPSTORE_VENDOR_NUMBER, LOOT_APPSTORE_APPS, LOOT_APPSTORE_BACKFILL_DAYS,
 #   LOOT_GOOGLEPLAY_SERVICE_ACCOUNT_JSON_PATH, LOOT_GOOGLEPLAY_BUCKET,
-#   LOOT_GOOGLEPLAY_PACKAGES, LOOT_GOOGLEPLAY_BACKFILL_MONTHS
+#   LOOT_GOOGLEPLAY_PACKAGES, LOOT_GOOGLEPLAY_BACKFILL_MONTHS,
+#   LOOT_PLAYVITALS_ENABLED, LOOT_PLAYVITALS_PACKAGES, LOOT_PLAYVITALS_BACKFILL_DAYS,
+#   LOOT_SENTRY_ENABLED, LOOT_SENTRY_CLIENT_SECRET,
+#   LOOT_CRASH_ENABLED, LOOT_CRASH_SECRET
 
 # HTTP bind address for the API, websocket and dashboard.
 listen: ":8080"
@@ -140,6 +143,57 @@ sources:
   webhook:
     # Generic webhook at POST /hooks/webhook: anything that can POST JSON can
     # drop loot. See docs/sources/webhook.md.
+    enabled: false
+    secret: ""
+
+  # ------------------------------------------------------------------ crashes
+  # The three ways crashes reach Loot. A crash never makes a drop of its own —
+  # instead, a crash cluster that breaks away from its own baseline becomes a
+  # **boss**: a named monster with a health bar that drains as your fix rolls
+  # out, and pays an epic drop when it dies. See docs/bosses.md and
+  # docs/sources/crashes.md.
+
+  playvitals:
+    # Android vitals: daily crash and ANR counts per app version, from the
+    # Google Play Developer Reporting API. This is the best crash source Loot
+    # has, because it is the only one that can say "I looked, and there were
+    # none" — which is what lets a boss be *slain* rather than just fade away.
+    #
+    # It reuses sources.googleplay.service_account_json_path, so there is only
+    # ever one Play credential to configure. Two extra steps though:
+    #   1. enable playdeveloperreporting.googleapis.com in the Cloud project
+    #      that owns the service account (this is the step everybody misses);
+    #   2. in Play Console > Users and permissions, grant that service account
+    #      "View app information and download bulk reports (read-only)".
+    enabled: false
+    # Package names to watch. Empty falls back to sources.googleplay.packages,
+    # which is usually the same list. Vitals are per app — there is no
+    # "every app" query — so one of the two lists must be set.
+    packages: []
+    # - com.example.yourapp
+    # How far back the first poll reads. 30 is exactly enough for the boss
+    # engine's 28-day baseline to exist on the very first evaluation.
+    backfill_days: 30
+
+  sentry:
+    # Sentry webhooks at POST /hooks/sentry. In Sentry: Settings > Developer
+    # Settings > Custom Integrations > Internal Integration, set the webhook
+    # URL to https://<your loot>/hooks/sentry, tick the "issue" webhook, give
+    # it Issue & Event read permission, and paste the Client Secret below.
+    # Resolving an issue in Sentry slays the boss in Loot.
+    enabled: false
+    client_secret: ""
+
+  crash:
+    # Generic crash receiver at POST /hooks/crash, for everything else —
+    # including Crashlytics, which has no data API at all. docs/sources/crashes.md
+    # has a Firebase Cloud Function that relays velocity alerts here in about
+    # twenty lines.
+    #
+    #   curl -X POST http://localhost:8080/hooks/crash \
+    #     -H 'Authorization: Bearer hunter2' \
+    #     -d '{"app":"com.example.app","version":"2.3.1","crashes":312,
+    #          "users_affected":91,"boss":true}'
     enabled: false
     secret: ""
 

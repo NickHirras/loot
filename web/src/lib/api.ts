@@ -1,5 +1,7 @@
 import type {
   Achievement,
+  Boss,
+  BossBoard,
   Casebook,
   ChestSummary,
   CodexBoard,
@@ -220,4 +222,19 @@ export async function fetchRecap(period = ''): Promise<RecapResponse> {
     query ? `/api/recap?${query}` : '/api/recap',
   )
   return { recap: data.recap, periods: data.periods ?? [] }
+}
+
+// ----------------------------------------------------------------- bosses
+
+/** The boss board: the fights in progress, and the last few that ended. */
+export async function fetchBosses(): Promise<BossBoard> {
+  const data = await getJSON<{ alive: Boss[] | null; recent: Boss[] | null }>('/api/bosses')
+  return { alive: data.alive ?? [], recent: data.recent ?? [] }
+}
+
+/** Says you fixed it. The epic drop arrives over the socket. */
+export async function slayBoss(id: string): Promise<Boss> {
+  const res = await postJSON(`/api/bosses/${encodeURIComponent(id)}/slay`, {})
+  const data = (await res.json()) as { boss: Boss }
+  return data.boss
 }

@@ -18,8 +18,9 @@ import (
 //	{"type":"quests"}                       the quest board changed
 //	{"type":"mysteries"}                    the mystery casebook changed
 //	{"type":"codex"}                        an achievement was unlocked
+//	{"type":"bosses"}                       a boss spawned, drained or died
 //
-// The last three carry no payload at all: they are a nudge to refetch, which
+// The last four carry no payload at all: they are a nudge to refetch, which
 // keeps one board out of every websocket frame and means a client that missed
 // one is corrected by the next.
 type Message struct {

@@ -13,11 +13,14 @@ import (
 	"github.com/nickhirras/loot/internal/config"
 	"github.com/nickhirras/loot/internal/core"
 	"github.com/nickhirras/loot/internal/sources/appstore"
+	"github.com/nickhirras/loot/internal/sources/crash"
 	"github.com/nickhirras/loot/internal/sources/flathub"
 	"github.com/nickhirras/loot/internal/sources/github"
 	"github.com/nickhirras/loot/internal/sources/googleplay"
 	"github.com/nickhirras/loot/internal/sources/microsoftstore"
+	"github.com/nickhirras/loot/internal/sources/playvitals"
 	"github.com/nickhirras/loot/internal/sources/revenuecat"
+	"github.com/nickhirras/loot/internal/sources/sentry"
 	"github.com/nickhirras/loot/internal/sources/snapcraft"
 	"github.com/nickhirras/loot/internal/sources/webhook"
 )
@@ -101,6 +104,22 @@ func runCheck(args []string) error {
 		src, err := github.New(cfg.Sources.GitHub, quiet)
 		candidates = append(candidates, candidate{name: github.Name, source: src, err: err,
 			note: fmt.Sprintf("%d repo(s)", len(cfg.Sources.GitHub.Repos))})
+	}
+	if cfg.PlayVitalsConfigured() {
+		src, err := playvitals.New(cfg.Sources.PlayVitals,
+			cfg.Sources.GooglePlay.ServiceAccountJSONPath, cfg.PlayVitalsPackages(), quiet)
+		candidates = append(candidates, candidate{name: playvitals.Name, source: src, err: err,
+			note: fmt.Sprintf("%d package(s)", len(cfg.PlayVitalsPackages()))})
+	}
+	if cfg.Sources.Sentry.Enabled {
+		src, err := sentry.New(cfg.Sources.Sentry, quiet)
+		candidates = append(candidates, candidate{name: sentry.Name, source: src, err: err,
+			note: "webhook at POST /hooks/sentry"})
+	}
+	if cfg.Sources.Crash.Enabled {
+		src, err := crash.New(cfg.Sources.Crash, quiet)
+		candidates = append(candidates, candidate{name: crash.Name, source: src, err: err,
+			note: "webhook at POST /hooks/crash"})
 	}
 	if cfg.Sources.Webhook.Enabled {
 		src, err := webhook.New(cfg.Sources.Webhook, quiet)

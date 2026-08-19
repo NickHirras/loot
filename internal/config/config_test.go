@@ -394,3 +394,72 @@ func TestDemoEnvOverrides(t *testing.T) {
 		t.Errorf("active db = %q, want the demo database", cfg.ActiveDBPath())
 	}
 }
+
+// Android vitals deliberately has no credential of its own: the same service
+// account that reads the Play reporting bucket reads vitals, so pointing Loot
+// at two key files for one Play Console account would be a trap rather than a
+// feature.
+func TestPlayVitalsBorrowsPlaysCredential(t *testing.T) {
+	cfg := config.Default()
+	cfg.Sources.PlayVitals.Enabled = true
+	cfg.Sources.GooglePlay.Packages = []string{"com.example.one", "com.example.two"}
+
+	if cfg.PlayVitalsConfigured() {
+		t.Error("configured without a service-account key")
+	}
+	cfg.Sources.GooglePlay.ServiceAccountJSONPath = "/tmp/key.json"
+	if !cfg.PlayVitalsConfigured() {
+		t.Error("not configured with a key and Play's package list")
+	}
+	if got := cfg.PlayVitalsPackages(); len(got) != 2 || got[0] != "com.example.one" {
+		t.Errorf("packages = %v, want Play's list", got)
+	}
+
+	// Its own list wins when it has one.
+	cfg.Sources.PlayVitals.Packages = []string{"com.example.three"}
+	if got := cfg.PlayVitalsPackages(); len(got) != 1 || got[0] != "com.example.three" {
+		t.Errorf("packages = %v, want the vitals list", got)
+	}
+
+	// Vitals are per app; the API has no "every app" query.
+	cfg.Sources.PlayVitals.Packages = nil
+	cfg.Sources.GooglePlay.Packages = nil
+	if cfg.PlayVitalsConfigured() {
+		t.Error("configured with no packages at all")
+	}
+
+	// And it stays off until it is asked for: it needs an extra API enabled
+	// and an extra Play Console grant, so it cannot be on by default.
+	cfg.Sources.PlayVitals.Enabled = false
+	cfg.Sources.PlayVitals.Packages = []string{"com.example.one"}
+	if cfg.PlayVitalsConfigured() {
+		t.Error("configured while disabled")
+	}
+}
+
+func TestCrashSourceEnv(t *testing.T) {
+	t.Setenv("LOOT_PLAYVITALS_ENABLED", "1")
+	t.Setenv("LOOT_PLAYVITALS_PACKAGES", "com.a, com.b")
+	t.Setenv("LOOT_PLAYVITALS_BACKFILL_DAYS", "45")
+	t.Setenv("LOOT_SENTRY_ENABLED", "true")
+	t.Setenv("LOOT_SENTRY_CLIENT_SECRET", "s3cr3t")
+	t.Setenv("LOOT_CRASH_ENABLED", "yes")
+	t.Setenv("LOOT_CRASH_SECRET", "hunter2")
+
+	cfg, err := config.Load("", false)
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if !cfg.Sources.PlayVitals.Enabled || cfg.Sources.PlayVitals.BackfillDays != 45 {
+		t.Errorf("playvitals = %+v", cfg.Sources.PlayVitals)
+	}
+	if got := cfg.Sources.PlayVitals.Packages; len(got) != 2 || got[1] != "com.b" {
+		t.Errorf("packages = %v, want the trimmed list", got)
+	}
+	if !cfg.Sources.Sentry.Enabled || cfg.Sources.Sentry.ClientSecret != "s3cr3t" {
+		t.Errorf("sentry = %+v", cfg.Sources.Sentry)
+	}
+	if !cfg.Sources.Crash.Enabled || cfg.Sources.Crash.Secret != "hunter2" {
+		t.Errorf("crash = %+v", cfg.Sources.Crash)
+	}
+}

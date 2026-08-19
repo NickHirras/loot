@@ -12,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/nickhirras/loot/internal/bosses"
 	"github.com/nickhirras/loot/internal/bus"
 	"github.com/nickhirras/loot/internal/codex"
 	"github.com/nickhirras/loot/internal/config"
@@ -24,11 +25,14 @@ import (
 	"github.com/nickhirras/loot/internal/rules"
 	"github.com/nickhirras/loot/internal/server"
 	"github.com/nickhirras/loot/internal/sources/appstore"
+	"github.com/nickhirras/loot/internal/sources/crash"
 	"github.com/nickhirras/loot/internal/sources/flathub"
 	"github.com/nickhirras/loot/internal/sources/github"
 	"github.com/nickhirras/loot/internal/sources/googleplay"
 	"github.com/nickhirras/loot/internal/sources/microsoftstore"
+	"github.com/nickhirras/loot/internal/sources/playvitals"
 	"github.com/nickhirras/loot/internal/sources/revenuecat"
+	"github.com/nickhirras/loot/internal/sources/sentry"
 	"github.com/nickhirras/loot/internal/sources/snapcraft"
 	"github.com/nickhirras/loot/internal/sources/webhook"
 	"github.com/nickhirras/loot/internal/store"
@@ -177,12 +181,26 @@ func runServe(args []string) error {
 	// first run over an existing database, in today's chest instead.
 	codexSvc := codex.NewService(st, pipe, b, cfg.DisplayCurrency, log)
 
+	// Quest 3: bosses. Crash clusters that broke away from their own baseline,
+	// given a name and a health bar. The spawn, the enrage and the kill all
+	// travel the same pipeline as a sale, so a boss dying makes the same kind
+	// of noise as money arriving — which is the entire point.
+	bossSvc := bosses.NewService(st, pipe, b, log)
+
 	// A drop that just pushed a quest over its target — or an achievement over
 	// its threshold — should pay out now, not in a minute. Both Triggers only
 	// nudge a goroutine, so ingest stays fast.
-	pipe.AfterIngest = func(core.Event) {
+	pipe.AfterIngest = func(ev core.Event) {
 		questSvc.Trigger()
 		codexSvc.Trigger()
+		// Crash events are silent and never touch a quest or a trophy, so the
+		// boss engine is nudged only by the events it can actually act on —
+		// which keeps a poll of four hundred crash rows from re-reading the
+		// whole codex four hundred times.
+		switch ev.Kind {
+		case core.KindCrash, core.KindCrashDay, core.KindCrashResolved:
+			bossSvc.Trigger()
+		}
 	}
 
 	var sources []core.Source
@@ -227,6 +245,15 @@ func runServe(args []string) error {
 			log.Warn("demo codex evaluation failed", "error", err)
 		} else if len(res.Unlocked) > 0 {
 			log.Info("demo achievements unlocked", "count", len(res.Unlocked), "backfilled", res.Backfilled)
+		}
+		// And a boss fight already in progress, plus one the demo world won
+		// last month — a Quests tab with an empty Boss fights section would
+		// undersell the best thing on it.
+		if res, err := bossSvc.Evaluate(ctx); err != nil {
+			log.Warn("demo boss evaluation failed", "error", err)
+		} else if res.Changed() {
+			log.Info("demo bosses evaluated",
+				"spawned", len(res.Spawned), "slain", len(res.Slain), "faded", len(res.Faded))
 		}
 	}
 	if !cfg.Demo.Enabled && cfg.RevenueCatEnabled() {
@@ -302,6 +329,41 @@ func runServe(args []string) error {
 			log.Info("github source configured", "repos", cfg.Sources.GitHub.Repos)
 		}
 	}
+	if !cfg.Demo.Enabled && cfg.PlayVitalsConfigured() {
+		src, err := playvitals.New(cfg.Sources.PlayVitals,
+			cfg.Sources.GooglePlay.ServiceAccountJSONPath, cfg.PlayVitalsPackages(), log)
+		if err != nil {
+			log.Warn("play vitals source unavailable", "error", err)
+		} else {
+			sources = append(sources, src)
+			log.Info("play vitals source configured",
+				"packages", src.Packages, "backfill_days", src.BackfillDays)
+		}
+	}
+	if !cfg.Demo.Enabled && cfg.Sources.Sentry.Enabled {
+		src, err := sentry.New(cfg.Sources.Sentry, log)
+		if err != nil {
+			log.Warn("sentry source unavailable", "error", err)
+		} else {
+			sources = append(sources, src)
+			log.Info("sentry webhook configured at POST /hooks/sentry")
+			if cfg.Sources.Sentry.ClientSecret == "" {
+				log.Warn("sentry webhook has no client_secret; deliveries to /hooks/sentry are unverified")
+			}
+		}
+	}
+	if !cfg.Demo.Enabled && cfg.Sources.Crash.Enabled {
+		src, err := crash.New(cfg.Sources.Crash, log)
+		if err != nil {
+			log.Warn("crash webhook unavailable", "error", err)
+		} else {
+			sources = append(sources, src)
+			log.Info("crash webhook configured at POST /hooks/crash")
+			if cfg.Sources.Crash.Secret == "" {
+				log.Warn("crash webhook has no secret; anyone who can reach /hooks/crash can spawn bosses")
+			}
+		}
+	}
 	if !cfg.Demo.Enabled && cfg.Sources.Webhook.Enabled {
 		src, err := webhook.New(cfg.Sources.Webhook, log)
 		if err != nil {
@@ -323,11 +385,17 @@ func runServe(args []string) error {
 	go questSvc.Run(ctx)
 	go detector.RunLoop(ctx)
 	go codexSvc.Run(ctx)
+	go bossSvc.Run(ctx)
 
 	srv := server.New(cfg, st, b, pipe, sources, web.DistFS(), log)
 	srv.Quests = questSvc
 	srv.Mysteries = mysterySvc
 	srv.Codex = codexSvc
+	srv.Bosses = bossSvc
+	// A spawn or a kill invalidates the board's memo for the same reason an
+	// unlock invalidates the wall's: the nudge and the stale answer would
+	// otherwise race, and the page would redraw a boss that is already dead.
+	bossSvc.OnChange = srv.InvalidateBosses
 	// An unlock invalidates the wall's memo, so the refetch its websocket nudge
 	// provokes cannot be answered with a board from before the trophy.
 	codexSvc.OnChange = srv.InvalidateCodex

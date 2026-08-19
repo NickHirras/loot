@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nickhirras/loot/internal/bosses"
 	"github.com/nickhirras/loot/internal/bus"
 	"github.com/nickhirras/loot/internal/codex"
 	"github.com/nickhirras/loot/internal/config"
@@ -42,11 +43,16 @@ type Server struct {
 	// Codex is optional in the same way: without it /api/codex answers an
 	// empty wall rather than 404.
 	Codex *codex.Service
+	// Bosses is optional too: without it /api/bosses answers "peace in the
+	// realm" rather than 404.
+	Bosses *bosses.Service
 
 	// hearth memoizes the globe aggregate; see hearth.go.
 	hearth hearthCache
 	// codex memoizes the trophy wall; see codex.go.
 	codex codexCache
+	// bosses memoizes the boss board; see bosses.go.
+	bosses bossCache
 }
 
 // New returns a server.
@@ -76,6 +82,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/mysteries", s.handleMysteries)
 	mux.HandleFunc("POST /api/mysteries/{id}/solve", s.handleMysterySolve)
 	mux.HandleFunc("POST /api/mysteries/{id}/dismiss", s.handleMysteryDismiss)
+	mux.HandleFunc("GET /api/bosses", s.handleBosses)
+	mux.HandleFunc("POST /api/bosses/{id}/slay", s.handleBossSlay)
 	mux.HandleFunc("GET /api/codex", s.handleCodex)
 	mux.HandleFunc("GET /api/recap", s.handleRecap)
 	mux.HandleFunc("GET /ws", s.handleWS)
@@ -142,6 +150,13 @@ func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, "stats", err)
 		return
 	}
+	// And one the Quests tab needs so its badge can turn red before the board
+	// itself has been fetched: how many monsters are still standing.
+	aliveBosses, err := s.Store.CountAliveBosses(r.Context())
+	if err != nil {
+		s.fail(w, "stats", err)
+		return
+	}
 
 	writeJSON(w, http.StatusOK, map[string]any{
 		"total_drops":      st.TotalDrops,
@@ -155,6 +170,7 @@ func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {
 		"chest_dates":      st.ChestDates,
 		"open_mysteries":   openMysteries,
 		"active_quests":    activeQuests,
+		"bosses_alive":     aliveBosses,
 		"display_currency": s.displayCurrency(),
 		"dev":              s.Cfg.Dev.Enabled,
 		// demo tells the dashboard to wear its "synthetic data" pill, so

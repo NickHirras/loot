@@ -58,6 +58,14 @@ type serviceAccount struct {
 // Loot nothing — a service-account key file is the only credential Play
 // reporting accepts.
 func TokenSourceFromJSON(ctx context.Context, data []byte) (oauth2.TokenSource, error) {
+	return TokenSourceForScopes(ctx, data, StorageScope)
+}
+
+// TokenSourceForScopes is TokenSourceFromJSON with the scopes spelled out. The
+// same service-account key that reads the reporting bucket also reads Android
+// vitals, so internal/sources/playvitals borrows this rather than asking the
+// operator to configure a second key file for the same Play Console account.
+func TokenSourceForScopes(ctx context.Context, data []byte, scopes ...string) (oauth2.TokenSource, error) {
 	var sa serviceAccount
 	if err := json.Unmarshal(data, &sa); err != nil {
 		return nil, fmt.Errorf("googleplay: parse service account key: %w", err)
@@ -75,7 +83,7 @@ func TokenSourceFromJSON(ctx context.Context, data []byte) (oauth2.TokenSource, 
 		PrivateKey:   []byte(sa.PrivateKey),
 		PrivateKeyID: sa.PrivateKeyID,
 		TokenURL:     tokenURI,
-		Scopes:       []string{StorageScope},
+		Scopes:       scopes,
 	}
 	return conf.TokenSource(ctx), nil
 }

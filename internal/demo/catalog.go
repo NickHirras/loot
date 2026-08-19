@@ -1,5 +1,7 @@
 package demo
 
+import "github.com/nickhirras/loot/internal/core"
+
 // The cast: three fictional apps, the storefronts they sell in, and the
 // products they sell. Everything the seeder and the live emitter invent is
 // built out of this file, so tuning the demo world means editing data here
@@ -148,6 +150,42 @@ type app struct {
 	// reported daily as a subscription_snapshot.
 	Subscribers int
 	Products    []product
+	// CrashBase is the app's ordinary daily crash count in Android vitals, and
+	// CrashVersion the shipping version they are attributed to. Zero means the
+	// app reports no vitals at all, which is what a Flathub-only app looks
+	// like.
+	CrashBase    float64
+	CrashVersion string
+	// Fights are the scripted boss battles in this app's history. Everything
+	// else about a boss — its name, its HP, when it died — is worked out by
+	// the real detector from the crash numbers below, exactly as it would be
+	// for a real app.
+	Fights []fight
+}
+
+// fight scripts one crash spike: a bad version shipping, and a fix rolling out
+// behind it. The shape is deliberately the shape a real one has — one terrible
+// day, then a geometric decay as the fixed build reaches more of the install
+// base — because a demo that invents a shape the detector was not built for is
+// a demo of nothing.
+type fight struct {
+	// Version is the build that broke, and Title the crash's own name.
+	Version string
+	Title   string
+	// Kind is "crash" or "anr".
+	Kind string
+	// SpikeBefore is how many days before the end of the seeded window the
+	// terrible day falls.
+	SpikeBefore int
+	// Peak is that day's crash count and Users how many people it hit.
+	Peak  float64
+	Users float64
+	// Decay is the daily multiplier as the fix rolls out: 0.85 is a slow
+	// staged rollout, 0.35 a hotfix that went out to everyone at once.
+	Decay float64
+	// Days is how long the fight's own series runs before the version stops
+	// being reported at all.
+	Days int
 }
 
 // apps is the demo catalogue: a subscription notes app, a weather app that
@@ -167,6 +205,20 @@ var apps = []app{
 		Weekend:      0.78,
 		Growth:       2.1,
 		Subscribers:  1480,
+		CrashBase:    6,
+		CrashVersion: "4.1.3",
+		// The fight the demo opens on: a bad build six days ago, a staged
+		// rollout draining it since. It is deliberately still standing —
+		// the whole point of the Quests tab is the one you have not won yet.
+		Fights: []fight{{
+			Version:     "4.2.0",
+			Title:       "NullPointerException in SyncWorker.onRun",
+			SpikeBefore: 6,
+			Peak:        312,
+			Users:       91,
+			Decay:       0.85,
+			Days:        14,
+		}},
 		Products: []product{
 			{SKU: "notes.pro.monthly", ProductType: "IA9", PlayType: "Subscription", Kind: "subscription", PriceUSD: 4.99, Share: 0.7, Weight: 52, Period: "MONTHLY"},
 			{SKU: "notes.pro.annual", ProductType: "IAY", PlayType: "Subscription", Kind: "subscription", PriceUSD: 39.99, Share: 0.7, Weight: 16, Period: "ANNUAL"},
@@ -188,6 +240,20 @@ var apps = []app{
 		Growth:       1.7,
 		LaunchAt:     0.66,
 		Subscribers:  610,
+		CrashBase:    5,
+		CrashVersion: "3.0.4",
+		// The one on the shelf: a much worse crash last month, hotfixed in a
+		// day, dead in five. It is what a won fight looks like afterwards.
+		Fights: []fight{{
+			Version:     "3.1.0",
+			Title:       "ANR in RadarTileRenderer.draw",
+			Kind:        core.BossKindANR,
+			SpikeBefore: 34,
+			Peak:        620,
+			Users:       210,
+			Decay:       0.35,
+			Days:        9,
+		}},
 		Products: []product{
 			{SKU: "app.orbitweather.pro", ProductType: "1", PlayType: "Paid App", Kind: "sale", PriceUSD: 2.99, Share: 0.7, Weight: 44},
 			{SKU: "orbit.radar.monthly", ProductType: "IA9", PlayType: "Subscription", Kind: "subscription", PriceUSD: 1.99, Share: 0.7, Weight: 24, Period: "MONTHLY"},

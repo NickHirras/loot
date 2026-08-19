@@ -1,7 +1,9 @@
 <script lang="ts">
   import { untrack } from 'svelte'
+  import BossCard from './BossCard.svelte'
   import MysteryCard from './MysteryCard.svelte'
   import QuestCard from './QuestCard.svelte'
+  import { bossesState } from './bosses.svelte'
   import { questsState } from './quests.svelte'
   import { loot } from './state.svelte'
   import type { Metric, NewQuest } from './types'
@@ -12,10 +14,12 @@
   // store already untracks its own setup; untracking here as well means a
   // future edit to either side cannot turn this into a fetch loop.
   $effect(() => untrack(() => questsState.activate()))
+  $effect(() => untrack(() => bossesState.activate()))
 
   const code = $derived(loot.stats?.display_currency ?? 'USD')
   const board = $derived(questsState.board)
   const casebook = $derived(questsState.casebook)
+  const bosses = $derived(bossesState.board)
 
   // --- the new quest form ---------------------------------------------------
 
@@ -138,6 +142,43 @@
 
   {#if questsState.error}
     <p class="note error">{questsState.error}</p>
+  {/if}
+
+  <!-- Boss fights sit above the quest board: a crash you are in the middle of
+       fixing is the most urgent thing on this tab, and the only one where
+       looking at it twice a day genuinely helps. -->
+  {#if bosses.alive.length > 0 || bosses.recent.length > 0}
+    <h3 class="section">
+      Boss fights
+      {#if bosses.alive.length > 0}<span class="count danger">{bosses.alive.length}</span>{/if}
+    </h3>
+    <p class="lede">
+      A crash cluster that broke away from its own baseline, given a name and a health bar. HP is what it did on the
+      most recent completed day, so shipping a fix drains the bar and the kill pays an epic drop. Nothing here can be
+      failed — a boss that is still standing is just still standing.
+    </p>
+    {#if bosses.alive.length > 0}
+      <div class="grid wide-grid">
+        {#each bosses.alive as boss (boss.id)}
+          <BossCard {boss} flashing={bossesState.flashing.includes(boss.id)} />
+        {/each}
+      </div>
+    {/if}
+    {#if bosses.recent.length > 0}
+      <h3 class="section sub-section">Won, and lost sight of</h3>
+      <div class="grid wide-grid">
+        {#each bosses.recent as boss (boss.id)}
+          <BossCard {boss} flashing={bossesState.flashing.includes(boss.id)} />
+        {/each}
+      </div>
+    {/if}
+  {:else if !bossesState.loading}
+    <h3 class="section">Boss fights</h3>
+    <p class="empty">
+      No bosses. Peace in the realm. Point a crash source at Loot — Android vitals, Sentry, or anything that can POST
+      to <code>/hooks/crash</code> — and the next crash spike becomes a monster with a health bar you can drain. See
+      <code>docs/bosses.md</code>.
+    </p>
   {/if}
 
   {#if questsState.loading}
@@ -333,6 +374,23 @@
     border-radius: 999px;
     color: var(--accent);
     border: 1px solid color-mix(in oklab, var(--accent) 40%, transparent);
+  }
+
+  /* The one count in Loot allowed to be red. It is a number of fights, not an
+     alarm: it never pulses, never grows, and disappears when you win. */
+  .count.danger {
+    color: var(--cursed);
+    border-color: color-mix(in oklab, var(--cursed) 45%, transparent);
+  }
+
+  .sub-section {
+    margin-top: 1rem;
+  }
+
+  .empty code {
+    font-family: var(--mono);
+    font-size: 0.92em;
+    color: var(--text-dim);
   }
 
   .lede {

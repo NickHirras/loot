@@ -1,4 +1,5 @@
 import { fetchChests, fetchDrops, fetchSources, fetchStats, openChest, websocketURL } from './api'
+import { bossesState } from './bosses.svelte'
 import { codexState } from './codex.svelte'
 import { questsState } from './quests.svelte'
 import { prefersReducedMotion } from './route.svelte'
@@ -129,6 +130,15 @@ class LootState {
    */
   get openMysteries(): number {
     return questsState.casebook.open.length || (this.stats?.open_mysteries ?? 0)
+  }
+
+  /**
+   * How many bosses are still standing, for the Quests tab's red badge. The
+   * section's own state wins once it has loaded, so slaying one clears the
+   * badge without waiting for the next stats poll.
+   */
+  get aliveBosses(): number {
+    return bossesState.board.alive.length || (this.stats?.bosses_alive ?? 0)
   }
 
   /** How many drops are waiting in unopened chests. Drives the header badge. */
@@ -315,6 +325,11 @@ class LootState {
         codexState.markStale()
         return
       }
+      if (msg.type === 'bosses') {
+        bossesState.markStale()
+        void this.refreshMeta()
+        return
+      }
       if (msg.type === 'drop' && msg.drop) {
         // The wire splits drop and originating event; the API returns them
         // flattened, so merge here to keep one Drop shape everywhere.
@@ -378,6 +393,9 @@ class LootState {
     // An achievement drop *is* the unlock, arriving on the normal drop
     // pathway with its own rarity and sound; the wall behind it is stale.
     if (drop.kind === 'achievement') codexState.markStale()
+    // A spawn, an enrage or a kill *is* the boss news, arriving on the normal
+    // drop pathway with its own rarity and sound; the board behind it is stale.
+    if (drop.kind.startsWith('boss_')) bossesState.markStale()
 
     if (!this.muted && !quiet) sounds.play(drop.rarity)
 

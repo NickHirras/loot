@@ -50,6 +50,14 @@
           {#if tab.id === 'quests' && loot.openMysteries > 0}
             <span class="tab-badge" title="{loot.openMysteries} open mysteries">{loot.openMysteries}</span>
           {/if}
+          <!-- And the one badge in Loot that is allowed to be red. A boss is a
+               crash you are in the middle of fixing: the only thing here where
+               looking twice a day genuinely helps. -->
+          {#if tab.id === 'quests' && loot.aliveBosses > 0}
+            <span class="tab-badge danger" title="{loot.aliveBosses} boss fight(s) in progress">
+              {loot.aliveBosses}
+            </span>
+          {/if}
         </a>
       {/each}
     </nav>
@@ -228,6 +236,12 @@
     color: var(--text);
     background: color-mix(in oklab, var(--accent) 12%, var(--panel-2));
     border-color: color-mix(in oklab, var(--accent) 35%, transparent);
+  }
+
+  .tab-badge.danger {
+    color: var(--cursed);
+    background: color-mix(in oklab, var(--cursed) 16%, #0d111a);
+    border-color: color-mix(in oklab, var(--cursed) 45%, transparent);
   }
 
   .tab-badge {

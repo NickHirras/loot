@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nickhirras/loot/internal/bosses"
 	"github.com/nickhirras/loot/internal/bus"
 	"github.com/nickhirras/loot/internal/codex"
 	"github.com/nickhirras/loot/internal/core"
@@ -465,5 +466,88 @@ func TestSeededWorldFillsTheCodex(t *testing.T) {
 	}
 	if len(recap.Series) < 28 {
 		t.Errorf("recap sparkline has %d points", len(recap.Series))
+	}
+}
+
+// TestSeededWorldHasBossFights is Quest 3's half of the demo promise: the
+// Quests tab should open on a real fight in progress *and* a trophy on the
+// shelf, because a Boss fights section with nothing in it undersells the best
+// thing on the page.
+//
+// The live fight is deliberately not hard-coded anywhere: it is found by the
+// real detector reading the crash series the seeder invented, so this test
+// also checks the two halves agree about what a plausible crash spike looks
+// like.
+func TestSeededWorldHasBossFights(t *testing.T) {
+	ctx := context.Background()
+	d, st := newDemo(t, t.TempDir(), 20260818, 120)
+
+	if _, err := d.Seed(ctx); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	svc := bosses.NewService(st, d.live, bus.New(16), quietLogger())
+	if _, err := svc.Evaluate(ctx); err != nil {
+		t.Fatalf("evaluate: %v", err)
+	}
+
+	board, err := svc.List(ctx)
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	if len(board.Alive) != 1 {
+		t.Fatalf("%d bosses alive, want exactly 1 — a demo with three monsters is a demo of noise", len(board.Alive))
+	}
+	if len(board.Recent) != 1 {
+		t.Fatalf("%d finished fights, want 1 on the shelf", len(board.Recent))
+	}
+
+	live := board.Alive[0]
+	if live.Name == "" || live.Title == "" {
+		t.Errorf("the live boss has no name or title: %+v", live)
+	}
+	// The demo is tuned to open on a fight that is visibly being won: about
+	// 40% of its opening strength, with the fix still rolling out.
+	if live.Pct < 0.25 || live.Pct > 0.55 {
+		t.Errorf("live boss is at %.0f%% HP, want roughly 40%% — the demo should show a fight being won",
+			live.Pct*100)
+	}
+	if live.HPMax < 100 {
+		t.Errorf("live boss opened at %v, want a fight worth having", live.HPMax)
+	}
+	if live.UsersAffected == 0 {
+		t.Error("live boss affected nobody")
+	}
+	if len(live.Series) != bosses.SeriesPoints {
+		t.Errorf("live boss has %d sparkline points, want %d", len(live.Series), bosses.SeriesPoints)
+	}
+	if live.Enraged {
+		t.Error("the demo's live boss enraged; the scripted decay should never climb")
+	}
+
+	won := board.Recent[0]
+	if won.Status != core.BossSlain {
+		t.Fatalf("the finished fight is %s, want slain", won.Status)
+	}
+	if won.XPAwarded == 0 {
+		t.Error("the won fight paid no XP")
+	}
+	if won.DaysAlive < 2 || won.DaysAlive > 10 {
+		t.Errorf("the won fight lasted %d days, want a readable few", won.DaysAlive)
+	}
+
+	// Its spawn and kill drops are backdated into the feed on the days they
+	// happened, rather than all landing the moment the demo boots.
+	var spawnDay, slainDay string
+	if err := st.DB().QueryRowContext(ctx, `
+        SELECT MIN(CASE WHEN e.kind = 'boss_spawn' THEN e.day END),
+               MIN(CASE WHEN e.kind = 'boss_slain' THEN e.day END)
+        FROM events e WHERE e.source = 'loot' AND e.kind LIKE 'boss_%'`).
+		Scan(&spawnDay, &slainDay); err != nil {
+		t.Fatalf("read boss drop days: %v", err)
+	}
+	today := core.DayOf(time.Now().UTC())
+	if spawnDay >= today || slainDay >= today {
+		t.Errorf("the won fight's drops are dated %s / %s, want days in the past", spawnDay, slainDay)
 	}
 }
