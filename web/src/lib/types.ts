@@ -66,6 +66,10 @@ export interface Stats {
   unrevealed_count: number
   /** The days those chests are for, oldest first. */
   chest_dates: string[]
+  /** How many mysteries are still unexplained; drives the Quests tab badge. */
+  open_mysteries: number
+  /** How many quests are running. */
+  active_quests: number
   display_currency: string
   dev: boolean
   /** True when this Loot is running on synthetic demo data. */
@@ -89,9 +93,11 @@ export interface SourceInfo {
  *   {"type":"drop","drop":…,"event":…}    a drop landed
  *   {"type":"drop","chest":true,…}        a drop revealed by opening a chest
  *   {"type":"chest","chests":[…]}         the set of unopened chests changed
+ *   {"type":"quests"}                     the quest board changed — refetch
+ *   {"type":"mysteries"}                  the casebook changed — refetch
  */
 export interface WSMessage {
-  type: 'hello' | 'drop' | 'chest'
+  type: 'hello' | 'drop' | 'chest' | 'quests' | 'mysteries'
   drop?: Pick<
     Drop,
     'id' | 'event_id' | 'rarity' | 'title' | 'subtitle' | 'xp' | 'created_at' | 'chest_date' | 'revealed_at'
@@ -385,4 +391,155 @@ export interface Hearth {
   countries: HearthCountry[]
   tiers: HearthTier[]
   recent: HearthDrop[]
+}
+
+// --------------------------------------------------------------- quest types
+
+/**
+ * What a quest counts, mirroring internal/core. Each one is a SQL aggregate
+ * over events and drops inside the quest's window.
+ */
+export const METRICS = [
+  'revenue',
+  'units',
+  'installs',
+  'subscribers',
+  'drops',
+  'settlements',
+  'stars',
+  'xp',
+] as const
+
+export type Metric = (typeof METRICS)[number]
+
+/** How a metric reads in a sentence, and the glyph that stands for it. */
+export const METRIC_LABEL: Record<Metric, string> = {
+  revenue: 'revenue',
+  units: 'units',
+  installs: 'installs',
+  subscribers: 'subscribers',
+  drops: 'drops',
+  settlements: 'new countries',
+  stars: 'stars',
+  xp: 'XP',
+}
+
+export const METRIC_ICON: Record<Metric, string> = {
+  revenue: '◈',
+  units: '▦',
+  installs: '⤓',
+  subscribers: '☗',
+  drops: '◆',
+  settlements: '⚑',
+  stars: '★',
+  xp: '✦',
+}
+
+/** A quest is only ever running, finished, or quietly over. Never "failed". */
+export type QuestStatus = 'active' | 'completed' | 'expired'
+
+/** One goal over one window of days, as GET /api/quests returns it. */
+export interface Quest {
+  id: string
+  /** `auto` was generated from your history, `custom` you set yourself. */
+  kind: 'auto' | 'custom'
+  metric: Metric
+  target: number
+  app: string
+  source: string
+  /** Inclusive days (YYYY-MM-DD). */
+  window_start: string
+  window_end: string
+  title: string
+  status: QuestStatus
+  /** Progress, and 0..1 of the target it represents. */
+  value: number
+  pct: number
+  /** Today counts; 0 once the window has ended. */
+  days_left: number
+  /** What the completion drop paid. */
+  xp: number
+  created_at: string
+  completed_at?: string | null
+  updated_at?: string | null
+}
+
+/** The whole of GET /api/quests. */
+export interface QuestBoard {
+  active: Quest[]
+  recent: Quest[]
+}
+
+/** The body of POST /api/quests. */
+export interface NewQuest {
+  metric: Metric
+  target: number
+  app?: string
+  source?: string
+  window: 'week' | 'month' | { start: string; end: string }
+  title?: string
+}
+
+// ------------------------------------------------------------- mystery types
+
+export type MysteryKind = 'spike' | 'dip' | 'refund_spike' | 'record' | 'new_country_cluster' | 'silence'
+
+export type MysteryStatus = 'open' | 'solved' | 'dismissed'
+
+/** One day of a mystery's sparkline. */
+export interface MysteryPoint {
+  day: string
+  value: number
+}
+
+/** The context a mystery carries so its card can be drawn and understood. */
+export interface MysteryDetail {
+  series: MysteryPoint[]
+  /** The robust centre (median) and spread (MAD) the day was measured against. */
+  baseline: number
+  deviation: number
+  /** observed / expected, 0 when there was nothing to divide by. */
+  ratio: number
+  /** `money` formats in the display currency, `count` as a plain number. */
+  unit: 'money' | 'count'
+  /** One line on what tripped the detector. */
+  why?: string
+}
+
+/** One flagged day: something the numbers did that the days before it do not
+ * explain. */
+export interface Mystery {
+  id: string
+  kind: MysteryKind
+  source: string
+  app: string
+  metric: string
+  day: string
+  observed: number
+  expected: number
+  /** Modified z-score of the flagged day, signed. */
+  z: number
+  title: string
+  detail?: MysteryDetail
+  status: MysteryStatus
+  /** Your own explanation, written when solving it. */
+  note: string
+  created_at: string
+  resolved_at?: string | null
+}
+
+/** The whole of GET /api/mysteries. */
+export interface Casebook {
+  open: Mystery[]
+  resolved: Mystery[]
+}
+
+/** How a mystery kind reads on its card. */
+export const MYSTERY_KIND_LABEL: Record<MysteryKind, string> = {
+  spike: 'spike',
+  dip: 'dip',
+  refund_spike: 'refunds',
+  record: 'record',
+  new_country_cluster: 'new countries',
+  silence: 'silence',
 }

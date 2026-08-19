@@ -1,5 +1,5 @@
 /**
- * The whole router. Loot has three pages, so a hash and a `$state` are enough —
+ * The whole router. Loot has four pages, so a hash and a `$state` are enough —
  * no dependency, no history juggling, and it survives being served from any
  * sub-path because the hash never reaches the server.
  */
@@ -7,6 +7,7 @@ export const TABS = [
   { id: 'feed', label: 'Feed', hash: '#/' },
   { id: 'vault', label: 'Vault', hash: '#/vault' },
   { id: 'hearth', label: 'Hearth', hash: '#/hearth' },
+  { id: 'quests', label: 'Quests', hash: '#/quests' },
 ] as const
 
 export type Tab = (typeof TABS)[number]['id']
@@ -26,7 +27,8 @@ function parse(hash: string): Route {
   const [path, query] = hash.replace(/^#\/?/, '').split('?')
   if (path === 'ambient') return { tab: 'hearth', ambient: true }
 
-  const tab: Tab = path === 'vault' ? 'vault' : path === 'hearth' ? 'hearth' : 'feed'
+  const tab: Tab =
+    path === 'vault' ? 'vault' : path === 'hearth' ? 'hearth' : path === 'quests' ? 'quests' : 'feed'
   const ambient = tab === 'hearth' && new URLSearchParams(query ?? '').get('ambient') === '1'
   return { tab, ambient }
 }

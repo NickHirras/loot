@@ -17,7 +17,9 @@ import (
 	"github.com/nickhirras/loot/internal/core"
 	"github.com/nickhirras/loot/internal/demo"
 	"github.com/nickhirras/loot/internal/fx"
+	"github.com/nickhirras/loot/internal/mysteries"
 	"github.com/nickhirras/loot/internal/pipeline"
+	"github.com/nickhirras/loot/internal/quests"
 	"github.com/nickhirras/loot/internal/rules"
 	"github.com/nickhirras/loot/internal/server"
 	"github.com/nickhirras/loot/internal/sources/appstore"
@@ -146,6 +148,16 @@ func runServe(args []string) error {
 	}
 	go pipe.RunChestAutoOpen(ctx)
 
+	// Quest 5: goals with windows, and the flagged days that ask why. The
+	// quest service ingests its completion drops through the same pipeline as
+	// everything else, so a finished quest lands in the feed with a sound.
+	questSvc := quests.NewService(st, pipe, b, cfg.DisplayCurrency, log)
+	mysterySvc := mysteries.NewService(st, pipe, b, log)
+	detector := mysteries.NewDetector(st, b, cfg.DisplayCurrency, log)
+	// A drop that just pushed a quest over its target should pay out now, not
+	// in a minute. Trigger only nudges a goroutine, so ingest stays fast.
+	pipe.AfterIngest = func(core.Event) { questSvc.Trigger() }
+
 	var sources []core.Source
 	if cfg.Demo.Enabled {
 		// Demo mode mounts no real source at all: no credentials are read, no
@@ -169,6 +181,17 @@ func runServe(args []string) error {
 				"xp", res.XP, "took", res.Took.Round(time.Millisecond).String())
 		}
 		go d.Run(ctx)
+
+		// A demo should open on a board with quests already in progress and a
+		// few open questions about the history it just invented.
+		if err := questSvc.Startup(ctx); err != nil {
+			log.Warn("demo quest generation failed", "error", err)
+		}
+		if found, err := detector.Run(ctx); err != nil {
+			log.Warn("demo mystery detection failed", "error", err)
+		} else if len(found) > 0 {
+			log.Info("demo mysteries found", "count", len(found))
+		}
 	}
 	if !cfg.Demo.Enabled && cfg.RevenueCatEnabled() {
 		rc := revenuecat.New(cfg.Sources.RevenueCat.Secret, log)
@@ -261,8 +284,12 @@ func runServe(args []string) error {
 
 	sched := pipeline.NewScheduler(pipe, st, sources, log)
 	go sched.Run(ctx)
+	go questSvc.Run(ctx)
+	go detector.RunLoop(ctx)
 
 	srv := server.New(cfg, st, b, pipe, sources, web.DistFS(), log)
+	srv.Quests = questSvc
+	srv.Mysteries = mysterySvc
 	return srv.ListenAndServe(ctx)
 }
 

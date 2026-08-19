@@ -1,4 +1,5 @@
 import { fetchChests, fetchDrops, fetchSources, fetchStats, openChest, websocketURL } from './api'
+import { questsState } from './quests.svelte'
 import { prefersReducedMotion } from './route.svelte'
 import { sounds } from './sound'
 import type { ChestSummary, Drop, Rarity, SourceInfo, Stats, WSMessage } from './types'
@@ -109,6 +110,15 @@ class LootState {
   /** True when the server is serving synthetic demo data. */
   get demo(): boolean {
     return this.stats?.demo ?? false
+  }
+
+  /**
+   * How many mysteries are still unexplained, for the Quests tab badge. The
+   * page's own state wins once it has loaded, so solving one updates the badge
+   * without waiting for the next stats poll.
+   */
+  get openMysteries(): number {
+    return questsState.casebook.open.length || (this.stats?.open_mysteries ?? 0)
   }
 
   /** How many drops are waiting in unopened chests. Drives the header badge. */
@@ -247,6 +257,13 @@ class LootState {
         this.#setChests(msg.chests ?? [])
         return
       }
+      // The quest board and the casebook are nudges, not payloads: the page
+      // refetches, and the header's counts ride along on the next stats read.
+      if (msg.type === 'quests' || msg.type === 'mysteries') {
+        questsState.markStale()
+        void this.refreshMeta()
+        return
+      }
       if (msg.type === 'drop' && msg.drop) {
         // The wire splits drop and originating event; the API returns them
         // flattened, so merge here to keep one Drop shape everywhere.
@@ -302,6 +319,9 @@ class LootState {
     this.#bumpStats(drop)
     // Money that landed changes what the vault would answer.
     if (drop.amount_base || drop.amount) vault.markStale()
+    // A completion drop is the quest board's own news; refresh it so the card
+    // lights up as the sound plays.
+    if (drop.kind === 'quest_complete' || drop.kind === 'mystery_solved') questsState.markStale()
 
     if (!this.muted && !quiet) sounds.play(drop.rarity)
 

@@ -45,6 +45,11 @@
           aria-current={router.tab === tab.id ? 'page' : undefined}
         >
           {tab.label}
+          <!-- The one badge in the header that is not about money: how many
+               days are still unexplained. It is a count, never a warning. -->
+          {#if tab.id === 'quests' && loot.openMysteries > 0}
+            <span class="tab-badge" title="{loot.openMysteries} open mysteries">{loot.openMysteries}</span>
+          {/if}
         </a>
       {/each}
     </nav>
@@ -202,7 +207,9 @@
   }
 
   .tab {
-    display: inline-block;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
     padding: 0.25rem 0.7rem;
     border-radius: 999px;
     font-size: 0.82rem;
@@ -221,6 +228,17 @@
     color: var(--text);
     background: color-mix(in oklab, var(--accent) 12%, var(--panel-2));
     border-color: color-mix(in oklab, var(--accent) 35%, transparent);
+  }
+
+  .tab-badge {
+    font-size: 0.62rem;
+    font-weight: 700;
+    line-height: 1;
+    padding: 0.15rem 0.32rem;
+    border-radius: 999px;
+    color: var(--accent);
+    background: color-mix(in oklab, var(--accent) 16%, #0d111a);
+    border: 1px solid color-mix(in oklab, var(--accent) 40%, transparent);
   }
 
   .right {

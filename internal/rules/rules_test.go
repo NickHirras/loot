@@ -612,3 +612,99 @@ rules:
 		t.Fatalf("subtitle = %q, want the business day", drop.Subtitle)
 	}
 }
+
+// lootEvent is one of Loot's own events: something Loot noticed about your
+// data rather than something a store reported.
+func lootEvent(kind, payload string) core.Event {
+	return core.Event{
+		ID:        core.NewID(),
+		Source:    "loot",
+		Kind:      kind,
+		App:       "com.example.app",
+		DedupeKey: "loot:" + kind + ":1",
+		Payload:   []byte(payload),
+	}
+}
+
+// TestQuestAndMysteryRules covers Quest 5's two rules: a finished quest is
+// rare, a finished *month's* quest is epic, and writing down an explanation is
+// worth an uncommon drop.
+func TestQuestAndMysteryRules(t *testing.T) {
+	ctx := context.Background()
+	e := defaultEngine(t, fakeLookup{})
+
+	cases := []struct {
+		name       string
+		event      core.Event
+		wantRarity core.Rarity
+		wantTitle  string
+		wantSub    string
+		wantXP     int
+	}{
+		{
+			name: "a week's quest is rare",
+			event: lootEvent("quest_complete",
+				`{"title":"Beat last week's revenue · $1,240","scope":"week","detail":"revenue · $1,302 of $1,240"}`),
+			wantRarity: core.Rare,
+			wantTitle:  "Quest complete: Beat last week's revenue · $1,240",
+			wantSub:    "revenue · $1,302 of $1,240",
+			wantXP:     200,
+		},
+		{
+			name: "a month's quest is epic",
+			event: lootEvent("quest_complete",
+				`{"title":"Settle 2 new countries this month","scope":"month","detail":"new countries · 2 of 2"}`),
+			wantRarity: core.Epic,
+			wantTitle:  "Quest complete: Settle 2 new countries this month",
+			wantSub:    "new countries · 2 of 2",
+			wantXP:     500,
+		},
+		{
+			name: "a solved mystery is uncommon",
+			event: lootEvent("mystery_solved",
+				`{"title":"Google Play installs tripled on Fri Aug 14 — why?","note":"a newsletter linked us"}`),
+			wantRarity: core.Uncommon,
+			wantTitle:  "Mystery solved",
+			wantSub:    "Google Play installs tripled on Fri Aug 14 — why?",
+			wantXP:     75,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			drop, err := e.Classify(ctx, tc.event)
+			if err != nil {
+				t.Fatalf("classify: %v", err)
+			}
+			if drop.Rarity != tc.wantRarity {
+				t.Errorf("rarity = %s, want %s", drop.Rarity, tc.wantRarity)
+			}
+			if drop.Title != tc.wantTitle {
+				t.Errorf("title = %q, want %q", drop.Title, tc.wantTitle)
+			}
+			if drop.Subtitle != tc.wantSub {
+				t.Errorf("subtitle = %q, want %q", drop.Subtitle, tc.wantSub)
+			}
+			if drop.XP != tc.wantXP {
+				t.Errorf("xp = %d, want %d", drop.XP, tc.wantXP)
+			}
+		})
+	}
+}
+
+// A settlement is also a `loot` event; the quest rules must not shadow it.
+func TestSettlementStillClassifiesAfterQuestRules(t *testing.T) {
+	ctx := context.Background()
+	e := defaultEngine(t, fakeLookup{})
+
+	ev := lootEvent("settlement", `{"via":"appstore"}`)
+	ev.Country = "BR"
+
+	drop, err := e.Classify(ctx, ev)
+	if err != nil {
+		t.Fatalf("classify: %v", err)
+	}
+	if drop.Rarity != core.Rare || !strings.Contains(drop.Title, "New settlement") {
+		t.Fatalf("settlement drop = %s / %q", drop.Rarity, drop.Title)
+	}
+}

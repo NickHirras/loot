@@ -251,6 +251,11 @@ func (d *Demo) txPipeline(tx *store.Store) (*pipeline.Pipeline, error) {
 	pipe.Rules = engine
 	pipe.Bus = nil
 	pipe.Logger = slog.New(slog.DiscardHandler)
+	// Nobody is told about a backfilled event, and that includes the quest
+	// engine: it reads the finished world once, after the transaction commits.
+	// (SQLite gives Loot one connection, so a listener that queried the outer
+	// store mid-seed would sit waiting for the transaction holding it.)
+	pipe.AfterIngest = nil
 	// Chests are the point of the seeded history, and backdating is what makes
 	// the feed read as a timeline instead of as one very busy minute.
 	pipe.ChestEnabled = true

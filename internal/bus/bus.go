@@ -15,6 +15,12 @@ import (
 //	{"type":"drop","drop":…,"event":…}      a drop landed
 //	{"type":"drop","chest":true,…}          a drop revealed by opening a chest
 //	{"type":"chest","chests":[…]}           the set of unopened chests changed
+//	{"type":"quests"}                       the quest board changed
+//	{"type":"mysteries"}                    the mystery casebook changed
+//
+// The last two carry no payload at all: they are a nudge to refetch, which
+// keeps one board out of every websocket frame and means a client that missed
+// one is corrected by the next.
 type Message struct {
 	Type string     `json:"type"`
 	Drop *core.Drop `json:"drop,omitempty"`

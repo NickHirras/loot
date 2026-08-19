@@ -68,6 +68,17 @@ type Pipeline struct {
 	// order the events actually happened.
 	Backdate bool
 
+	// AfterIngest is called once per *new* event, after its drop (if any) has
+	// been published. It exists for the quest engine: a quest that crossed its
+	// target should pay out while the drop that pushed it over is still on
+	// screen, rather than up to a minute later.
+	//
+	// It must not block — the implementation is expected to nudge a goroutine
+	// and return — and it is deliberately not called for duplicates or for
+	// Loot's own synthetic events, which is what stops a quest completion from
+	// triggering another quest check forever.
+	AfterIngest func(ev core.Event)
+
 	// Now is the clock, swappable in tests.
 	Now func() time.Time
 }
@@ -140,6 +151,9 @@ func (p *Pipeline) ingest(ctx context.Context, ev core.Event, depth int) (*core.
 			// A failed settlement must not lose the event that caused it.
 			p.Logger.Error("settlement failed", "error", err, "country", ev.Country)
 		}
+	}
+	if p.AfterIngest != nil && ev.Source != settlementSource {
+		p.AfterIngest(ev)
 	}
 	return drop, nil
 }

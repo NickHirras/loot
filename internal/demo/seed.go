@@ -58,8 +58,14 @@ func (p dayPlan) weekend() bool {
 // badWeek is the week where everything went wrong: a bad release, a payment
 // provider outage, a review pile-on. Sales dip, refunds multiply and
 // subscribers churn.
+//
+// It sits near the end of the window on purpose: recent enough for the mystery
+// detector's fortnight to see it (a demo should open with a real question in
+// its casebook, not only a good one), but clear of the record day a few days
+// later, so the last two weeks read as a slump, a recovery, and then the best
+// day the business ever had.
 func (p dayPlan) badWeek() bool {
-	start := int(0.78 * float64(p.span))
+	start := int(0.88 * float64(p.span))
 	return p.index >= start && p.index < start+7
 }
 

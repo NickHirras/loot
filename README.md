@@ -456,6 +456,13 @@ Events with no country at all are counted apart, as **unknown lands**: Flathub r
 
 `GET /api/hearth` is the aggregate behind all of it — settlements, capital, era, tier ladder and the last 30 country-bearing drops. It is cached for five seconds server-side; the page refetches once a minute and merges live websocket drops in between, so a new country appears the instant its first customer does.
 
+## Quests & mysteries
+
+The **Quests** tab gives you goals worth chasing and puzzles worth poking at — see [docs/quests.md](docs/quests.md) for the full design and API.
+
+- **Quests** are generated from your own history each week and month ("Beat last week's revenue · $1,240", "Settle 2 new countries this month", "Earn 10,900 XP this week"), plus custom ones you create. Completing one mints a rare (weekly) or epic (monthly) drop. An unmet quest quietly ends as "ended · 62%" — never red, never a broken streak.
+- **Mysteries** are anomalies Loot noticed in your data and turned into open questions: "Google Play installs tripled on Fri Aug 14 — why?", refund spikes, a cluster of new countries, or a source that has gone quiet (usually broken credentials). Each card has a 28-day sparkline; write a one-line explanation and **Solve** it for a drop, or dismiss it. Solved mysteries become a notebook of your own explanations.
+
 ## Rarity rules
 
 Classification is a small ordered YAML rule list. The defaults are embedded in the binary ([`internal/rules/default.yaml`](internal/rules/default.yaml)); point `rules_path` at your own file to override them.
@@ -592,9 +599,9 @@ Loot ships in quests.
 
 - **Quest 1 — First Blood** ✅ — the scaffold: event pipeline, SQLite store, rarity rules engine, RevenueCat webhooks, Flathub polling, live feed with synthesized sounds, `loot tail`.
 - **Quest 2 — The Vault Opens** ✅ — silent ledger events, the **daily chest** with its cascade, currency conversion and the vault API, settlement drops, `loot check` / `loot chest` / `loot fx`, and the dashboard's Vault page and chest-opening ritual.
-- **Quest 4 — The Hearth** ✅ *(you are here)* — the globe: a settlement per country that grows with every customer, tiers from outpost to metropolis, eras from Camp to Dynasty, live arcs flying home to your capital, a real day/night terminator, and **ambient mode** for the spare monitor.
+- **Quest 4 — The Hearth** ✅ — the globe: a settlement per country that grows with every customer, tiers from outpost to metropolis, eras from Camp to Dynasty, live arcs flying home to your capital, a real day/night terminator, and **ambient mode** for the spare monitor.
 - **Quest 3 — Know Thy Enemy** 🔨 *(next)* — Crashlytics and Sentry as *boss fights*: a crash spike spawns a named boss with a health bar that drains as you ship fixes and the crash-free rate recovers.
-- **Quest 5 — Quests & Mysteries** — goals worth chasing: streaks, "sell in a country you have never sold in", "beat last month", each with its own reward.
+- **Quest 5 — Quests & Mysteries** ✅ — auto-generated weekly/monthly goals from your own history plus custom quests, and anomaly detection surfaced as puzzles with a notebook of your explanations.
 - **Quest 6 — Codex & Season Recap** — a permanent record of everything that has ever dropped, and a shareable end-of-season summary of the year in loot.
 - **Quest 7 — More Worlds** ✅ — Microsoft Store, Snapcraft and GitHub as sources, plus a generic webhook so anything that can POST JSON can drop loot.
 

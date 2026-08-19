@@ -1,4 +1,17 @@
-import type { ChestSummary, Drop, Hearth, SourceInfo, Stats, VaultRange, VaultSummary } from './types'
+import type {
+  Casebook,
+  ChestSummary,
+  Drop,
+  Hearth,
+  Mystery,
+  NewQuest,
+  Quest,
+  QuestBoard,
+  SourceInfo,
+  Stats,
+  VaultRange,
+  VaultSummary,
+} from './types'
 
 async function getJSON<T>(path: string): Promise<T> {
   const res = await fetch(path, { headers: { Accept: 'application/json' } })
@@ -12,8 +25,23 @@ async function postJSON(path: string, body: unknown): Promise<Response> {
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
     body: JSON.stringify(body),
   })
-  if (!res.ok) throw new Error(`${path}: ${res.status} ${res.statusText}`)
+  if (!res.ok) throw new Error(await errorText(res, path))
   return res
+}
+
+/**
+ * The API answers a rejected request with `{"error": "…"}` and a reason worth
+ * showing — "target must be greater than zero" is more use in a form than
+ * "400 Bad Request".
+ */
+async function errorText(res: Response, path: string): Promise<string> {
+  try {
+    const body = (await res.json()) as { error?: string }
+    if (body?.error) return body.error
+  } catch {
+    // Not JSON, or no body at all: fall back to the status line.
+  }
+  return `${path}: ${res.status} ${res.statusText}`
 }
 
 export async function fetchDrops(limit = 100, before?: string): Promise<{ drops: Drop[]; next_before: string }> {
@@ -89,4 +117,50 @@ export function websocketURL(): string {
 /** The globe: settlements, era, capital and the recent arrivals ticker. */
 export function fetchHearth(): Promise<Hearth> {
   return getJSON<Hearth>('/api/hearth')
+}
+
+// ---------------------------------------------------------------- quests
+
+/** The quest board: what is running, and what recently finished or ended. */
+export async function fetchQuests(): Promise<QuestBoard> {
+  const data = await getJSON<{ active: Quest[] | null; recent: Quest[] | null }>('/api/quests')
+  return { active: data.active ?? [], recent: data.recent ?? [] }
+}
+
+/** Sets a quest of your own. */
+export async function createQuest(req: NewQuest): Promise<Quest> {
+  const res = await postJSON('/api/quests', req)
+  const data = (await res.json()) as { quest: Quest }
+  return data.quest
+}
+
+/** Removes a custom quest. Generated ones expire on their own instead. */
+export async function deleteQuest(id: string): Promise<void> {
+  const res = await fetch(`/api/quests/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+    headers: { Accept: 'application/json' },
+  })
+  if (!res.ok) throw new Error(await errorText(res, '/api/quests'))
+}
+
+// -------------------------------------------------------------- mysteries
+
+/** The casebook: what is unexplained, and the notes on what was. */
+export async function fetchMysteries(): Promise<Casebook> {
+  const data = await getJSON<{ open: Mystery[] | null; resolved: Mystery[] | null }>('/api/mysteries')
+  return { open: data.open ?? [], resolved: data.resolved ?? [] }
+}
+
+/** Writes down what you think happened, which pays a drop. */
+export async function solveMystery(id: string, note: string): Promise<Mystery> {
+  const res = await postJSON(`/api/mysteries/${encodeURIComponent(id)}/solve`, { note })
+  const data = (await res.json()) as { mystery: Mystery }
+  return data.mystery
+}
+
+/** Closes one quietly: no drop, no XP, no judgement. */
+export async function dismissMystery(id: string): Promise<Mystery> {
+  const res = await postJSON(`/api/mysteries/${encodeURIComponent(id)}/dismiss`, {})
+  const data = (await res.json()) as { mystery: Mystery }
+  return data.mystery
 }

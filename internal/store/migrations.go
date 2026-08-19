@@ -94,4 +94,58 @@ CREATE TABLE fx_rates (
 );
 `,
 	},
+	{
+		// Quest 5: goals with windows, and the flagged days that ask why.
+		Name: "0003_quests",
+		SQL: `
+CREATE TABLE quests (
+    id           TEXT PRIMARY KEY,
+    kind         TEXT    NOT NULL DEFAULT 'auto',
+    metric       TEXT    NOT NULL,
+    target       REAL    NOT NULL DEFAULT 0,
+    app          TEXT    NOT NULL DEFAULT '',
+    source       TEXT    NOT NULL DEFAULT '',
+    window_start TEXT    NOT NULL,
+    window_end   TEXT    NOT NULL,
+    title        TEXT    NOT NULL DEFAULT '',
+    status       TEXT    NOT NULL DEFAULT 'active',
+    -- Progress cache: what the metric last read, and when it was measured.
+    value        REAL    NOT NULL DEFAULT 0,
+    updated_at   INTEGER,
+    xp           INTEGER NOT NULL DEFAULT 0,
+    created_at   INTEGER NOT NULL,
+    completed_at INTEGER,
+    -- One auto quest per (metric, app, source, window), so the generator can
+    -- run at every startup and every midnight without ever duplicating one.
+    dedupe_key   TEXT    NOT NULL
+);
+
+CREATE UNIQUE INDEX quests_dedupe_key_idx ON quests(dedupe_key);
+CREATE INDEX quests_status_idx           ON quests(status, window_end);
+
+CREATE TABLE mysteries (
+    id          TEXT PRIMARY KEY,
+    kind        TEXT    NOT NULL,
+    source      TEXT    NOT NULL DEFAULT '',
+    app         TEXT    NOT NULL DEFAULT '',
+    metric      TEXT    NOT NULL DEFAULT '',
+    day         TEXT    NOT NULL,
+    observed    REAL    NOT NULL DEFAULT 0,
+    expected    REAL    NOT NULL DEFAULT 0,
+    z           REAL    NOT NULL DEFAULT 0,
+    title       TEXT    NOT NULL DEFAULT '',
+    detail      BLOB,
+    status      TEXT    NOT NULL DEFAULT 'open',
+    note        TEXT    NOT NULL DEFAULT '',
+    created_at  INTEGER NOT NULL,
+    resolved_at INTEGER,
+    -- (kind, source, app, metric, day): the detector is idempotent, so it can
+    -- re-examine the same fortnight every hour for free.
+    dedupe_key  TEXT    NOT NULL
+);
+
+CREATE UNIQUE INDEX mysteries_dedupe_key_idx ON mysteries(dedupe_key);
+CREATE INDEX mysteries_status_idx           ON mysteries(status, day);
+`,
+	},
 }

@@ -17,7 +17,9 @@ import (
 	"github.com/nickhirras/loot/internal/bus"
 	"github.com/nickhirras/loot/internal/config"
 	"github.com/nickhirras/loot/internal/core"
+	"github.com/nickhirras/loot/internal/mysteries"
 	"github.com/nickhirras/loot/internal/pipeline"
+	"github.com/nickhirras/loot/internal/quests"
 	"github.com/nickhirras/loot/internal/store"
 )
 
@@ -30,6 +32,12 @@ type Server struct {
 	Sources  []core.Source
 	Static   fs.FS
 	Logger   *slog.Logger
+
+	// Quests and Mysteries are optional: without them the endpoints answer
+	// empty rather than 404, so a UI built against them never has to ask
+	// whether this server has Quest 5 in it.
+	Quests    *quests.Service
+	Mysteries *mysteries.Service
 
 	// hearth memoizes the globe aggregate; see hearth.go.
 	hearth hearthCache
@@ -56,6 +64,12 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/hearth", s.handleHearth)
 	mux.HandleFunc("GET /api/chest", s.handleChest)
 	mux.HandleFunc("POST /api/chest/open", s.handleChestOpen)
+	mux.HandleFunc("GET /api/quests", s.handleQuests)
+	mux.HandleFunc("POST /api/quests", s.handleQuestCreate)
+	mux.HandleFunc("DELETE /api/quests/{id}", s.handleQuestDelete)
+	mux.HandleFunc("GET /api/mysteries", s.handleMysteries)
+	mux.HandleFunc("POST /api/mysteries/{id}/solve", s.handleMysterySolve)
+	mux.HandleFunc("POST /api/mysteries/{id}/dismiss", s.handleMysteryDismiss)
 	mux.HandleFunc("GET /ws", s.handleWS)
 	// Method-scoped so it does not collide with the catch-all SPA route below.
 	mux.HandleFunc("POST /hooks/{source}", s.handleWebhook)
@@ -103,6 +117,19 @@ func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, "stats", err)
 		return
 	}
+	// Two counts the header needs on every page: what is still unexplained,
+	// and how much is running. Both are one indexed COUNT.
+	openMysteries, err := s.Store.CountOpenMysteries(r.Context())
+	if err != nil {
+		s.fail(w, "stats", err)
+		return
+	}
+	activeQuests, err := s.Store.CountActiveQuests(r.Context(), "")
+	if err != nil {
+		s.fail(w, "stats", err)
+		return
+	}
+
 	writeJSON(w, http.StatusOK, map[string]any{
 		"total_drops":      st.TotalDrops,
 		"total_events":     st.TotalEvents,
@@ -113,6 +140,8 @@ func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {
 		"countries_count":  st.CountriesCount,
 		"unrevealed_count": st.UnrevealedCount,
 		"chest_dates":      st.ChestDates,
+		"open_mysteries":   openMysteries,
+		"active_quests":    activeQuests,
 		"display_currency": s.displayCurrency(),
 		"dev":              s.Cfg.Dev.Enabled,
 		// demo tells the dashboard to wear its "synthetic data" pill, so

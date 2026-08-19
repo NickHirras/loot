@@ -166,6 +166,47 @@ rules:
       subtitle: "first customer via {{.Payload.via}}"
       xp: 250
 
+  # --------------------------------------------------------------------- Loot
+  # Loot's own events: things Loot noticed about your data rather than things a
+  # store reported. A quest you finished, a mystery you explained.
+  #
+  # A month's quest is worth more than a week's, which is what `scope` in the
+  # payload is for — the quest engine writes it, and the more specific rule
+  # sits first so it wins.
+  - name: quest-complete-month
+    match:
+      source: loot
+      kind: quest_complete
+      payload_match:
+        scope: month
+    then:
+      rarity: epic
+      title: "Quest complete: {{.Payload.title}}"
+      subtitle: "{{.Payload.detail}}"
+      xp: 500
+
+  - name: quest-complete
+    match:
+      source: loot
+      kind: quest_complete
+    then:
+      rarity: rare
+      title: "Quest complete: {{.Payload.title}}"
+      subtitle: "{{.Payload.detail}}"
+      xp: 200
+
+  # Writing down what you think happened is the whole feature; the drop is the
+  # thank-you note.
+  - name: mystery-solved
+    match:
+      source: loot
+      kind: mystery_solved
+    then:
+      rarity: uncommon
+      title: "Mystery solved"
+      subtitle: "{{.Payload.title}}"
+      xp: 75
+
   # ------------------------------------------------------------------- Flathub
   - name: flathub-record-day
     match:

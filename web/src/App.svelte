@@ -4,6 +4,7 @@
   import Feed from './lib/Feed.svelte'
   import Header from './lib/Header.svelte'
   import HearthPage from './lib/HearthPage.svelte'
+  import QuestsPage from './lib/QuestsPage.svelte'
   import VaultPage from './lib/VaultPage.svelte'
   import { router } from './lib/route.svelte'
   import { loot } from './lib/state.svelte'
@@ -48,6 +49,8 @@
   <HearthPage />
 {:else if router.tab === 'vault'}
   <VaultPage />
+{:else if router.tab === 'quests'}
+  <QuestsPage />
 {:else}
   <Feed />
 {/if}
