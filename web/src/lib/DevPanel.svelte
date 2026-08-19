@@ -1,5 +1,6 @@
 <script lang="ts">
   import { fireFakeDrop } from './api'
+  import type { FakeDropRequest } from './api'
   import { RARITIES } from './types'
 
   let open = $state(false)
@@ -8,17 +9,36 @@
   /** Optional country code, so the "new settlement" floor rule is testable. */
   let country = $state('')
 
-  async function fire(rarity: string) {
-    busy = rarity
+  /** The rarities a fake chest is filled with: dull first, so it builds. */
+  const CHEST_MIX = ['common', 'uncommon', 'rare', 'cursed', 'legendary'] as const
+
+  async function run(tag: string, requests: FakeDropRequest[]) {
+    busy = tag
     error = ''
     try {
-      await fireFakeDrop(rarity, country.trim().toUpperCase())
+      for (const req of requests) {
+        await fireFakeDrop({ country: country.trim().toUpperCase(), ...req })
+      }
     } catch (err) {
       error = err instanceof Error ? err.message : String(err)
     } finally {
       busy = ''
     }
   }
+
+  const fire = (rarity: string) => run(rarity, [{ rarity }])
+
+  /** Five chest-bound drops on today's chest: the reveal cascade, on demand. */
+  const fakeChest = () => run('chest', CHEST_MIX.map((rarity) => ({ rarity, chest: true })))
+
+  /**
+   * A ledger day the way a store reports one: a silent revenue row plus a
+   * chest-bound `sales_day` summary. This is what fills the vault.
+   */
+  const fakeSalesDay = () =>
+    run('sales_day', [
+      { kind: 'sales_day', amount: 250, currency: 'EUR', country: 'DE', quantity: 62, chest: true },
+    ])
 
   function randomCountry() {
     const pool = ['JP', 'BR', 'DE', 'NG', 'IN', 'CA', 'AU', 'FR', 'MX', 'ZA', 'SE', 'KR']
@@ -41,6 +61,15 @@
             {rarity}
           </button>
         {/each}
+      </div>
+
+      <div class="scenarios">
+        <button class="scenario" onclick={fakeChest} disabled={busy === 'chest'}>
+          📦 Fake chest (5 drops)
+        </button>
+        <button class="scenario" onclick={fakeSalesDay} disabled={busy === 'sales_day'}>
+          💶 Fake sales day (EUR 250)
+        </button>
       </div>
 
       <div class="country">
@@ -123,6 +152,31 @@
   }
 
   .fire:disabled {
+    opacity: 0.5;
+    cursor: wait;
+  }
+
+  .scenarios {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    margin-top: 0.45rem;
+  }
+
+  .scenario {
+    font-size: 0.75rem;
+    text-align: left;
+    color: var(--text-dim);
+    border-color: color-mix(in oklab, var(--legendary) 28%, transparent);
+    background: color-mix(in oklab, var(--legendary) 8%, #0d111a);
+  }
+
+  .scenario:hover {
+    color: var(--text);
+    border-color: color-mix(in oklab, var(--legendary) 55%, transparent);
+  }
+
+  .scenario:disabled {
     opacity: 0.5;
     cursor: wait;
   }

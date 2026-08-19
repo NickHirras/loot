@@ -1,0 +1,8 @@
+Order Number,Order Charged Date,Order Charged Timestamp,Financial Status,Device Model,Product Title,Package ID,Product Type,SKU ID,Currency of Sale,Item Price,Taxes Collected,Charged Amount,City of Buyer,State of Buyer,Postal Code of Buyer,Country of Buyer,Base Plan or Purchase Option ID,Offer ID,Sales Channel
+GPA.0001-0001-0001-00001,2026-08-15,"Aug 15, 2026 10:12:33 AM PDT",Charged,Pixel 8,Dungeon Ledger,com.example.app,paid app,com.example.app,USD,4.99,0.40,4.99,Springfield,IL,62704,US,,,Play Store
+GPA.0002-0002-0002-00002,2026-08-15,1786804353000,Charged,SM-G991B,Dungeon Ledger,com.example.app,inapp,coin_pack_large,EUR,2.99,0.57,2.99,Köln,NRW,50667,DE,,,Play Store
+GPA.0003-0003-0003-00003,2026-08-15,"Aug 15, 2026 8:04:00 PM PDT",Charged,Pixel 8,Dungeon Ledger,com.example.app,subscription,pro_monthly,USD,9.99,0.80,9.99,Austin,TX,73301,US,pro-monthly,intro-7d,Play Store
+GPA.0001-0001-0001-00001,2026-08-15,"Aug 15, 2026 11:59:01 PM PDT",Refund,Pixel 8,Dungeon Ledger,com.example.app,paid app,com.example.app,USD,-4.99,-0.40,-4.99,Springfield,IL,62704,US,,,Play Store
+GPA.0004-0004-0004-00004,2026-08-16,,Charged,Pixel 7a,Dungeon Ledger,com.example.app,paid app,com.example.app,EUR,4.49,0.86,4.49,Lyon,ARA,69001,FR,,,Play Store
+GPA.0005-0005-0005-00005,2026-08-18,"Aug 18, 2026 1:15:00 AM PDT",Charged,Pixel 8,Dungeon Ledger,com.example.app,paid app,com.example.app,USD,1.99,0.16,1.99,Reno,NV,89501,US,,,Play Store
+GPA.0006-0006-0006-00006,2026-08-15,"Aug 15, 2026 6:00:00 AM PDT",Charged,Pixel 6,Other Game,com.other.app,paid app,com.other.app,USD,0.99,0.08,0.99,Boise,ID,83702,US,,,Play Store

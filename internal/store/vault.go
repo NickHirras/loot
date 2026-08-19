@@ -25,11 +25,15 @@ import (
 // Signed math: a refund is a ledger row whose kind is "refund" or whose
 // quantity is negative, and ledger sources must store its amount negative.
 // Revenue therefore nets out by summing amount_base over every ledger row,
-// while units (sales) and refunds (returns) are reported as two positive
+// while units (paid sales, excluding free downloads) and refunds are two positive
 // counts so a day with 10 sales and 2 refunds reads as "10 / 2", not "8".
 const ledgerRows = `e.is_ledger = 1 AND e.kind <> 'sales_day'`
 
 const isRefund = `(e.kind = 'refund' OR e.quantity < 0)`
+
+// Free downloads are ledger rows (they carry a country and feed settlements)
+// but they are not sales, so units counts only paid, non-refund quantity.
+const isPaidUnit = `NOT ` + isRefund + ` AND e.kind <> 'download'`
 
 // VaultRange is the window a summary covers, inclusive of both days.
 type VaultRange struct {
@@ -167,7 +171,7 @@ func (s *Store) vaultTotals(ctx context.Context, from, to string) (VaultTotals, 
 	)
 	err := s.db.QueryRowContext(ctx, `
         SELECT COALESCE(SUM(e.amount_base), 0),
-               COALESCE(SUM(CASE WHEN `+isRefund+` THEN 0 ELSE e.quantity END), 0),
+               COALESCE(SUM(CASE WHEN `+isPaidUnit+` THEN e.quantity ELSE 0 END), 0),
                COALESCE(SUM(CASE WHEN `+isRefund+` THEN ABS(e.quantity) ELSE 0 END), 0)
         FROM events e
         WHERE `+ledgerRows+` AND e.day BETWEEN ? AND ?`, from, to).Scan(&revenue, &units, &refunds)
@@ -211,7 +215,7 @@ func (s *Store) vaultSeries(ctx context.Context, from, to string, days int) ([]V
 	rows, err := s.db.QueryContext(ctx, `
         SELECT e.day, e.source,
                COALESCE(SUM(e.amount_base), 0),
-               COALESCE(SUM(CASE WHEN `+isRefund+` THEN 0 ELSE e.quantity END), 0)
+               COALESCE(SUM(CASE WHEN `+isPaidUnit+` THEN e.quantity ELSE 0 END), 0)
         FROM events e
         WHERE `+ledgerRows+` AND e.day BETWEEN ? AND ?
         GROUP BY e.day, e.source`, from, to)
@@ -251,7 +255,7 @@ func (s *Store) vaultBreakdowns(ctx context.Context, from, to string, totalReven
 		rows, err := s.db.QueryContext(ctx, `
             SELECT `+column+`,
                    COALESCE(SUM(e.amount_base), 0),
-                   COALESCE(SUM(CASE WHEN `+isRefund+` THEN 0 ELSE e.quantity END), 0)
+                   COALESCE(SUM(CASE WHEN `+isPaidUnit+` THEN e.quantity ELSE 0 END), 0)
             FROM events e
             WHERE `+ledgerRows+` AND e.day BETWEEN ? AND ?
             GROUP BY `+column+`

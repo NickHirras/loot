@@ -130,6 +130,29 @@ rules:
       subtitle: "{{if .App}}{{.App}} · {{end}}{{.Source}}"
       xp: 10
 
+  # ------------------------------------------------------- Install day totals
+  # Sources that report installs a whole day at a time (Google Play) emit one
+  # `installs_day` per app per day. Matched on kind alone, so any source that
+  # adopts the same event gets these for free.
+  - name: installs-day-record
+    match:
+      kind: installs_day
+      record_high: true
+    then:
+      rarity: epic
+      title: "Best install day on {{.Source}}"
+      subtitle: "{{.QuantityFmt}} installs{{if .App}} · {{.App}}{{end}}"
+      xp: 300
+
+  - name: installs-day
+    match:
+      kind: installs_day
+    then:
+      rarity: common
+      title: "{{.QuantityFmt}} installs on {{.Source}}"
+      subtitle: "{{.App}}"
+      xp: 10
+
   # -------------------------------------------------------------- Settlements
   # The pipeline synthesizes one of these the first time an event carries a
   # country Loot has never seen, including from silent ledger rows.

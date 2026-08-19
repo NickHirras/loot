@@ -1,7 +1,9 @@
-import { fetchDrops, fetchSources, fetchStats, websocketURL } from './api'
+import { fetchChests, fetchDrops, fetchSources, fetchStats, openChest, websocketURL } from './api'
+import { prefersReducedMotion } from './route.svelte'
 import { sounds } from './sound'
-import type { Drop, Rarity, SourceInfo, Stats, WSMessage } from './types'
-import { RARITIES } from './types'
+import type { ChestSummary, Drop, Rarity, SourceInfo, Stats, WSMessage } from './types'
+import { RARITIES, RARITY_RANK } from './types'
+import { vault } from './vault.svelte'
 
 /** A drop plus client-only presentation state. */
 export type FeedDrop = Drop & { fresh?: boolean }
@@ -11,6 +13,23 @@ const MUTE_KEY = 'loot.muted'
 const MAX_DROPS = 400
 /** How long a drop keeps its "just arrived" glow. */
 const FRESH_MS = 2200
+
+/** How long the lid animation runs before the first drop is shown. */
+const LID_MS = 900
+const LID_MS_REDUCED = 120
+/** The floor between two reveals, so a queued burst still plays as a cascade. */
+const PACE_MS = 520
+/**
+ * How long the cascade waits on the websocket before pulling the next drop out
+ * of the POST response instead. The server spaces drops 600 ms apart, so this
+ * only fires when a message was genuinely lost (or the socket is down).
+ */
+const STALL_MS = 1600
+/** How often the cascade engine looks at its queue. */
+const TICK_MS = 120
+
+/** Where an open chest is in its reveal. */
+export type ChestPhase = 'idle' | 'opening' | 'cascade' | 'done'
 
 function readMuted(): boolean {
   try {
@@ -25,7 +44,8 @@ const emptyByRarity = (): Record<Rarity, number> =>
 
 /**
  * The single source of truth for the dashboard: the drop feed, aggregate stats,
- * source health, the websocket connection and the sound settings.
+ * source health, the daily chest, the websocket connection and the sound
+ * settings.
  */
 class LootState {
   drops = $state<FeedDrop[]>([])
@@ -41,6 +61,30 @@ class LootState {
   muted = $state(readMuted())
   audioReady = $state(false)
 
+  // ------------------------------------------------------------------ chest
+
+  /** The chests still waiting, oldest first. */
+  chests = $state<ChestSummary[]>([])
+  /** Whether the chest overlay is on screen. */
+  chestOverlay = $state(false)
+  chestPhase = $state<ChestPhase>('idle')
+  /** The day being opened right now. */
+  chestDate = $state('')
+  /** Everything the opened chest holds, in cascade order. */
+  chestExpected = $state<Drop[]>([])
+  /** What has been revealed so far, in arrival order. */
+  chestRevealed = $state<Drop[]>([])
+  /** The drop currently centre stage. */
+  chestCurrent = $state<Drop | null>(null)
+  chestError = $state('')
+
+  #chestsLoaded = false
+  #queue: Drop[] = []
+  #shown = new Set<string>()
+  #queued = new Set<string>()
+  #lastShownAt = 0
+  #cascadeTimer: ReturnType<typeof setInterval> | null = null
+
   #socket: WebSocket | null = null
   #retry = 0
   #reconnectTimer: ReturnType<typeof setTimeout> | null = null
@@ -53,6 +97,39 @@ class LootState {
 
   get devEnabled(): boolean {
     return this.stats?.dev ?? false
+  }
+
+  /** How many drops are waiting in unopened chests. Drives the header badge. */
+  get chestCount(): number {
+    if (this.#chestsLoaded) return this.chests.reduce((sum, c) => sum + c.count, 0)
+    return this.stats?.unrevealed_count ?? 0
+  }
+
+  /** True while a chest is mid-reveal, which several buttons need to know. */
+  get chestBusy(): boolean {
+    return this.chestPhase === 'opening' || this.chestPhase === 'cascade'
+  }
+
+  /** XP gained by the chest that was just opened. */
+  get chestHaulXP(): number {
+    return this.chestRevealed.reduce((sum, d) => sum + d.xp, 0)
+  }
+
+  /** The rarest (then highest XP) drop of the current haul. */
+  get chestBest(): Drop | null {
+    let best: Drop | null = null
+    for (const drop of this.chestRevealed) {
+      if (!best) {
+        best = drop
+        continue
+      }
+      const rank = RARITY_RANK[drop.rarity] ?? 0
+      const bestRank = RARITY_RANK[best.rarity] ?? 0
+      // `cursed` sits above the ladder as bad news; it never wins "best drop".
+      const better = drop.rarity !== 'cursed' && (best.rarity === 'cursed' || rank > bestRank)
+      if (better || (rank === bestRank && drop.rarity !== 'cursed' && drop.xp > best.xp)) best = drop
+    }
+    return best
   }
 
   /** Loads the initial page and opens the live stream. */
@@ -71,17 +148,24 @@ class LootState {
     this.#stopped = true
     if (this.#reconnectTimer) clearTimeout(this.#reconnectTimer)
     if (this.#statsTimer) clearInterval(this.#statsTimer)
+    if (this.#cascadeTimer) clearInterval(this.#cascadeTimer)
     this.#socket?.close()
     this.#socket = null
   }
 
   async refresh(): Promise<void> {
     try {
-      const [page, stats, sources] = await Promise.all([fetchDrops(100), fetchStats(), fetchSources()])
+      const [page, stats, sources, chests] = await Promise.all([
+        fetchDrops(100),
+        fetchStats(),
+        fetchSources(),
+        fetchChests(),
+      ])
       this.drops = page.drops
       this.nextBefore = page.next_before
       this.stats = stats
       this.sources = sources
+      this.#setChests(chests)
       this.error = ''
     } catch (err) {
       this.error = err instanceof Error ? err.message : String(err)
@@ -93,6 +177,9 @@ class LootState {
       const [stats, sources] = await Promise.all([fetchStats(), fetchSources()])
       this.stats = stats
       this.sources = sources
+      // The chest list rides the websocket; only re-read it when a cascade is
+      // not in flight, so a late poll cannot resurrect a chest being opened.
+      if (!this.chestBusy) this.#setChests(await fetchChests())
     } catch {
       // A failed background refresh is not worth surfacing; the websocket
       // status already tells the user whether the server is reachable.
@@ -123,8 +210,9 @@ class LootState {
     socket.onopen = () => {
       this.connected = true
       this.#retry = 0
-      // Catch up on anything missed while the socket was down.
-      void this.refresh()
+      // Catch up on anything missed while the socket was down — unless a chest
+      // is mid-cascade, whose drops the reveal engine is still holding back.
+      if (!this.chestBusy) void this.refresh()
     }
 
     socket.onmessage = (event) => {
@@ -135,25 +223,34 @@ class LootState {
         return
       }
       if (msg.type === 'chest') {
-        // TODO(quest 2, frontend): render the chest badge and the open button.
-        // Ignoring it keeps the feed working against a chest-aware server.
+        this.#setChests(msg.chests ?? [])
         return
       }
       if (msg.type === 'drop' && msg.drop) {
         // The wire splits drop and originating event; the API returns them
         // flattened, so merge here to keep one Drop shape everywhere.
         const ev = msg.event ?? {}
-        this.receive({
+        const drop: Drop = {
           source: (ev.source as string) ?? '',
           kind: (ev.kind as string) ?? '',
           app: (ev.app as string) ?? '',
           country: (ev.country as string) ?? '',
           amount: (ev.amount as number) ?? 0,
+          amount_base: (ev.amount_base as number) ?? 0,
           currency: (ev.currency as string) ?? '',
           quantity: (ev.quantity as number) ?? 0,
+          day: (ev.day as string) ?? '',
           occurred_at: (ev.occurred_at as string) ?? msg.drop.created_at,
           ...msg.drop,
-        })
+        }
+
+        // A drop from the chest being opened here is the cascade's clock: it
+        // goes into the reveal queue instead of straight into the feed.
+        if (msg.chest && this.#wantsArrival(drop)) {
+          this.#enqueue(drop)
+          return
+        }
+        this.receive(drop)
       }
     }
 
@@ -175,15 +272,17 @@ class LootState {
   }
 
   /** Handles a drop arriving over the websocket. */
-  receive(drop: Drop): void {
+  receive(drop: Drop, quiet = false): void {
     // The reconnect refresh can race the socket; never show a drop twice.
     if (this.drops.some((d) => d.id === drop.id)) return
 
     const fresh: FeedDrop = { ...drop, fresh: true }
     this.drops = [fresh, ...this.drops].slice(0, MAX_DROPS)
     this.#bumpStats(drop)
+    // Money that landed changes what the vault would answer.
+    if (drop.amount_base || drop.amount) vault.markStale()
 
-    if (!this.muted) sounds.play(drop.rarity)
+    if (!this.muted && !quiet) sounds.play(drop.rarity)
 
     setTimeout(() => {
       const found = this.drops.find((d) => d.id === drop.id)
@@ -203,6 +302,142 @@ class LootState {
       this.stats.countries = [...this.stats.countries, drop.country].sort()
       this.stats.countries_count = this.stats.countries.length
     }
+  }
+
+  // ------------------------------------------------------------ chest reveal
+
+  #setChests(chests: ChestSummary[]): void {
+    this.chests = chests
+    this.#chestsLoaded = true
+    if (this.stats) this.stats.unrevealed_count = chests.reduce((sum, c) => sum + c.count, 0)
+  }
+
+  showChest(): void {
+    this.chestOverlay = true
+  }
+
+  /** Closes the overlay. The cascade, if any, keeps running underneath. */
+  hideChest(): void {
+    this.chestOverlay = false
+    if (this.chestPhase === 'done') this.#resetChest()
+  }
+
+  #resetChest(): void {
+    this.chestPhase = 'idle'
+    this.chestDate = ''
+    this.chestExpected = []
+    this.chestRevealed = []
+    this.chestCurrent = null
+    this.#queue = []
+    this.#shown.clear()
+    this.#queued.clear()
+  }
+
+  /**
+   * Opens a chest and starts the reveal. The POST answers with the whole haul,
+   * which is both the cascade's script and its safety net; the websocket
+   * arrivals are what actually pace it.
+   */
+  async open(date = ''): Promise<void> {
+    if (this.chestBusy) return
+    this.#resetChest()
+    this.chestError = ''
+    this.chestPhase = 'opening'
+    this.chestDate = date
+
+    let result
+    try {
+      result = await openChest(date)
+    } catch (err) {
+      this.chestError = err instanceof Error ? err.message : String(err)
+      this.chestPhase = 'idle'
+      return
+    }
+
+    this.#setChests(result.chests)
+    if (result.count === 0 || result.drops.length === 0) {
+      this.chestError = 'That chest is already open.'
+      this.chestPhase = 'idle'
+      return
+    }
+
+    this.chestDate = result.opened
+    this.chestExpected = result.drops
+    // Anything the socket delivered during the POST is already queued; the lid
+    // animation runs first either way.
+    await new Promise((r) => setTimeout(r, prefersReducedMotion() ? LID_MS_REDUCED : LID_MS))
+
+    this.chestPhase = 'cascade'
+    this.#lastShownAt = Date.now()
+    if (this.#cascadeTimer) clearInterval(this.#cascadeTimer)
+    this.#cascadeTimer = setInterval(() => this.#tick(), TICK_MS)
+  }
+
+  /** True when a websocket arrival belongs to the reveal happening right now. */
+  #wantsArrival(drop: Drop): boolean {
+    if (!this.chestBusy) return false
+    if (this.#shown.has(drop.id) || this.#queued.has(drop.id)) return false
+    // While the POST is still in flight the date is not known yet, so accept
+    // any chest drop; afterwards, only the chest actually being opened.
+    return !this.chestDate || !drop.chest_date || drop.chest_date === this.chestDate
+  }
+
+  #enqueue(drop: Drop): void {
+    this.#queued.add(drop.id)
+    this.#queue.push(drop)
+    // A drop the POST response did not mention still counts towards the haul.
+    if (!this.chestExpected.some((d) => d.id === drop.id)) this.chestExpected = [...this.chestExpected, drop]
+  }
+
+  #tick(): void {
+    if (this.chestPhase !== 'cascade') return
+    const now = Date.now()
+    if (now - this.#lastShownAt < PACE_MS) return
+
+    const next = this.#queue.shift()
+    if (next) {
+      this.#show(next)
+      return
+    }
+
+    const missing = this.chestExpected.filter((d) => !this.#shown.has(d.id) && !this.#queued.has(d.id))
+    if (missing.length === 0) {
+      this.#finish()
+      return
+    }
+    // The socket owes us a drop and has not delivered: fall back to the POST
+    // response so a lost message cannot strand the cascade.
+    if (now - this.#lastShownAt >= STALL_MS) this.#show(missing[0])
+  }
+
+  #show(drop: Drop, quiet = false): void {
+    this.#shown.add(drop.id)
+    this.#queued.delete(drop.id)
+    this.chestRevealed = [...this.chestRevealed, drop]
+    this.chestCurrent = drop
+    this.#lastShownAt = Date.now()
+    this.receive(drop, quiet)
+  }
+
+  /** Reveals whatever is left at once, without a wall of sound. */
+  skipCascade(): void {
+    if (this.chestPhase !== 'cascade') return
+    for (const drop of this.chestExpected) {
+      if (!this.#shown.has(drop.id)) this.#show(drop, true)
+    }
+    this.#queue = []
+    this.#finish()
+  }
+
+  #finish(): void {
+    if (this.#cascadeTimer) clearInterval(this.#cascadeTimer)
+    this.#cascadeTimer = null
+    this.chestPhase = 'done'
+    this.chestCurrent = null
+    vault.markStale()
+    void this.refreshMeta()
+    // Nobody is watching the final screen, so do not save it for later.
+    if (!this.chestOverlay) this.#resetChest()
   }
 
   /** Called from a click handler to satisfy the browser's autoplay policy. */

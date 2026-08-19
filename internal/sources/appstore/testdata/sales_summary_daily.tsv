@@ -1,0 +1,10 @@
+Provider	Provider Country	SKU	Developer	Title	Version	Product Type Identifier	Units	Developer Proceeds	Begin Date	End Date	Customer Currency	Country Code	Currency of Proceeds	Apple Identifier	Customer Price	Promo Code	Parent Identifier	Subscription	Period	Category	CMB	Device	Supported Platforms	Proceeds Reason	Preserved Pricing	Client	Order Type
+APPLE	US	widget-pro	Indie Software	Widget Pro	3.1	1	3	0.70	08/17/2026	08/17/2026	USD	US	USD	1234567890	0.99					Productivity		iPhone	iOS				PURCHASE
+APPLE	US	widget-pro	Indie Software	Widget Pro	3.1	1	2	0.70	08/17/2026	08/17/2026	USD	US	USD	1234567890	0.99					Productivity		iPad	iOS				PURCHASE
+APPLE	US	widget.pro.tip	Indie Software	Widget Pro	3.1	IA1	2	3.50	08/17/2026	08/17/2026	USD	US	USD	1234567890	4.99		widget-pro			Productivity		iPhone	iOS				PURCHASE
+APPLE	US	widget.pro.yearly	Indie Software	Widget Pro	3.1	IAY	4	6.99	08/17/2026	08/17/2026	USD	US	USD	1234567890	9.99		widget-pro	Renewal	1 Year	Productivity		iPhone	iOS				PURCHASE
+APPLE	US	widget-pro	Indie Software	Widget Pro	3.1	1	-1	0.70	08/17/2026	08/17/2026	USD	US	USD	1234567890	0.99					Productivity		iPhone	iOS				PURCHASE
+APPLE	US	widget-pro	Indie Software	Widget Pro	3.1	1F	12	0.00	08/17/2026	08/17/2026	USD	US	USD	1234567890	0.00	LAUNCH				Productivity		iPhone	iOS				PURCHASE
+APPLE	US	widget-pro	Indie Software	Widget Pro	3.1	7	40	0.00	08/17/2026	08/17/2026	USD	US	USD	1234567890	0.00					Productivity		iPhone	iOS				PURCHASE
+APPLE	US	widget-pro	Indie Software	Widget Pro	3.1	1	5	0.65	08/17/2026	08/17/2026	EUR	DE	EUR	1234567890	1.09					Productivity		iPhone	iOS				PURCHASE
+APPLE	US	tiny-timer	Indie Software	Tiny Timer	1.4	1	2	100	08/17/2026	08/17/2026	JPY	JP	JPY	999999999	160					Productivity		iPhone	iOS				PURCHASE

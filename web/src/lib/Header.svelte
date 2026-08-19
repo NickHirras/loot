@@ -1,4 +1,6 @@
 <script lang="ts">
+  import ChestIcon from './ChestIcon.svelte'
+  import { TABS, router } from './route.svelte'
   import { loot } from './state.svelte'
   import { RARITIES } from './types'
 
@@ -31,7 +33,31 @@
       </span>
     </div>
 
+    <nav class="tabs" aria-label="Sections">
+      {#each TABS as tab (tab.id)}
+        <a
+          class="tab"
+          class:current={router.tab === tab.id}
+          href={tab.hash}
+          aria-current={router.tab === tab.id ? 'page' : undefined}
+        >
+          {tab.label}
+        </a>
+      {/each}
+    </nav>
+
     <div class="right">
+      {#if loot.chestCount > 0}
+        <button
+          class="chest-badge"
+          onclick={() => loot.showChest()}
+          title="{loot.chestCount} drops waiting in {loot.chests.length || 1} chest(s)"
+          aria-label="Open the daily chest: {loot.chestCount} drops waiting"
+        >
+          <ChestIcon size={20} idle glow />
+          <span class="chest-count">{loot.chestCount}</span>
+        </button>
+      {/if}
       <button
         class="mute"
         onclick={() => loot.toggleMute()}
@@ -150,6 +176,61 @@
     50% {
       opacity: 0.45;
     }
+  }
+
+  .tabs {
+    display: flex;
+    gap: 0.2rem;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .tab {
+    display: inline-block;
+    padding: 0.25rem 0.7rem;
+    border-radius: 999px;
+    font-size: 0.82rem;
+    font-weight: 550;
+    text-decoration: none;
+    color: var(--text-dim);
+    border: 1px solid transparent;
+  }
+
+  .tab:hover {
+    color: var(--text);
+    background: var(--panel-2);
+  }
+
+  .tab.current {
+    color: var(--text);
+    background: color-mix(in oklab, var(--accent) 12%, var(--panel-2));
+    border-color: color-mix(in oklab, var(--accent) 35%, transparent);
+  }
+
+  .right {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+  }
+
+  .chest-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.25rem 0.55rem;
+    border-color: color-mix(in oklab, var(--legendary) 40%, transparent);
+    background: color-mix(in oklab, var(--legendary) 10%, #0d111a);
+  }
+
+  .chest-badge:hover {
+    border-color: var(--legendary);
+    background: color-mix(in oklab, var(--legendary) 18%, #0d111a);
+  }
+
+  .chest-count {
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--legendary);
   }
 
   .mute {

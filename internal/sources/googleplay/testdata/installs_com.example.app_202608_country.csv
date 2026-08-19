@@ -1,0 +1,6 @@
+Date,Package Name,Country,Daily Device Installs,Daily Device Uninstalls,Daily Device Upgrades,Total User Installs,Daily User Installs,Daily User Uninstalls,Active Device Installs
+2026-08-15,com.example.app,US,80,5,20,3600,72,4,2700
+2026-08-15,com.example.app,DE,40,5,10,1800,38,4,1400
+2026-08-16,com.example.app,US,95,6,15,3695,88,5,2760
+2026-08-16,com.example.app,ZZ,5,0,0,50,4,0,40
+2026-08-18,com.example.app,US,50,2,4,3745,45,3,2800

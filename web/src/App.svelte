@@ -1,13 +1,18 @@
 <script lang="ts">
+  import ChestOverlay from './lib/ChestOverlay.svelte'
   import DevPanel from './lib/DevPanel.svelte'
   import Feed from './lib/Feed.svelte'
   import Header from './lib/Header.svelte'
+  import VaultPage from './lib/VaultPage.svelte'
+  import { router } from './lib/route.svelte'
   import { loot } from './lib/state.svelte'
 
   $effect(() => {
     void loot.start()
     return () => loot.stop()
   })
+
+  $effect(() => router.start())
 
   // Browsers will not start an AudioContext without a gesture, so the banner
   // stays until the user clicks (or explicitly mutes).
@@ -29,7 +34,16 @@
 {/if}
 
 <Header />
-<Feed />
+
+{#if router.tab === 'vault'}
+  <VaultPage />
+{:else}
+  <Feed />
+{/if}
+
+{#if loot.chestOverlay}
+  <ChestOverlay />
+{/if}
 
 {#if loot.devEnabled}
   <DevPanel />

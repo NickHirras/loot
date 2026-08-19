@@ -168,9 +168,15 @@ Loot polls `https://flathub.org/api/v2/stats/{app_id}` once an hour and emits on
 
 The Flathub API also returns `installs_per_country`, but those figures are cumulative and carry no dates, so they cannot be turned into events without double counting. Country data currently comes from RevenueCat only.
 
-### App Store Connect and Google Play (Quest 2)
+### App Store Connect (polling, hourly)
 
-Both sources read the stores' own financial reports, so their figures are settled money rather than estimates. Configure them like this — the fields are parsed and validated today, and the sources themselves land during Quest 2:
+The App Store source reads Apple's own Sales and Trends reports, so its figures are settled developer proceeds rather than estimates.
+
+**1. Create an API key.** In App Store Connect go to **Users and Access → Integrations → App Store Connect API**, stay on **Team Keys**, and generate a key with the **Sales and Reports** role (older accounts show this role as **Sales**; Finance and Admin also work). Download the `AuthKey_<KEY_ID>.p8` file — Apple lets you download it exactly once — and note the **Key ID** and the **Issuer ID** shown at the top of the same page.
+
+**2. Find your vendor number.** It is on **Payments and Financial Reports**, beside your legal entity name: an eight digit number, usually starting with `8`. It is not your team ID and not your Apple ID.
+
+**3. Point Loot at both.**
 
 ```yaml
 sources:
@@ -179,17 +185,97 @@ sources:
     issuer_id: "11111111-2222-3333-4444-555555555555"
     private_key_path: "/etc/loot/AuthKey_2X9R4HXF34.p8"
     vendor_number: "80123456"
-    apps: []            # optional: only these Apple IDs
+    apps: []            # optional: only these Apple IDs (the numeric app ids)
     backfill_days: 30
+```
 
+The section counts as *configured* only when `key_id`, `issuer_id`, `private_key_path` and `vendor_number` are all set, and Loot checks that the `.p8` exists at startup rather than at the first poll.
+
+Every field also has an environment override (`LOOT_APPSTORE_KEY_ID`, `LOOT_APPSTORE_ISSUER_ID`, `LOOT_APPSTORE_PRIVATE_KEY_PATH`, `LOOT_APPSTORE_VENDOR_NUMBER`, `LOOT_APPSTORE_APPS`, `LOOT_APPSTORE_BACKFILL_DAYS`), so a container needs no config file. Keep the `.p8` mounted read-only; it is a credential for your whole team's sales data.
+
+Then check it before you wait an hour for the first poll:
+
+```bash
+./bin/loot check
+```
+
+```
+✓ appstore     vendor 80123456
+```
+
+`check` signs a real ES256 token (no JWT library — `crypto/ecdsa` and 40 lines) and asks Apple for a real report. A wrong key, issuer or vendor number fails immediately with Apple's own explanation; a day Apple has not published yet counts as a pass, because it proves the credentials were accepted.
+
+**What it reads.** Two daily reports, both keyed on a **Pacific** calendar day:
+
+| report | version | what Loot takes from it |
+|---|---|---|
+| `SALES` / `SUMMARY` | `1_1` | every unit sold, refunded or downloaded |
+| `SUBSCRIPTION` / `SUMMARY` | `1_3` | how many subscriptions were active that day |
+
+Loot polls hourly and walks forward one day at a time, oldest first. Apple publishes a day's report a few hours after that day closes in Pacific time — usually between 05:00 and 08:00 PT — and until then the endpoint answers `404`. That is **not** an error and never lights up `last_error`: the cursor simply stays put and the next poll tries again. Columns are addressed by name rather than by position, so Apple inserting a column (it does) cannot silently shift every value one place to the left.
+
+**What it emits.** One **silent ledger row event** per report row — `sale`, `iap`, `subscription`, `refund` or `download` — carrying that row's country, units and developer proceeds in the row's own proceeds currency. Update rows are counted but never emitted; an update is not a sale. On top of those sits one **`sales_day` summary per app per day**, whose drop goes into that day's chest.
+
+The first poll backfills `backfill_days` (30 by default) of history. Those days land as chests, not as a live-feed flood — one chest per day, oldest first, each opening into its own cascade. Set it lower if you would rather not spend an evening opening chests; `loot serve --since 2026-01-01` overrides it once for a one-off bootstrap.
+
+Because Apple pays euros for the euro zone and yen for Japan, one day usually contains several proceeds currencies. Each row keeps its own currency and the vault converts every one of them into your `display_currency`, so revenue is always right. The single-currency `sales_day` headline reports the day's **dominant** proceeds currency and marks itself `proceeds_mixed`, with the full split in `payload.by_currency`.
+
+Subscription counts arrive as one `subscription_snapshot` event per app per day, which is what the vault's `subscriptions.active` reads. An account with no subscriptions has no such report; after a few 404s Loot stops asking, and looks again a week later in case that changed.
+
+### Google Play (polling, every 6 hours)
+
+Play has no sales API. It writes its reports as files into a private Cloud Storage bucket that belongs to your developer account, and a service account with read access is how anything else gets at them. Setting it up is three steps in two consoles.
+
+**1. Make a service account.** In the [Google Cloud console](https://console.cloud.google.com/iam-admin/serviceaccounts), pick or create any project, create a service account (no project roles are needed — the grant that matters is the Play one), then open it, go to **Keys → Add key → Create new key → JSON**, and save the file somewhere Loot can read it. That file is a credential: `chmod 600` it and keep it out of your repo.
+
+**2. Grant it access in Play Console.** Go to **Play Console → Users and permissions → Invite new users** and invite the service account's email address (the long `…@….iam.gserviceaccount.com` one from the key file). Under **Account permissions**, tick:
+
+- **View app information and download bulk reports** — the statistics files
+- **View financial data, orders, and cancellation survey responses** — the sales files
+
+Play can take up to 24 hours to propagate a new grant to the bucket, so a `403` right after inviting is usually patience rather than a mistake.
+
+**3. Find the bucket id.** **Play Console → Download reports → Statistics**, then **Copy Cloud Storage URI**. It looks like `gs://pubsite_prod_rev_01234567890`. Loot accepts it with or without the `gs://` prefix.
+
+```yaml
+sources:
   googleplay:
     service_account_json_path: "/etc/loot/play-reports.json"
     bucket: "pubsite_prod_rev_01234567890"
-    packages: []        # optional: only these package names
+    packages: []          # optional: only these package names
     backfill_months: 2
 ```
 
-A section counts as *configured* only when every required field is set (`key_id`, `issuer_id`, `private_key_path` and `vendor_number` for the App Store; `service_account_json_path` and `bucket` for Play), and Loot checks that the credential files exist at startup rather than at the first poll.
+The section counts as *configured* only when both `service_account_json_path` and `bucket` are set, and Loot checks that the key file exists at startup rather than at the first poll.
+
+Then check it before you wait six hours to find out:
+
+```bash
+./bin/loot check
+```
+
+```
+✓ googleplay   bucket pubsite_prod_rev_01234567890
+```
+
+A failure says which of the two things went wrong: a `403` prints the exact Play Console permissions to tick, a `404` prints where the bucket id comes from.
+
+**What Loot reads.** Two report families, both monthly files that Play rewrites in place every day:
+
+| file | becomes |
+|---|---|
+| `sales/salesreport_YYYYMM.zip` | one **silent ledger row** per order line — `sale`, `iap`, `subscription` or `refund` — plus one `sales_day` chest summary per app per day |
+| `stats/installs/installs_<package>_YYYYMM_overview.csv` | silent `install` and `active_devices` counters, plus one `installs_day` chest drop per day |
+| `stats/installs/installs_<package>_YYYYMM_country.csv` | silent per-country `install` events, which is what founds **settlements** |
+
+The other statistics dimensions (device, os_version, carrier, language, app_version…) are ignored. Buyer city, state and postal code are columns of the sales report and are deliberately never stored.
+
+> [!IMPORTANT]
+> **Estimated sales are gross.** `Charged Amount` is what the customer paid — Play's 15–30% service fee and any withheld tax are still in it, so the vault will read high against your bank statement. Every Play payload carries `"gross": true` and says so. The monthly **earnings** report is the net truth; ingesting it is a later quest.
+
+Because the current month's file is still being rewritten and late rows genuinely arrive, a day only gets its `sales_day` summary once it is older than yesterday in Pacific Time (the timezone Play states financial reports in; statistics are UTC). Rows for an unsettled day are still stored the moment they appear — the vault sums rows, not summaries — they just do not mint a chest yet. If a row for an already-summarized day turns up later, it is stored and the summary is *not* re-emitted, so a day can never be counted twice.
+
+The first poll reads `backfill_months` months (the current one and last, by default) and turns every settled day in them into a chest. That is roughly six weeks of history waiting to be opened, and it gives the "best day ever" rules a baseline to beat. Afterwards each poll re-lists the bucket but only downloads a file whose `md5Hash` has changed, so a quiet day costs two listings and nothing else.
 
 ## The daily chest
 
@@ -198,7 +284,7 @@ A ledger source does not report a sale when it happens; it reports yesterday, al
 - **silent row events** — stored, counted in the vault and in stats, but they produce no drop at all. This is where the money lives.
 - **one summary event per app per day** (`kind: sales_day`), whose drop is filed into that day's **chest** instead of being published.
 
-A chest is opened by clicking it, by `loot chest open`, or by itself once its day is `chest.auto_open_after_hours` old (36 by default, measured from midnight UTC of the chest's own day — so yesterday's chest springs open around noon). Opening it cascades the drops onto the websocket 600 ms apart, ordered cursed → common → … → legendary, so the reveal builds instead of dumping.
+A chest is opened from the dashboard, by `loot chest open`, or by itself once its day is `chest.auto_open_after_hours` old (36 by default, measured from midnight UTC of the chest's own day — so yesterday's chest springs open around noon). Opening it cascades the drops onto the websocket 600 ms apart, ordered cursed → common → … → legendary, so the reveal builds instead of dumping.
 
 ```bash
 ./bin/loot chest                      # what is waiting
@@ -215,6 +301,8 @@ A chest is opened by clicking it, by `loot chest open`, or by itself once its da
    LEGENDARY Best day ever on appstore [+1000 xp appstore]
    total +1265 xp
 ```
+
+In the dashboard a chest icon appears in the header with the number of drops waiting. Clicking it opens the chest overlay: the chests by date with their counts, XP and rarity dots, and an **Open** button per chest (or one for the oldest). The lid swings open, the drops cascade in one at a time as they arrive over the websocket — each with its rarity sound — and settle into a growing haul, ending on the total XP and the best drop. The haul then sits in the feed, tagged 📦.
 
 Everything an unopened chest holds is invisible until it is opened: `GET /api/drops` excludes it, `GET /api/stats` does not count its XP, and the vault does not count its drops. Set `chest.enabled: false` to publish everything the moment it is ingested.
 
@@ -237,7 +325,7 @@ Rates are the ECB daily reference rates, fetched from [frankfurter.app](https://
 
 ## The vault
 
-`GET /api/vault/summary?range=7d|30d|90d|365d` is the money view. Its cardinal rule is that **only ledger rows count as revenue**:
+The dashboard's **Vault** tab draws this: a range picker (7d/30d/90d/365d, remembered), stat tiles with a change against the preceding window, revenue per day as an area chart stacked by source with units underneath, and breakdowns by source, app and country. `GET /api/vault/summary?range=7d|30d|90d|365d` is the money view behind it. Its cardinal rule is that **only ledger rows count as revenue**:
 
 - RevenueCat amounts are pre-tax, pre-store-cut estimates. They are reported separately, as `realtime`, and never added to revenue.
 - `sales_day` summaries are a rollup of the rows beside them, so they are excluded too — otherwise every ledger day would count twice.
@@ -392,7 +480,7 @@ Loot has no authentication of its own. The RevenueCat webhook secret protects th
 Loot ships in quests.
 
 - **Quest 1 — First Blood** ✅ — the scaffold: event pipeline, SQLite store, rarity rules engine, RevenueCat webhooks, Flathub polling, live feed with synthesized sounds, `loot tail`.
-- **Quest 2 — The Vault Opens** 🔨 *(you are here)* — the core has landed: silent ledger events, the **daily chest** with its cascade, currency conversion and the vault API, settlement drops, `loot check` / `loot chest` / `loot fx`. Still in flight: the App Store Connect and Google Play sources themselves, and the Vault and Chest pages in the dashboard.
+- **Quest 2 — The Vault Opens** 🔨 *(you are here)* — the core has landed: silent ledger events, the **daily chest** with its cascade, currency conversion and the vault API, settlement drops, `loot check` / `loot chest` / `loot fx`, and the dashboard's Vault page and chest-opening ritual.
 - **Quest 3 — Know Thy Enemy** — Crashlytics and Sentry as *boss fights*: a crash spike spawns a named boss with a health bar that drains as you ship fixes and the crash-free rate recovers.
 - **Quest 4 — The Hearth** — a rotating globe where every country you have sold in grows a settlement, scaled by revenue and installs. New countries plant a flag with fanfare; lapsed ones dim.
 

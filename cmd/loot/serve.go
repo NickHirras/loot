@@ -138,8 +138,11 @@ func runServe(args []string) error {
 			// dashboard: everything else still works without it.
 			log.Warn("app store connect source unavailable", "error", err)
 		} else {
+			src.Since = cfg.Since
 			sources = append(sources, src)
-			log.Info("app store connect source configured", "vendor", cfg.Sources.AppStore.VendorNumber)
+			log.Info("app store connect source configured",
+				"vendor", cfg.Sources.AppStore.VendorNumber,
+				"backfill_days", cfg.Sources.AppStore.BackfillDays)
 		}
 	}
 	if cfg.Sources.GooglePlay.Configured() {
@@ -148,7 +151,10 @@ func runServe(args []string) error {
 			log.Warn("google play source unavailable", "error", err)
 		} else {
 			sources = append(sources, src)
-			log.Info("google play source configured", "bucket", cfg.Sources.GooglePlay.Bucket)
+			log.Info("google play source configured",
+				"bucket", src.Bucket,
+				"packages", cfg.Sources.GooglePlay.Packages,
+				"backfill_months", src.BackfillMonths)
 		}
 	}
 	if len(sources) == 0 {

@@ -67,29 +67,38 @@ sources:
     backfill_days: 7
 
   appstore:
-    # App Store Connect sales reports (Quest 2). Create an API key with the
-    # "Sales and Reports" role under Users and Access > Integrations > Keys,
-    # download the .p8 once, and take the vendor number from
-    # Payments and Financial Reports.
+    # App Store Connect sales reports, polled hourly. Create a team API key
+    # with the "Sales and Reports" role (shown as "Sales" in older accounts)
+    # under Users and Access > Integrations > App Store Connect API, download
+    # the .p8 once, and take the vendor number from Payments and Financial
+    # Reports. `loot check` verifies all four fields against Apple in one go.
     key_id: ""
     issuer_id: ""
     private_key_path: ""    # e.g. /etc/loot/AuthKey_2X9R4HXF34.p8
     vendor_number: ""       # e.g. "80123456"
     # Optional: restrict ingest to these Apple IDs (numeric app ids).
     apps: []
-    # How many past days the first run reads. Sales reports are available for
-    # roughly a year; 30 gives the vault some history without a flood.
+    # How many past days the first run reads, each landing as its own chest.
+    # Sales reports are available for roughly a year; 30 gives the vault some
+    # history without a flood. Override once with `loot serve --since`.
     backfill_days: 30
 
   googleplay:
-    # Google Play sales reports (Quest 2). Play writes monthly CSV reports into
-    # a private Cloud Storage bucket; grant a service account read access to it
-    # and point Loot at the key file.
+    # Google Play reports. Play has no sales API: it writes monthly CSV reports
+    # into a private Cloud Storage bucket. Create a service account in Google
+    # Cloud, download its JSON key, then invite that service account's email in
+    # Play Console > Users and permissions and give it "View app information"
+    # and "View financial data".
     service_account_json_path: ""   # e.g. /etc/loot/play-reports.json
+    # The bucket id, from Play Console > Download reports > Statistics >
+    # "Copy Cloud Storage URI". A gs:// prefix is accepted and stripped.
     bucket: ""                      # e.g. pubsite_prod_rev_01234567890
     # Optional: restrict ingest to these package names.
     packages: []
-    # How many monthly reports the first run reads.
+    # - com.example.yourapp
+    # How many monthly reports each poll reads, counting the current month. The
+    # first poll turns every settled day in that window into a chest, so 2 is
+    # about six weeks of history without burying the feed.
     backfill_months: 2
 
 dev:

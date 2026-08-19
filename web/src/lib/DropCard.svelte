@@ -34,6 +34,9 @@
       <span class="badge">{drop.rarity}</span>
       <span class="source mono">{drop.source}</span>
       {#if drop.kind}<span class="kind mono">{drop.kind}</span>{/if}
+      {#if drop.chest_date}
+        <span class="chest" title="Came out of the chest for {drop.chest_date}">📦 {drop.chest_date}</span>
+      {/if}
       <span class="spacer"></span>
       <span class="xp">+{drop.xp} XP</span>
       <time class="ago" datetime={drop.created_at} title={new Date(drop.created_at).toLocaleString()}>
@@ -119,6 +122,16 @@
 
   .kind::before {
     content: '· ';
+  }
+
+  .chest {
+    font-size: 0.66rem;
+    color: var(--legendary);
+    background: color-mix(in oklab, var(--legendary) 12%, transparent);
+    border: 1px solid color-mix(in oklab, var(--legendary) 30%, transparent);
+    border-radius: 999px;
+    padding: 0.02rem 0.4rem;
+    white-space: nowrap;
   }
 
   .xp {

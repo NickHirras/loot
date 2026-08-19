@@ -140,3 +140,172 @@ export function money(amount: number, currency: string): string {
     return `${amount.toFixed(2)} ${currency}`.trim()
   }
 }
+
+// --------------------------------------------------------------- vault types
+
+/** The ranges GET /api/vault/summary accepts, and the labels the picker shows. */
+export const VAULT_RANGES = ['7d', '30d', '90d', '365d'] as const
+
+export type VaultRange = (typeof VAULT_RANGES)[number]
+
+export interface VaultWindow {
+  from: string
+  to: string
+  days: number
+}
+
+export interface VaultTotals {
+  revenue_base: number
+  units: number
+  refunds: number
+  drops: number
+  events: number
+  countries: number
+}
+
+/** One day of the (zero-filled) series; `by_source` maps source to revenue. */
+export interface VaultPoint {
+  day: string
+  revenue_base: number
+  units: number
+  by_source: Record<string, number>
+}
+
+/** The shared body of every breakdown row. `share` is a fraction of revenue. */
+export interface VaultSlice {
+  revenue_base: number
+  units: number
+  share: number
+}
+
+export type SourceSlice = VaultSlice & { source: string }
+export type AppSlice = VaultSlice & { app: string }
+export type CountrySlice = VaultSlice & { country: string }
+
+export interface VaultSubscriptions {
+  active: number | null
+  as_of: string | null
+}
+
+/** Sighted-but-not-banked numbers: RevenueCat's realtime view of today. */
+export interface VaultRealtime {
+  revenuecat_purchases_today: number
+  revenuecat_amount_base_today: number
+}
+
+/** The whole of GET /api/vault/summary. */
+export interface VaultSummary {
+  display_currency: string
+  range: VaultWindow
+  totals: VaultTotals
+  prev_totals: VaultTotals
+  series: VaultPoint[]
+  by_source: SourceSlice[]
+  by_app: AppSlice[]
+  by_country: CountrySlice[]
+  subscriptions: VaultSubscriptions
+  realtime: VaultRealtime
+}
+
+// ----------------------------------------------------------------- formatting
+
+/** Currency formatter, cached per currency: Intl objects are not cheap. */
+const currencyFormatters = new Map<string, Intl.NumberFormat>()
+
+function currencyFormatter(currency: string, fractionDigits: number): Intl.NumberFormat {
+  const key = `${currency}/${fractionDigits}`
+  let fmt = currencyFormatters.get(key)
+  if (!fmt) {
+    try {
+      fmt = new Intl.NumberFormat(undefined, {
+        style: 'currency',
+        currency: currency || 'USD',
+        minimumFractionDigits: fractionDigits,
+        maximumFractionDigits: fractionDigits,
+      })
+    } catch {
+      fmt = new Intl.NumberFormat(undefined, {
+        minimumFractionDigits: fractionDigits,
+        maximumFractionDigits: fractionDigits,
+      })
+    }
+    currencyFormatters.set(key, fmt)
+  }
+  return fmt
+}
+
+/** Formats an amount in the display currency, always (unlike `money`). */
+export function currency(amount: number, code: string, fractionDigits = 2): string {
+  return currencyFormatter(code, fractionDigits).format(amount ?? 0)
+}
+
+/** Whole-unit currency, for axis ticks and stat tiles that would look noisy. */
+export function currencyCompact(amount: number, code: string): string {
+  return currency(amount, code, Math.abs(amount) >= 1000 ? 0 : 2)
+}
+
+const integerFormat = new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 })
+
+export function integer(value: number): string {
+  return integerFormat.format(value ?? 0)
+}
+
+const percentFormat = new Intl.NumberFormat(undefined, {
+  style: 'percent',
+  maximumFractionDigits: 1,
+})
+
+/** Formats a 0..1 share as a percentage. */
+export function percent(share: number): string {
+  return percentFormat.format(share ?? 0)
+}
+
+/** The direction of a period-over-period change; `flat` covers 0 and "no basis". */
+export type Direction = 'up' | 'down' | 'flat'
+
+export interface Delta {
+  direction: Direction
+  /** Formatted percentage, or "" when the previous period was empty. */
+  label: string
+}
+
+/**
+ * Percentage change against the previous period. With nothing to compare
+ * against, the delta is deliberately neutral rather than "+100%".
+ */
+export function delta(current: number, previous: number): Delta {
+  if (!previous) {
+    if (!current) return { direction: 'flat', label: '' }
+    return { direction: 'flat', label: 'new' }
+  }
+  const change = (current - previous) / Math.abs(previous)
+  if (Math.abs(change) < 0.0005) return { direction: 'flat', label: '0%' }
+  return {
+    direction: change > 0 ? 'up' : 'down',
+    label: `${change > 0 ? '+' : ''}${percentFormat.format(change)}`,
+  }
+}
+
+/** "Aug 18" style day label for chart axes and tooltips. */
+export function dayLabel(day: string, withYear = false): string {
+  const parsed = new Date(`${day}T00:00:00Z`)
+  if (Number.isNaN(parsed.getTime())) return day
+  return parsed.toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: withYear ? 'numeric' : undefined,
+    timeZone: 'UTC',
+  })
+}
+
+/** One row of a vault breakdown panel (by source, app or country). */
+export interface BreakdownRow {
+  /** Stable identity, used as the key and for the bar color. */
+  key: string
+  label: string
+  /** Rendered before the label; the country panel puts a flag here. */
+  prefix?: string
+  revenue_base: number
+  units: number
+  share: number
+}

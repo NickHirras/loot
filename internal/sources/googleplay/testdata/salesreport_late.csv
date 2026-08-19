@@ -1,0 +1,2 @@
+Order Number,Order Charged Date,Order Charged Timestamp,Financial Status,Device Model,Product Title,Package ID,Product Type,SKU ID,Currency of Sale,Item Price,Taxes Collected,Charged Amount,City of Buyer,State of Buyer,Postal Code of Buyer,Country of Buyer,Base Plan or Purchase Option ID,Offer ID,Sales Channel
+GPA.0007-0007-0007-00007,2026-08-15,"Aug 15, 2026 9:30:00 PM PDT",Charged,Pixel 8,Dungeon Ledger,com.example.app,inapp,coin_pack_small,USD,0.99,0.08,0.99,Tulsa,OK,74103,US,,,Play Store

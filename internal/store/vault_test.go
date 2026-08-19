@@ -46,6 +46,12 @@ func TestVaultSummary(t *testing.T) {
 		ledgerRow("googleplay", "com.example.b", today, "US", 4, 25, "gp:1"),
 		// A refund: negative quantity and a negative amount, so revenue nets.
 		ledgerRow("appstore", "com.example.a", today, "US", -2, -20, "as:3"),
+		// A free download: ledger (feeds settlements) but never a paid unit.
+		func() core.Event {
+			e := ledgerRow("appstore", "com.example.a", today, "FR", 7, 0, "as:dl")
+			e.Kind = "download"
+			return e
+		}(),
 		// Outside the 7 day window: it belongs to prev_totals, not totals.
 		ledgerRow("appstore", "com.example.a", lastWeek, "US", 100, 999, "as:old"),
 	}
@@ -104,13 +110,13 @@ func TestVaultSummary(t *testing.T) {
 		t.Fatalf("revenue = %v, want 155 (no RevenueCat, no double-counted summary)", sum.Totals.RevenueBase)
 	}
 	if sum.Totals.Units != 19 {
-		t.Fatalf("units = %d, want 19 (10 + 5 + 4, refunds excluded)", sum.Totals.Units)
+		t.Fatalf("units = %d, want 19 (10 + 5 + 4, refunds and free downloads excluded)", sum.Totals.Units)
 	}
 	if sum.Totals.Refunds != 2 {
 		t.Fatalf("refunds = %d, want 2", sum.Totals.Refunds)
 	}
-	if sum.Totals.Countries != 3 {
-		t.Fatalf("countries = %d, want 3 (US, DE, JP)", sum.Totals.Countries)
+	if sum.Totals.Countries != 4 {
+		t.Fatalf("countries = %d, want 4 (US, DE, JP, FR via free download)", sum.Totals.Countries)
 	}
 
 	// The older row lands in the preceding window.
