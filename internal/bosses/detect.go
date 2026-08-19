@@ -92,7 +92,13 @@ type world struct {
 	// totals is crashes per (source, app) per day: the baseline.
 	totals map[store.SeriesKey]map[string]float64
 	// reported is the days each (source, app) said anything at all, ascending.
+	// It answers "have we heard from this source?" and drives the fade test.
 	reported map[store.SeriesKey][]string
+	// attested is the subset of those days the source positively vouched for
+	// the app's whole crash total on — the `crash_day` heartbeat. Only these
+	// days may be counted quiet, because only a source that looked can say
+	// nothing happened. See store.CrashAttestedDays.
+	attested map[store.SeriesKey][]string
 	// resolved maps a boss key to the day somebody closed it upstream.
 	resolved map[string]string
 	// forced maps a boss key to the first day a source demanded a boss.
@@ -135,6 +141,9 @@ func (s *Service) Evaluate(ctx context.Context) (Result, error) {
 		return res, err
 	}
 	if w.reported, err = s.Store.CrashReportedDays(ctx, from, w.lastDay); err != nil {
+		return res, err
+	}
+	if w.attested, err = s.Store.CrashAttestedDays(ctx, from, w.lastDay); err != nil {
 		return res, err
 	}
 	if w.resolved, err = s.Store.CrashResolutions(ctx, from); err != nil {
@@ -337,13 +346,12 @@ func (s *Service) drive(ctx context.Context, w world, b core.Boss) (outcome, err
 	// day the source said nothing about is not a quiet day, it is an unknown
 	// one, and treating the two the same is how a broken credential would
 	// otherwise be mistaken for a fix.
-	var timeline []core.BossPoint
-	for _, day := range w.reported[app] {
-		if day < b.SpawnedDay {
-			continue
-		}
-		timeline = append(timeline, core.BossPoint{Day: day, Value: valueOn(byDay, day, unit)})
-	}
+	timeline := pointsOver(w.reported[app], b.SpawnedDay, byDay, unit)
+	// The quiet run is counted over the stricter set: only days the source
+	// *attested* to the whole app's total on. A push-only source's rows about
+	// some other issue are not a statement that this issue went quiet, and
+	// counting them as one would let a boss spawn and die in the same pass.
+	attested := pointsOver(w.attested[app], b.SpawnedDay, byDay, unit)
 
 	if len(timeline) > 0 {
 		last := timeline[len(timeline)-1]
@@ -363,7 +371,7 @@ func (s *Service) drive(ctx context.Context, w world, b core.Boss) (outcome, err
 		b.UsersAffected = u
 	}
 	detail.Series = seriesFor(w.series[b.Key], w.lastDay)
-	detail.QuietDays = quietDays(timeline, b.HPMax)
+	detail.QuietDays = quietDays(attested, b.HPMax)
 
 	newlyEnraged := detail.Enraged && !decodeDetail(b.Detail).Enraged
 
@@ -435,7 +443,19 @@ func (s *Service) drive(ctx context.Context, w world, b core.Boss) (outcome, err
 	return outcome{kind: outcomeNone, boss: b}, nil
 }
 
-// quietDays counts the trailing run of reported days at or below the slay
+// pointsOver reads one value per day of `days` from the spawn day onwards.
+func pointsOver(days []string, spawnedDay string, byDay map[string]store.BossDay, unit string) []core.BossPoint {
+	var out []core.BossPoint
+	for _, day := range days {
+		if day < spawnedDay {
+			continue
+		}
+		out = append(out, core.BossPoint{Day: day, Value: valueOn(byDay, day, unit)})
+	}
+	return out
+}
+
+// quietDays counts the trailing run of *attested* days at or below the slay
 // threshold. The spawn day itself always fails the test (it *is* the maximum),
 // so a one-day fight can never kill itself the moment it appears.
 func quietDays(timeline []core.BossPoint, hpMax float64) int {

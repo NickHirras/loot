@@ -57,6 +57,11 @@ const (
 	maxStarPages = 20
 	// maxReleases is how many releases each poll inspects.
 	maxReleases = 20
+	// maxListPages caps how many pages of issues or forks one poll walks. A
+	// thousand items in ten minutes is not a repository, it is an incident, and
+	// a poller that would page through it forever is worse than one that stops
+	// and says where it got to.
+	maxListPages = 10
 	// dateLayout is the format of the --since flag.
 	dateLayout = "2006-01-02"
 )
@@ -380,6 +385,14 @@ func (s *Source) pollStars(ctx context.Context, r repoRef, rs *repoState, now ti
 		}
 	}
 
+	// A silent snapshot of where the repo actually stands. Star *events* only
+	// exist for stars Loot watched arrive, so a repo that had three thousand
+	// stars before Loot was installed would forever count as having none —
+	// and the Codex's star achievements would sit locked at 0/1,000 next to a
+	// repo that had passed the target years ago. One row a day, keyed on the
+	// day, so re-polling costs nothing.
+	events = append(events, s.starsTotalEvent(r.String(), total, now))
+
 	rs.StarsCount = total
 	switch {
 	case newest.After(floor):
@@ -418,6 +431,27 @@ func (s *Source) starEvent(repo, login string, starredAt, observed time.Time) co
 	}
 }
 
+// starsTotalEvent is the daily "this repo has N stars" level. It is silent:
+// the number is context for the Codex, not news, and a drop a day saying the
+// star count is unchanged is exactly the dashboard Loot is not.
+func (s *Source) starsTotalEvent(repo string, total int, now time.Time) core.Event {
+	payload, _ := json.Marshal(map[string]any{"repo": repo, "stars": total})
+	return core.Event{
+		ID:         core.NewIDAt(now),
+		Source:     Name,
+		Kind:       "stars_total",
+		App:        repo,
+		OccurredAt: now,
+		ObservedAt: now,
+		Day:        core.DayOf(now),
+		Quantity:   total,
+		DedupeKey:  fmt.Sprintf("github:stars_total:%s:%s", repo, core.DayOf(now)),
+		IsLedger:   false,
+		Silent:     true,
+		Payload:    payload,
+	}
+}
+
 func (s *Source) milestoneEvent(repo string, milestone int, now time.Time) core.Event {
 	payload, _ := json.Marshal(map[string]any{"repo": repo, "stars": milestone})
 	return core.Event{
@@ -442,6 +476,7 @@ type issueItem struct {
 	State     string     `json:"state"`
 	HTMLURL   string     `json:"html_url"`
 	CreatedAt time.Time  `json:"created_at"`
+	UpdatedAt time.Time  `json:"updated_at"`
 	ClosedAt  *time.Time `json:"closed_at"`
 	User      struct {
 		Login string `json:"login"`
@@ -466,52 +501,110 @@ type pullRequest struct {
 }
 
 // pollIssues emits issue_opened / issue_closed / pr_opened / pr_merged.
+//
+// The list is paged. A busy repository (or a first run backfilling a month)
+// has more than one page of issues touched since the cursor, and reading only
+// the first while advancing the cursor to *now* threw the rest away silently —
+// the drops for them could never arrive, because the next poll would never ask
+// about them again. So every page is walked until a short one ends the list,
+// and if the page cap stops the walk early the cursor is left at the oldest
+// item actually seen rather than moved past what was never read.
 func (s *Source) pollIssues(ctx context.Context, r repoRef, rs *repoState, now time.Time) ([]core.Event, error) {
 	floor := parseTime(rs.LastIssuePoll)
 	if rs.LastIssuePoll == "" {
 		floor = s.firstRunFloor(now)
 	}
 
-	path := fmt.Sprintf("/repos/%s/%s/issues?state=all&sort=updated&direction=desc&since=%s&per_page=%d",
-		r.Owner, r.Name, url.QueryEscape(formatTime(floor)), perPage)
-
-	var items []issueItem
-	if err := s.get(ctx, path, "", &items); err != nil {
-		return nil, err
-	}
-
 	repo := r.String()
-	var events []core.Event
-	for _, it := range items {
-		isPR := it.PullRequest != nil
+	var (
+		events []core.Event
+		oldest time.Time
+		capped bool
+	)
+	for page := 1; ; page++ {
+		if page > maxListPages {
+			capped = true
+			s.log.Warn("github: issue page cap reached; cursor held back",
+				"repo", repo, "pages", maxListPages)
+			break
+		}
+		path := fmt.Sprintf("/repos/%s/%s/issues?state=all&sort=updated&direction=desc&since=%s&per_page=%d&page=%d",
+			r.Owner, r.Name, url.QueryEscape(formatTime(floor)), perPage, page)
 
-		if !isPR {
-			if it.CreatedAt.After(floor) {
-				events = append(events, s.issueEvent("issue_opened", repo, it, it.CreatedAt, now))
+		var items []issueItem
+		if err := s.get(ctx, path, "", &items); err != nil {
+			// Leave the cursor untouched: what was not read must still be
+			// asked for next time.
+			return events, err
+		}
+		for _, it := range items {
+			if touched := issueTouchedAt(it); !touched.IsZero() && (oldest.IsZero() || touched.Before(oldest)) {
+				oldest = touched
 			}
-			if it.ClosedAt != nil && it.ClosedAt.After(floor) {
-				events = append(events, s.issueEvent("issue_closed", repo, it, *it.ClosedAt, now))
+			evs, err := s.issueEvents(ctx, r, repo, it, floor, now)
+			if err != nil {
+				return events, err
 			}
-			continue
+			events = append(events, evs...)
 		}
-
-		if it.CreatedAt.After(floor) {
-			events = append(events, s.issueEvent("pr_opened", repo, it, it.CreatedAt, now))
-		}
-		merged := it.PullRequest.MergedAt
-		if merged == nil && strings.EqualFold(it.State, "closed") && it.ClosedAt != nil && it.ClosedAt.After(floor) {
-			// The issues API is documented to carry merged_at inside
-			// pull_request, but it is null on some responses and absent on
-			// older API versions; a closed PR is worth one extra call to find
-			// out whether it was merged or just abandoned.
-			merged = s.fetchMergedAt(ctx, r, it.Number)
-		}
-		if merged != nil && merged.After(floor) {
-			events = append(events, s.issueEvent("pr_merged", repo, it, *merged, now))
+		if len(items) < perPage {
+			break
 		}
 	}
 
-	rs.LastIssuePoll = formatTime(now)
+	// Sorted by updated descending, so the walk runs out of relevant items
+	// rather than out of pages; the cap is the exception, and it is the one
+	// case where advancing to `now` would lose data.
+	if capped && !oldest.IsZero() {
+		rs.LastIssuePoll = formatTime(oldest)
+	} else {
+		rs.LastIssuePoll = formatTime(now)
+	}
+	return events, nil
+}
+
+// issueTouchedAt is when an item last moved, which is what `sort=updated`
+// orders by. Older API responses omit updated_at, in which case the creation
+// time is the most conservative stand-in.
+func issueTouchedAt(it issueItem) time.Time {
+	if !it.UpdatedAt.IsZero() {
+		return it.UpdatedAt
+	}
+	if it.ClosedAt != nil && it.ClosedAt.After(it.CreatedAt) {
+		return *it.ClosedAt
+	}
+	return it.CreatedAt
+}
+
+// issueEvents maps one list entry onto whichever of the four kinds it earned.
+func (s *Source) issueEvents(ctx context.Context, r repoRef, repo string, it issueItem,
+	floor, now time.Time,
+) ([]core.Event, error) {
+	var events []core.Event
+	if it.PullRequest == nil {
+		if it.CreatedAt.After(floor) {
+			events = append(events, s.issueEvent("issue_opened", repo, it, it.CreatedAt, now))
+		}
+		if it.ClosedAt != nil && it.ClosedAt.After(floor) {
+			events = append(events, s.issueEvent("issue_closed", repo, it, *it.ClosedAt, now))
+		}
+		return events, nil
+	}
+
+	if it.CreatedAt.After(floor) {
+		events = append(events, s.issueEvent("pr_opened", repo, it, it.CreatedAt, now))
+	}
+	merged := it.PullRequest.MergedAt
+	if merged == nil && strings.EqualFold(it.State, "closed") && it.ClosedAt != nil && it.ClosedAt.After(floor) {
+		// The issues API is documented to carry merged_at inside
+		// pull_request, but it is null on some responses and absent on
+		// older API versions; a closed PR is worth one extra call to find
+		// out whether it was merged or just abandoned.
+		merged = s.fetchMergedAt(ctx, r, it.Number)
+	}
+	if merged != nil && merged.After(floor) {
+		events = append(events, s.issueEvent("pr_merged", repo, it, *merged, now))
+	}
 	return events, nil
 }
 
@@ -641,35 +734,69 @@ type fork struct {
 }
 
 // pollForks emits a "fork" event per new fork, newest first from the API.
+//
+// Paged for the same reason issues are: a single page held the hundred newest
+// forks, and the cursor then jumped to the newest of them — so anything past
+// the hundredth was skipped over and could never be asked for again. The walk
+// stops as soon as a page ends at or before the cursor, which on an ordinary
+// poll is the first page.
 func (s *Source) pollForks(ctx context.Context, r repoRef, rs *repoState, now time.Time) ([]core.Event, error) {
 	floor := parseTime(rs.LastForkAt)
 	if rs.LastForkAt == "" {
 		floor = s.firstRunFloor(now)
 	}
 
-	var list []fork
-	path := fmt.Sprintf("/repos/%s/%s/forks?sort=newest&per_page=%d", r.Owner, r.Name, perPage)
-	if err := s.get(ctx, path, "", &list); err != nil {
-		return nil, err
-	}
-
 	repo := r.String()
 	var (
 		events []core.Event
 		newest time.Time
+		oldest time.Time
+		capped bool
 	)
-	for _, f := range list {
-		if f.CreatedAt.After(newest) {
-			newest = f.CreatedAt
+	for page := 1; ; page++ {
+		if page > maxListPages {
+			capped = true
+			s.log.Warn("github: fork page cap reached; cursor held back",
+				"repo", repo, "pages", maxListPages)
+			break
 		}
-		if !f.CreatedAt.After(floor) || f.Owner.Login == "" {
-			continue
+		var list []fork
+		path := fmt.Sprintf("/repos/%s/%s/forks?sort=newest&per_page=%d&page=%d",
+			r.Owner, r.Name, perPage, page)
+		if err := s.get(ctx, path, "", &list); err != nil {
+			return events, err
 		}
-		events = append(events, s.forkEvent(repo, f.Owner.Login, f.HTMLURL, f.CreatedAt, now))
+		if len(list) == 0 {
+			break
+		}
+		for _, f := range list {
+			if f.CreatedAt.After(newest) {
+				newest = f.CreatedAt
+			}
+			if oldest.IsZero() || f.CreatedAt.Before(oldest) {
+				oldest = f.CreatedAt
+			}
+			if !f.CreatedAt.After(floor) || f.Owner.Login == "" {
+				continue
+			}
+			events = append(events, s.forkEvent(repo, f.Owner.Login, f.HTMLURL, f.CreatedAt, now))
+		}
+		if len(list) < perPage {
+			break
+		}
+		// Newest first, so the last entry is the page's oldest: once it is at
+		// or before the cursor, every later page is older still.
+		if !list[len(list)-1].CreatedAt.After(floor) {
+			break
+		}
 	}
 	sort.Slice(events, func(i, j int) bool { return events[i].OccurredAt.Before(events[j].OccurredAt) })
 
 	switch {
+	case capped && !oldest.IsZero():
+		// Do not step over forks that were never read. Re-reading the ones
+		// already emitted costs nothing: their dedupe keys collapse them.
+		rs.LastForkAt = formatTime(oldest)
 	case newest.After(floor):
 		rs.LastForkAt = formatTime(newest)
 	case rs.LastForkAt == "":

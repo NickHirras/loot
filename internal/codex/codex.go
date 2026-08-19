@@ -159,6 +159,14 @@ func (s *Service) Run(ctx context.Context) {
 		case <-quiet.C:
 			armed = false
 		case <-sweep.C:
+			// The sweep is about to do the work a pending nudge asked for;
+			// leaving the timer armed would swallow every later nudge.
+			if armed {
+				if !quiet.Stop() {
+					<-quiet.C
+				}
+				armed = false
+			}
 		}
 		if _, err := s.Evaluate(ctx); err != nil {
 			s.log().Error("codex evaluation failed", "error", err)
@@ -258,13 +266,18 @@ func (s *Service) Evaluate(ctx context.Context) (Result, error) {
 		// stamped at noon UTC: an exact hour is not knowable from a day, and
 		// noon cannot fall out of its own day in any timezone the UI renders.
 		at := now
-		backfilled := res.Backfilled
 		if earnedDay != "" && earnedDay != today {
 			if t, ok := parseDay(earnedDay); ok {
 				at = t.Add(12 * time.Hour)
-				backfilled = true
 			}
 		}
+		// Backfilled means "this pass was the first ever over this database",
+		// and nothing else. Dating a trophy in the past is ordinary — a
+		// milestone crossed on a day whose report only settled this morning is
+		// earned yesterday and found today — but it is still live news, and it
+		// should land in the feed with its own sound rather than being posted
+		// silently into a chest.
+		backfilled := res.Backfilled
 
 		meta, err := json.Marshal(map[string]any{
 			"earned_day": earnedDay,

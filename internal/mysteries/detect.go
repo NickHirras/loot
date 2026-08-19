@@ -435,6 +435,29 @@ var settlementLagDays = map[string]int{
 	"microsoftstore": 3,
 	"googleplay":     2,
 	"appstore":       1,
+	// Play's vitals API is the slowest of the lot: its freshness window is a
+	// couple of days, so the newest day it will ever hand back sits about
+	// three behind the calendar. Without this the crash source that keeps the
+	// boss board honest was itself reported broken every single morning.
+	"playvitals": 3,
+	// The Snap Store's metrics API publishes a day once it has stopped moving,
+	// and Flathub's stats are yesterday's, written overnight.
+	"snapcraft": 2,
+	"flathub":   1,
+}
+
+// pushOnlySources never poll: they emit when something happens and say nothing
+// otherwise. Silence from one of them is not evidence of anything — a week
+// with no Sentry issues and a week with a revoked Sentry token look exactly
+// alike from here — so they are skipped rather than measured against a
+// threshold that could only ever cry wolf. GitHub is deliberately absent: it
+// polls on a timer as well as receiving pushes, so its silence does mean
+// something.
+var pushOnlySources = map[string]bool{
+	"sentry":     true,
+	"crash":      true,
+	"webhook":    true,
+	"revenuecat": true,
 }
 
 // silenceThreshold is how many completed days a source has to miss before the
@@ -489,6 +512,11 @@ func (d *Detector) scanSilence(ctx context.Context, from, to string) ([]core.Mys
 
 	var out []core.Mystery
 	for _, source := range sources {
+		if pushOnlySources[source] {
+			// Nothing to ask about, and nothing to resume: a push-only source
+			// has no schedule to fall behind.
+			continue
+		}
 		days := bySource[source]
 		last := ""
 		for day := range days {
@@ -669,28 +697,17 @@ func phrase(observed, expected float64) string {
 	}
 }
 
-// sourceLabels give the stores the names they call themselves.
-var sourceLabels = map[string]string{
-	"appstore":       "App Store",
-	"googleplay":     "Google Play",
-	"flathub":        "Flathub",
-	"revenuecat":     "RevenueCat",
-	"github":         "GitHub",
-	"microsoftstore": "Microsoft Store",
-	"snapcraft":      "Snapcraft",
-	"webhook":        "Webhook",
-	"loot":           "Loot",
-}
-
 // SourceLabel is a source's display name, falling back to its own id.
+//
+// The names live in core, in the one map the rules templates read as well, so
+// a source added there is spelled the same in a mystery title as it is in the
+// drop beside it — a second private list here drifted, and left the crash
+// sources with no name at all.
 func SourceLabel(source string) string {
-	if label, ok := sourceLabels[source]; ok {
-		return label
-	}
 	if source == "" {
 		return "Loot"
 	}
-	return source
+	return core.SourceDisplayName(source)
 }
 
 // seriesLabel is how a series reads inside a sentence.

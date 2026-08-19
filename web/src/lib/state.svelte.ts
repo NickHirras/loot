@@ -126,19 +126,24 @@ class LootState {
   /**
    * How many mysteries are still unexplained, for the Quests tab badge. The
    * page's own state wins once it has loaded, so solving one updates the badge
-   * without waiting for the next stats poll.
+   * without waiting for the next stats poll — *including* when it drops to
+   * zero. Falling back on a falsy count instead of on a loaded flag meant
+   * solving the last mystery left the badge showing the stale stat until the
+   * next poll, which is the one case the local count exists to get right.
    */
   get openMysteries(): number {
-    return questsState.casebook.open.length || (this.stats?.open_mysteries ?? 0)
+    if (questsState.loaded) return questsState.casebook.open.length
+    return this.stats?.open_mysteries ?? 0
   }
 
   /**
-   * How many bosses are still standing, for the Quests tab's red badge. The
-   * section's own state wins once it has loaded, so slaying one clears the
-   * badge without waiting for the next stats poll.
+   * How many bosses are still standing, for the Quests tab's red badge. Same
+   * rule, same reason: once the board has loaded it is the answer, zero
+   * included, so slaying the last monster clears the badge at once.
    */
   get aliveBosses(): number {
-    return bossesState.board.alive.length || (this.stats?.bosses_alive ?? 0)
+    if (bossesState.loaded) return bossesState.board.alive.length
+    return this.stats?.bosses_alive ?? 0
   }
 
   /** How many drops are waiting in unopened chests. Drives the header badge. */

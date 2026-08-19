@@ -49,7 +49,7 @@ func TestCrashSeriesGroupsAndSums(t *testing.T) {
 		t.Fatalf("%d fights, want 2 (one per version)", len(series))
 	}
 
-	key := store.BossSeriesKey{Source: "playvitals", App: "app", Version: "4.2.0"}
+	key := store.BossSeriesKey{Source: "playvitals", App: "app", Version: "4.2.0", Kind: core.BossKindCrash}
 	days := series[key]
 	if len(days) != 2 {
 		t.Fatalf("%d days for 4.2.0, want 2", len(days))
@@ -63,8 +63,67 @@ func TestCrashSeriesGroupsAndSums(t *testing.T) {
 	if days[0].Title != "Boom" || days[0].URL == "" {
 		t.Errorf("day lost its title/url: %+v", days[0])
 	}
-	if key.Key() != core.BossKey("playvitals", "app", "4.2.0", "") {
+	if key.Key() != core.BossKey("playvitals", "app", "4.2.0", "", core.BossKindCrash) {
 		t.Errorf("series key renders as %q", key.Key())
+	}
+}
+
+// A crash and an ANR are different bugs with different fixes, so they are
+// different series — and the crash series keeps the key it has always had, so
+// no live boss is orphaned from its own numbers.
+func TestCrashSeriesSplitsCrashesFromANRs(t *testing.T) {
+	ctx := context.Background()
+	st := newStore(t)
+
+	crashKindEvent(st, t, "playvitals", "app", "2026-05-30", "4.2.0", core.BossKindCrash, 100)
+	crashKindEvent(st, t, "playvitals", "app", "2026-05-30", "4.2.0", core.BossKindANR, 40)
+	// A row that names no kind at all is a crash, not a third series.
+	crashKindEvent(st, t, "playvitals", "app", "2026-05-30", "4.2.0", "", 5)
+	// And so is one that shouts it.
+	crashKindEvent(st, t, "playvitals", "app", "2026-05-30", "4.2.0", "ANR", 2)
+
+	series, err := st.CrashSeries(ctx, "2026-05-01", "2026-05-31")
+	if err != nil {
+		t.Fatalf("crash series: %v", err)
+	}
+	if len(series) != 2 {
+		t.Fatalf("%d fights, want 2 (crashes and ANRs):\n%+v", len(series), series)
+	}
+
+	crashes := series[store.BossSeriesKey{Source: "playvitals", App: "app", Version: "4.2.0", Kind: core.BossKindCrash}]
+	anrs := series[store.BossSeriesKey{Source: "playvitals", App: "app", Version: "4.2.0", Kind: core.BossKindANR}]
+	if len(crashes) != 1 || crashes[0].Crashes != 105 {
+		t.Errorf("crash series = %+v, want one day of 105", crashes)
+	}
+	if len(anrs) != 1 || anrs[0].Crashes != 42 {
+		t.Errorf("anr series = %+v, want one day of 42", anrs)
+	}
+
+	crashKey := store.BossSeriesKey{Source: "playvitals", App: "app", Version: "4.2.0", Kind: core.BossKindCrash}
+	if got := crashKey.Key(); got != "playvitals:app:4.2.0" {
+		t.Errorf("crash key = %q, want the unchanged %q", got, "playvitals:app:4.2.0")
+	}
+	anrKey := store.BossSeriesKey{Source: "playvitals", App: "app", Version: "4.2.0", Kind: core.BossKindANR}
+	if got := anrKey.Key(); got != "playvitals:app:4.2.0|anr" {
+		t.Errorf("anr key = %q", got)
+	}
+}
+
+// crashKindEvent stores one crash row of a named kind.
+func crashKindEvent(st *store.Store, t *testing.T, source, app, day, version, kind string, count int) {
+	t.Helper()
+	payload, err := json.Marshal(core.CrashPayload{Version: version, Kind: kind})
+	if err != nil {
+		t.Fatalf("encode payload: %v", err)
+	}
+	at, _ := time.Parse(core.DayLayout, day)
+	if _, err := st.InsertEvent(context.Background(), core.Event{
+		ID: core.NewID(), Source: source, Kind: core.KindCrash, App: app,
+		OccurredAt: at, ObservedAt: at, Day: day, Quantity: count,
+		DedupeKey: source + ":" + day + ":" + kind + ":" + core.NewID(),
+		Silent:    true, Payload: payload,
+	}); err != nil {
+		t.Fatalf("insert crash: %v", err)
 	}
 }
 
@@ -135,7 +194,7 @@ func TestCrashResolutionsAndForcedKeys(t *testing.T) {
 	if err != nil {
 		t.Fatalf("resolutions: %v", err)
 	}
-	if got := resolved[core.BossKey("sentry", "app", "4.2.0", "")]; got != "2026-05-31" {
+	if got := resolved[core.BossKey("sentry", "app", "4.2.0", "", core.BossKindCrash)]; got != "2026-05-31" {
 		t.Fatalf("resolutions = %v", resolved)
 	}
 
@@ -151,7 +210,7 @@ func TestCrashResolutionsAndForcedKeys(t *testing.T) {
 	if err != nil {
 		t.Fatalf("forced keys: %v", err)
 	}
-	if got := keys[core.BossKey("crash", "app", "9.9", "")]; got != "2026-05-31" {
+	if got := keys[core.BossKey("crash", "app", "9.9", "", core.BossKindCrash)]; got != "2026-05-31" {
 		t.Fatalf("forced keys = %v", keys)
 	}
 }

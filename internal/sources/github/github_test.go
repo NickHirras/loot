@@ -41,6 +41,11 @@ type fakeAPI struct {
 	releases string
 	forks    string
 	pulls    map[int]string
+	// issuePages/forkPages, when set, are served one per ?page=N and take
+	// precedence over the single-page fixtures above. Anything past the last
+	// entry is an empty list, exactly as GitHub answers.
+	issuePages []string
+	forkPages  []string
 
 	// rateRemaining/rateReset, when set, are sent on every response.
 	rateRemaining string
@@ -49,11 +54,13 @@ type fakeAPI struct {
 	status int
 
 	// Observed traffic.
-	starPages   []int
-	requests    int
-	lastAuth    string
-	lastUA      string
-	starAccepts []string
+	starPages      []int
+	issuePagesSeen []int
+	forkPagesSeen  []int
+	requests       int
+	lastAuth       string
+	lastUA         string
+	starAccepts    []string
 }
 
 func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -96,13 +103,17 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewEncoder(w).Encode(f.stars[start:end])
 
 	case path == "/repos/o/r/issues":
-		_, _ = io.WriteString(w, orEmpty(f.issues))
+		page := pageOf(r)
+		f.issuePagesSeen = append(f.issuePagesSeen, page)
+		_, _ = io.WriteString(w, orEmpty(pageBody(f.issuePages, f.issues, page)))
 
 	case path == "/repos/o/r/releases":
 		_, _ = io.WriteString(w, orEmpty(f.releases))
 
 	case path == "/repos/o/r/forks":
-		_, _ = io.WriteString(w, orEmpty(f.forks))
+		page := pageOf(r)
+		f.forkPagesSeen = append(f.forkPagesSeen, page)
+		_, _ = io.WriteString(w, orEmpty(pageBody(f.forkPages, f.forks, page)))
 
 	case strings.HasPrefix(path, "/repos/o/r/pulls/"):
 		n, _ := strconv.Atoi(strings.TrimPrefix(path, "/repos/o/r/pulls/"))
@@ -118,6 +129,30 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
 		_, _ = io.WriteString(w, `{"message":"Not Found"}`)
 	}
+}
+
+// pageOf reads ?page=N, defaulting to the first.
+func pageOf(r *http.Request) int {
+	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+	if page < 1 {
+		page = 1
+	}
+	return page
+}
+
+// pageBody serves the paged fixture when there is one, and otherwise the
+// single-page fixture on page one and nothing after it.
+func pageBody(pages []string, single string, page int) string {
+	if len(pages) == 0 {
+		if page == 1 {
+			return single
+		}
+		return "[]"
+	}
+	if page > len(pages) {
+		return "[]"
+	}
+	return pages[page-1]
 }
 
 func orEmpty(s string) string {
@@ -679,5 +714,176 @@ func TestEmittedEventsRenderWithTheDefaultRules(t *testing.T) {
 	}
 	if !strings.Contains(starDrop.Subtitle, "u105") {
 		t.Fatalf("star subtitle = %q, want the login in it", starDrop.Subtitle)
+	}
+}
+
+// ------------------------------------------------------------- pagination
+
+// fullIssuePage builds a page of `perPage` items so the poller has to ask for
+// the next one, numbered downwards from `from` and updated a minute apart so
+// the list reads newest-first the way `sort=updated&direction=desc` does.
+func fullIssuePage(t *testing.T, from int, base time.Time) string {
+	t.Helper()
+	items := make([]string, 0, perPage)
+	for i := 0; i < perPage; i++ {
+		at := base.Add(-time.Duration(i) * time.Minute).UTC().Format(time.RFC3339)
+		items = append(items, fmt.Sprintf(
+			`{"number":%d,"title":"Issue %d","state":"open","html_url":"https://github.com/o/r/issues/%d",
+			  "created_at":%q,"updated_at":%q,"user":{"login":"alice"}}`,
+			from-i, from-i, from-i, at, at))
+	}
+	return "[" + strings.Join(items, ",") + "]"
+}
+
+// One page was read and the cursor jumped to now, so everything on page two
+// was thrown away without ever producing a drop — and the next poll, asking
+// only for what changed since now, could never find it again.
+func TestPollIssuesWalksEveryPage(t *testing.T) {
+	first := fullIssuePage(t, 300, testNow.Add(-time.Hour))
+	second := `[
+	  {"number":42,"title":"Missed entirely","state":"open","html_url":"https://github.com/o/r/issues/42",
+	   "created_at":"2026-08-17T09:00:00Z","updated_at":"2026-08-17T09:00:00Z","user":{"login":"bob"}}
+	]`
+	api := &fakeAPI{issuePages: []string{first, second}}
+	s, _ := newTestSource(t, api, config.GitHub{BackfillDays: 30})
+
+	events, state, err := s.Poll(context.Background(), nil)
+	if err != nil {
+		t.Fatalf("Poll: %v", err)
+	}
+	opened := byKind(events, "issue_opened")
+	if len(opened) != perPage+1 {
+		t.Fatalf("emitted %d issue_opened events, want %d (both pages)", len(opened), perPage+1)
+	}
+	if !hasKey(opened, "github:issue_opened:o/r:42") {
+		t.Errorf("the second page was never read: %v", keysOf(opened))
+	}
+	if len(api.issuePagesSeen) != 2 || api.issuePagesSeen[0] != 1 || api.issuePagesSeen[1] != 2 {
+		t.Errorf("pages requested = %v, want [1 2] — a short page ends the walk", api.issuePagesSeen)
+	}
+	// The list ran out rather than the cap, so the cursor may safely advance.
+	if rs := decodeState(state).Repos["o/r"]; rs.LastIssuePoll != formatTime(testNow) {
+		t.Errorf("issue cursor = %q, want now", rs.LastIssuePoll)
+	}
+}
+
+// When the cap stops the walk, the cursor must not step over what was never
+// read: it stays at the oldest item actually seen, so the next poll picks up
+// from there instead of skipping the rest for good.
+func TestPollIssuesCappedHoldsTheCursorBack(t *testing.T) {
+	pages := make([]string, maxListPages+2)
+	base := testNow.Add(-time.Hour)
+	for i := range pages {
+		pages[i] = fullIssuePage(t, 10_000-i*perPage, base.Add(-time.Duration(i*perPage)*time.Minute))
+	}
+	api := &fakeAPI{issuePages: pages}
+	s, _ := newTestSource(t, api, config.GitHub{BackfillDays: 30})
+
+	_, state, err := s.Poll(context.Background(), nil)
+	if err != nil {
+		t.Fatalf("Poll: %v", err)
+	}
+	if got := len(api.issuePagesSeen); got != maxListPages {
+		t.Fatalf("requested %d pages, want the cap of %d", got, maxListPages)
+	}
+	cursor := decodeState(state).Repos["o/r"].LastIssuePoll
+	if cursor == formatTime(testNow) {
+		t.Fatal("the cursor advanced past pages that were never read")
+	}
+	oldestSeen := base.Add(-time.Duration(maxListPages*perPage-1) * time.Minute).UTC()
+	if cursor != formatTime(oldestSeen) {
+		t.Errorf("cursor = %q, want the oldest item seen %q", cursor, formatTime(oldestSeen))
+	}
+}
+
+// Forks page the same way: a hundred at a time, newest first, and the walk
+// stops at the first page that reaches back past the cursor.
+func TestPollForksWalksEveryPage(t *testing.T) {
+	items := make([]string, 0, perPage)
+	for i := 0; i < perPage; i++ {
+		at := testNow.Add(-time.Duration(i) * time.Minute).UTC().Format(time.RFC3339)
+		items = append(items, fmt.Sprintf(
+			`{"full_name":"u%d/r","html_url":"https://github.com/u%d/r","created_at":%q,"owner":{"login":"u%d"}}`,
+			i, i, at, i))
+	}
+	first := "[" + strings.Join(items, ",") + "]"
+	second := `[
+	  {"full_name":"zoe/r","html_url":"https://github.com/zoe/r","created_at":"2026-08-17T12:00:00Z","owner":{"login":"zoe"}}
+	]`
+	api := &fakeAPI{forkPages: []string{first, second}}
+	s, _ := newTestSource(t, api, config.GitHub{BackfillDays: 30})
+
+	events, state, err := s.Poll(context.Background(), nil)
+	if err != nil {
+		t.Fatalf("Poll: %v", err)
+	}
+	forks := byKind(events, "fork")
+	if len(forks) != perPage+1 {
+		t.Fatalf("emitted %d fork events, want %d (both pages)", len(forks), perPage+1)
+	}
+	if !hasKey(forks, "github:fork:o/r:zoe") {
+		t.Errorf("the second page of forks was never read: %v", keysOf(forks))
+	}
+	if rs := decodeState(state).Repos["o/r"]; rs.LastForkAt != formatTime(testNow) {
+		t.Errorf("fork cursor = %q, want the newest fork", rs.LastForkAt)
+	}
+
+	// An ordinary poll now finds one full page of already-known forks and
+	// stops there rather than walking the whole list again.
+	api.forkPagesSeen = nil
+	if _, _, err := s.Poll(context.Background(), state); err != nil {
+		t.Fatalf("second Poll: %v", err)
+	}
+	if got := len(api.forkPagesSeen); got != 1 {
+		t.Errorf("second poll read %d fork pages, want 1", got)
+	}
+}
+
+func hasKey(events []core.Event, key string) bool {
+	for _, ev := range events {
+		if ev.DedupeKey == key {
+			return true
+		}
+	}
+	return false
+}
+
+// Star events only exist for stars Loot watched arrive, so a repo that was
+// already popular before it was installed would forever count as having none.
+// One silent snapshot a day says where the repo actually stands.
+func TestPollEmitsAStarsTotalSnapshot(t *testing.T) {
+	api := &fakeAPI{stars: []stargazer{}}
+	// 2,500 stars, none of them new.
+	api.stars = make([]stargazer, 2500)
+	for i := range api.stars {
+		api.stars[i].StarredAt = mustTime(t, "2020-01-01T00:00:00Z").Add(time.Duration(i) * time.Minute)
+		api.stars[i].User.Login = fmt.Sprintf("u%d", i)
+	}
+	s, _ := newTestSource(t, api, config.GitHub{BackfillDays: 30})
+
+	events, _, err := s.Poll(context.Background(), nil)
+	if err != nil {
+		t.Fatalf("Poll: %v", err)
+	}
+	totals := byKind(events, "stars_total")
+	if len(totals) != 1 {
+		t.Fatalf("emitted %d stars_total events, want exactly 1 a poll", len(totals))
+	}
+	ev := totals[0]
+	if ev.Quantity != 2500 {
+		t.Errorf("quantity = %d, want the stargazers_count", ev.Quantity)
+	}
+	if !ev.Silent {
+		t.Error("the snapshot must be silent: the star count is context, not news")
+	}
+	if want := "github:stars_total:o/r:" + core.DayOf(testNow); ev.DedupeKey != want {
+		t.Errorf("dedupe key = %q, want %q", ev.DedupeKey, want)
+	}
+	if ev.App != "o/r" {
+		t.Errorf("app = %q, want the repo", ev.App)
+	}
+	// No star drops: none of these stars is new.
+	if got := byKind(events, "star"); len(got) != 0 {
+		t.Errorf("emitted %d star events for a repo with no new stars", len(got))
 	}
 }

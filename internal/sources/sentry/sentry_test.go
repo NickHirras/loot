@@ -200,6 +200,9 @@ func TestUninterestingActionsEmitNothing(t *testing.T) {
 	}
 }
 
+// eventAlertBody is the documented event-alert shape. `project` arrives as the
+// numeric project id and `project_slug` as the name the issue webhook also
+// uses; `web_url` names only the *organization*, which is the trap.
 const eventAlertBody = `{
   "action": "triggered",
   "data": {
@@ -211,6 +214,8 @@ const eventAlertBody = `{
       "level": "error",
       "platform": "javascript",
       "release": "frontend@4.2.0",
+      "project": 112,
+      "project_slug": "backend",
       "web_url": "https://sentry.io/organizations/test-org/issues/1117540176/events/e4874d664c3540c1a32eab185f12c5ab/",
       "timestamp": 1780000000.677
     },
@@ -234,8 +239,8 @@ func TestEventAlertMapsToOneCrash(t *testing.T) {
 	if !strings.Contains(ev.DedupeKey, "e4874d664c3540c1a32eab185f12c5ab") {
 		t.Errorf("dedupe key %q does not carry the event id", ev.DedupeKey)
 	}
-	if ev.App != "test-org" {
-		t.Errorf("app = %q, want the organization dug out of web_url", ev.App)
+	if ev.App != "backend" {
+		t.Errorf("app = %q, want the project slug", ev.App)
 	}
 	p := payloadOf(t, ev)
 	if p.Version != "frontend@4.2.0" {
@@ -263,5 +268,77 @@ func TestMalformedIssueIsRejected(t *testing.T) {
 	resp, _ := deliver(t, src, sentry.ResourceIssue, `{"action":"created","data":{}}`, true)
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("status = %d, want 400", resp.StatusCode)
+	}
+}
+
+// The two routes describe the same crashes, so they must agree about which app
+// those crashes belong to. Filing an event alert under the *organization* slug
+// gave one project two apps, two baselines and two bosses for one bug — and
+// pooled every project in the org into a single meaningless baseline.
+func TestBothRoutesAgreeOnTheApp(t *testing.T) {
+	src := newSource(t, config.Sentry{Enabled: true, ClientSecret: secret})
+
+	_, issueEvents := deliver(t, src, sentry.ResourceIssue, issueBody("created"), true)
+	if len(issueEvents) != 1 {
+		t.Fatalf("issue delivery emitted %d events, want 1", len(issueEvents))
+	}
+	_, alertEvents := deliver(t, src, sentry.ResourceEventAlert, eventAlertBody, true)
+	if len(alertEvents) != 1 {
+		t.Fatalf("event alert emitted %d events, want 1", len(alertEvents))
+	}
+
+	if issueEvents[0].App != alertEvents[0].App {
+		t.Fatalf("same project, two apps: issue %q vs event alert %q",
+			issueEvents[0].App, alertEvents[0].App)
+	}
+	if got := alertEvents[0].App; got != "backend" {
+		t.Errorf("app = %q, want the project slug", got)
+	}
+	if got := payloadOf(t, alertEvents[0]).Project; got != "backend" {
+		t.Errorf("payload project = %q, want the project slug", got)
+	}
+}
+
+// Where the project can only be read off the URL, it is read off the *project*
+// segment of an old-style URL — and never off the organization, which is not
+// an app.
+func TestEventAlertNeverUsesTheOrganizationSlug(t *testing.T) {
+	src := newSource(t, config.Sentry{Enabled: true, ClientSecret: secret})
+
+	alert := func(fields string) core.Event {
+		t.Helper()
+		body := `{"action":"triggered","data":{"event":{
+		  "event_id":"abc123","issue_id":"999","title":"Boom",` + fields + `}}}`
+		_, events := deliver(t, src, sentry.ResourceEventAlert, body, true)
+		if len(events) != 1 {
+			t.Fatalf("emitted %d events, want 1", len(events))
+		}
+		return events[0]
+	}
+
+	// New-style URL: organization only. Better to say "sentry" than to invent
+	// an app out of the org name.
+	if got := alert(`"web_url":"https://acme-org.sentry.io/issues/999/"`).App; got != "sentry" {
+		t.Errorf("app = %q, want the fallback rather than the org slug", got)
+	}
+	if got := alert(`"web_url":"https://sentry.io/organizations/acme-org/issues/999/"`).App; got != "sentry" {
+		t.Errorf("app = %q, want the fallback rather than the org slug", got)
+	}
+	// Old-style URL: <org>/<project>/issues/... really does carry the project.
+	if got := alert(`"web_url":"https://sentry.io/acme-org/checkout/issues/999/"`).App; got != "checkout" {
+		t.Errorf("app = %q, want the project segment", got)
+	}
+	// A tag is trusted ahead of any URL.
+	if got := alert(`"web_url":"https://acme-org.sentry.io/issues/999/",
+	  "tags":[["level","error"],["project","payments"]]`).App; got != "payments" {
+		t.Errorf("app = %q, want the project tag", got)
+	}
+	// `project` as a slug is used; as a numeric id it is not, because a number
+	// is not a name anybody would recognize on a card.
+	if got := alert(`"project":"analytics"`).App; got != "analytics" {
+		t.Errorf("app = %q, want the project field", got)
+	}
+	if got := alert(`"project":112`).App; got != "sentry" {
+		t.Errorf("app = %q, want the fallback for a numeric project id", got)
 	}
 }

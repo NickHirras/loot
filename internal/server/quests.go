@@ -3,6 +3,7 @@ package server
 import (
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"strings"
 
@@ -149,9 +150,16 @@ func (s *Server) handleMysterySolve(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "mysteries are not enabled"})
 		return
 	}
+	// An empty body is fine — solving a mystery without writing anything down
+	// is allowed — but a body that is *there* and unreadable is a mistake
+	// worth reporting, rather than a note silently thrown away.
 	var req solveRequest
 	if r.Body != nil {
-		_ = json.NewDecoder(http.MaxBytesReader(w, r.Body, maxBody)).Decode(&req)
+		err := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxBody)).Decode(&req)
+		if err != nil && !errors.Is(err, io.EOF) {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
+			return
+		}
 	}
 
 	m, err := s.Mysteries.Solve(r.Context(), r.PathValue("id"), req.Note)

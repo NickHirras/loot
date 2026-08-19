@@ -217,7 +217,7 @@ func (d *Demo) seedWonFight(ctx context.Context, tx *store.Store, pipe *pipeline
 	if kind == "" {
 		kind = core.BossKindCrash
 	}
-	key := core.BossKey(crashSource, a.Name, f.Version, "")
+	key := core.BossKey(crashSource, a.Name, f.Version, "", kind)
 
 	// Walk the fight forward exactly as the detector would, and stop where it
 	// would have declared the kill: two completed days at or under a tenth of

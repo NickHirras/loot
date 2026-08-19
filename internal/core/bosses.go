@@ -2,6 +2,7 @@ package core
 
 import (
 	"encoding/json"
+	"strings"
 	"time"
 )
 
@@ -136,8 +137,9 @@ type BossDetail struct {
 // Boss is one crash cluster, dressed as a monster.
 type Boss struct {
 	ID string `json:"id"`
-	// Key is the fight's identity: "<source>:<app>:<version>|<issue>". One
-	// alive boss per key, which is what makes every part of this idempotent.
+	// Key is the fight's identity: "<source>:<app>:<version>[|<issue>][|anr]".
+	// One alive boss per key, which is what makes every part of this
+	// idempotent. See BossKey.
 	Key    string `json:"key"`
 	Source string `json:"source"`
 	App    string `json:"app"`
@@ -199,12 +201,23 @@ func BossPct(hp, hpMax float64) float64 {
 	return p
 }
 
-// BossKey builds the fight identity from its parts. Version and issue are both
-// optional: a source that reports neither still gets one boss per app.
-func BossKey(source, app, version, issue string) string {
+// BossKey builds the fight identity from its parts:
+// "<source>:<app>:<version>[|<issue>][|anr]". Version and issue are both
+// optional — a source that reports neither still gets one boss per app.
+//
+// Kind is part of the identity because a crash and an ANR in the same version
+// are two different bugs with two different fixes: merged into one fight their
+// counts added up, the HP bar measured nothing in particular, and whichever
+// arrived second silently inherited the other's name. Only `anr` adds a
+// suffix, so every key ever written before this stays exactly as it was and no
+// live boss is orphaned from its own series.
+func BossKey(source, app, version, issue, kind string) string {
 	key := source + ":" + app + ":" + version
 	if issue != "" {
 		key += "|" + issue
+	}
+	if strings.EqualFold(strings.TrimSpace(kind), BossKindANR) {
+		key += "|" + BossKindANR
 	}
 	return key
 }

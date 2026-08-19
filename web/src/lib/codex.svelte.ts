@@ -47,6 +47,7 @@ class CodexState {
   #loading = false
   #again = false
   #loadingRecap = false
+  #againRecap = false
 
   /** How many trophies are won, and out of how many. */
   get unlocked(): number {
@@ -124,14 +125,23 @@ class CodexState {
   }
 
   async loadRecap(): Promise<void> {
-    if (this.#loadingRecap) return
+    // Same shape as load(): a request that arrives mid-flight is remembered
+    // and run once this one settles, rather than dropped. Without the retry a
+    // click on a different month while the first fetch was still going was
+    // simply ignored — the picker highlighted the new month and went on
+    // showing the old one, and nothing but another click would fix it.
+    if (this.#loadingRecap) {
+      this.#againRecap = true
+      return
+    }
     this.#loadingRecap = true
     this.recapLoading = true
     const wanted = untrack(() => this.period)
     try {
       const { recap, periods } = await fetchRecap(wanted)
-      // A period change mid-flight must not overwrite the newer request.
-      if (wanted !== this.period) return
+      // A period change mid-flight must not overwrite the newer request; the
+      // retry below is what fetches the one that is actually wanted.
+      if (wanted !== untrack(() => this.period)) return
       this.recap = recap
       this.periods = periods
       // The server decides what "" means; adopt its answer so the picker can
@@ -143,6 +153,10 @@ class CodexState {
     } finally {
       this.recapLoading = false
       this.#loadingRecap = false
+      if (this.#againRecap) {
+        this.#againRecap = false
+        void this.loadRecap()
+      }
     }
   }
 }

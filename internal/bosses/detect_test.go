@@ -549,3 +549,171 @@ func TestQuietFightWithALiveSourceIsAKill(t *testing.T) {
 		t.Fatalf("slew %d bosses, want 1", len(res.Slain))
 	}
 }
+
+// ------------------------------------------------------- attested quiet days
+
+const pushSource = "sentry"
+const pushApp = "push.example.app"
+
+// pushCrash stores one crash row from a *push-only* source: one that reports
+// individual crashes as they arrive and never emits the daily "I looked at the
+// whole app" heartbeat.
+func (h *harness) pushCrash(day, issue string, count int) {
+	h.t.Helper()
+	payload, err := json.Marshal(core.CrashPayload{
+		Version: "3.0.0", IssueID: issue, IssueTitle: "boom", Kind: core.BossKindCrash,
+	})
+	if err != nil {
+		h.t.Fatalf("encode payload: %v", err)
+	}
+	at, _ := time.Parse(core.DayLayout, day)
+	h.ingest(core.Event{
+		Source: pushSource, Kind: core.KindCrash, App: pushApp,
+		OccurredAt: at, ObservedAt: at, Day: day, Quantity: count,
+		DedupeKey: fmt.Sprintf("t:push:%s:%s", day, issue),
+		Silent:    true, Payload: payload,
+	})
+}
+
+// pushHeartbeat is the same source finally attesting to a whole day's total.
+func (h *harness) pushHeartbeat(day string) {
+	h.t.Helper()
+	at, _ := time.Parse(core.DayLayout, day)
+	h.ingest(core.Event{
+		Source: pushSource, Kind: core.KindCrashDay, App: pushApp,
+		OccurredAt: at, ObservedAt: at, Day: day,
+		DedupeKey: "t:push_day:" + day, Silent: true,
+	})
+}
+
+// A quiet day is a claim, and only a source that looked at the whole app can
+// make it. One chatty issue's rows are not evidence that a *different* issue
+// stopped — and before this was split apart they were, which let a boss spawn
+// and be slain for a legendary drop in a single pass with no heartbeat in the
+// database at all.
+func TestPushOnlySourceCannotClaimAQuietDay(t *testing.T) {
+	h := newHarness(t)
+	// Issue "b" grumbles along at two a day, forever. No heartbeats: this
+	// source only ever says "here is a crash".
+	for i := 40; i >= 1; i-- {
+		h.pushCrash(day(i), "b", 2)
+	}
+	// Issue "a" explodes exactly once and is never heard from again.
+	h.pushCrash(day(3), "a", 300)
+
+	res := h.evaluate()
+	if len(res.Spawned) != 1 {
+		t.Fatalf("spawned %d bosses, want 1 (the spike is still a boss)", len(res.Spawned))
+	}
+	if len(res.Slain) != 0 {
+		t.Fatalf("slew %d bosses on another issue's rows, want 0", len(res.Slain))
+	}
+	if n := len(h.dropsOfKind(bosses.KindSlain)); n != 0 {
+		t.Fatalf("minted %d kill drops with no heartbeat in the database, want 0", n)
+	}
+	if n := len(h.board().Alive); n != 1 {
+		t.Fatalf("%d bosses alive, want 1 still standing", n)
+	}
+
+	// Re-running changes nothing: the fight simply waits for evidence.
+	h.evaluate()
+	if n := len(h.board().Alive); n != 1 {
+		t.Fatalf("%d bosses alive after a second pass, want 1", n)
+	}
+
+	// Now the source attests to two quiet days, and the kill is earned.
+	h.pushHeartbeat(day(2))
+	h.pushHeartbeat(day(1))
+	res = h.evaluate()
+	if len(res.Slain) != 1 {
+		t.Fatalf("slew %d bosses after two attested quiet days, want 1", len(res.Slain))
+	}
+}
+
+// ------------------------------------------------------------- crashes v ANRs
+
+// A crash and an ANR in the same version are two different bugs with two
+// different fixes. Sharing a key merged their counts into a health bar that
+// measured neither, and whichever arrived second silently inherited the
+// other's name.
+func TestCrashesAndANRsAreSeparateFights(t *testing.T) {
+	h := newHarness(t)
+	h.background(40, 5, 2)
+	for i := 4; i >= 1; i-- {
+		h.heartbeat(day(i))
+		h.crashKind(day(i), "2.0.0", "", core.BossKindCrash, 200, 60)
+		h.crashKind(day(i), "2.0.0", "", core.BossKindANR, 150, 40)
+	}
+
+	res := h.evaluate()
+	if len(res.Spawned) != 2 {
+		t.Fatalf("spawned %d bosses, want 2 (a crash and an ANR)", len(res.Spawned))
+	}
+
+	byKind := map[string]core.Boss{}
+	for _, b := range h.board().Alive {
+		byKind[b.Kind] = b
+	}
+	crash, ok := byKind[core.BossKindCrash]
+	if !ok {
+		t.Fatalf("no crash boss in %v", byKind)
+	}
+	anr, ok := byKind[core.BossKindANR]
+	if !ok {
+		t.Fatalf("no ANR boss in %v", byKind)
+	}
+
+	if crash.Key == anr.Key {
+		t.Fatalf("both fights share the key %q", crash.Key)
+	}
+	// The crash key is spelled exactly as it always was, so no live boss is
+	// orphaned from its own series by this change.
+	if want := "playvitals:" + testApp + ":2.0.0"; crash.Key != want {
+		t.Errorf("crash key = %q, want the unchanged %q", crash.Key, want)
+	}
+	if want := crash.Key + "|" + core.BossKindANR; anr.Key != want {
+		t.Errorf("anr key = %q, want %q", anr.Key, want)
+	}
+	if crash.HPMax != 200 {
+		t.Errorf("crash hp_max = %v, want 200 (not 350, the two added up)", crash.HPMax)
+	}
+	if anr.HPMax != 150 {
+		t.Errorf("anr hp_max = %v, want 150", anr.HPMax)
+	}
+	if crash.Name == anr.Name {
+		t.Errorf("both fights are called %q", crash.Name)
+	}
+	// Each is named from its own key and its own kind, which is what puts the
+	// ANR templates in reach of the ANR.
+	if want := bosses.Name(anr.Key, anr.Version, core.BossKindANR); anr.Name != want {
+		t.Errorf("anr name = %q, want the ANR naming of its key %q", anr.Name, want)
+	}
+	if want := bosses.Name(crash.Key, crash.Version, core.BossKindCrash); crash.Name != want {
+		t.Errorf("crash name = %q, want %q", crash.Name, want)
+	}
+}
+
+// The title says which kind of failure it is when the source has no issue
+// title of its own to offer.
+func TestANRTitleSaysANRs(t *testing.T) {
+	h := newHarness(t)
+	h.background(40, 4, 2)
+	for i := 3; i >= 1; i-- {
+		h.heartbeat(day(i))
+		at, _ := time.Parse(core.DayLayout, day(i))
+		payload, _ := json.Marshal(core.CrashPayload{Version: "5.0.0", Kind: core.BossKindANR})
+		h.ingest(core.Event{
+			Source: testSource, Kind: core.KindCrash, App: testApp,
+			OccurredAt: at, ObservedAt: at, Day: day(i), Quantity: 300,
+			DedupeKey: "t:anr:" + day(i), Silent: true, Payload: payload,
+		})
+	}
+
+	res := h.evaluate()
+	if len(res.Spawned) != 1 {
+		t.Fatalf("spawned %d bosses, want 1", len(res.Spawned))
+	}
+	if got := res.Spawned[0].Title; got != "ANRs in v5.0.0" {
+		t.Errorf("title = %q, want \"ANRs in v5.0.0\"", got)
+	}
+}

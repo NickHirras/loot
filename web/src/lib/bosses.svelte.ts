@@ -22,6 +22,13 @@ class BossesState {
   board = $state<BossBoard>({ alive: [], recent: [] })
   loading = $state(true)
   error = $state('')
+  /**
+   * True once a fetch has actually succeeded. The header badge prefers this
+   * board over the stats poll's count from then on — including when the answer
+   * is zero, which is exactly the moment that matters: slaying the last boss
+   * must clear the badge, not fall back to a stat that still says one.
+   */
+  loaded = $state(false)
   /** Ids of bosses that died while the page was watching. */
   flashing = $state<string[]>([])
   /** Ids with a request in flight, so a button can disable itself. */
@@ -85,6 +92,7 @@ class BossesState {
       const board = await fetchBosses()
       this.#celebrate(board.recent)
       this.board = board
+      this.loaded = true
       this.error = ''
     } catch (err) {
       this.error = err instanceof Error ? err.message : String(err)

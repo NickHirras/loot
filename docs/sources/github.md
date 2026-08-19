@@ -74,6 +74,14 @@ Override the window once at startup with `loot serve --since 2026-01-01`.
 | `pr_opened` | a pull request is opened | `github:pr_opened:<repo>:<n>` | same |
 | `pr_merged` | a pull request is **merged** | `github:pr_merged:<repo>:<n>` | same |
 | `release` | a release is published | `github:release:<repo>:<tag>` | `tag`, `name`, `url`, `prerelease` |
+| `stars_total` | every poll — **silent**, no drop | `github:stars_total:<repo>:<day>` | `repo`, `stars` |
+
+`stars_total` is a daily snapshot of `stargazers_count` rather than news.
+Star *events* only exist for stars Loot watched arrive, so without it a repo
+that already had three thousand stars when Loot was installed would count as
+having none, and the Codex's star trophies would sit locked next to a repo
+that passed them years ago. The Codex takes whichever of the two counts is
+higher.
 
 `App` is the `owner/name` of the repository, so the feed and the vault group by
 project.

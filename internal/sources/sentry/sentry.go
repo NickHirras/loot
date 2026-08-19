@@ -189,18 +189,23 @@ type issue struct {
 // event is `data.event` on a resource=event_alert (or error) delivery. This
 // one is snake_case throughout, and its timestamps are float epoch seconds.
 type event struct {
-	EventID   string  `json:"event_id"`
-	IssueID   string  `json:"issue_id"`
-	Title     string  `json:"title"`
-	Message   string  `json:"message"`
-	Culprit   string  `json:"culprit"`
-	Level     string  `json:"level"`
-	Platform  string  `json:"platform"`
-	WebURL    string  `json:"web_url"`
-	IssueURL  string  `json:"issue_url"`
-	Timestamp float64 `json:"timestamp"`
-	Release   string  `json:"release"`
-	Tags      [][]any `json:"tags"`
+	EventID  string `json:"event_id"`
+	IssueID  string `json:"issue_id"`
+	Title    string `json:"title"`
+	Message  string `json:"message"`
+	Culprit  string `json:"culprit"`
+	Level    string `json:"level"`
+	Platform string `json:"platform"`
+	WebURL   string `json:"web_url"`
+	IssueURL string `json:"issue_url"`
+	// ProjectSlug is the field to trust for the app. Project is the same thing
+	// on some payloads and the numeric project *id* on others, so it is kept
+	// raw and only used when it decodes as a slug.
+	ProjectSlug string          `json:"project_slug"`
+	Project     json.RawMessage `json:"project"`
+	Timestamp   float64         `json:"timestamp"`
+	Release     string          `json:"release"`
+	Tags        [][]any         `json:"tags"`
 }
 
 // resolvedActions are the issue actions that mean "somebody dealt with it".
@@ -259,9 +264,12 @@ func issueEvents(is issue, action string, now time.Time) ([]core.Event, error) {
 	if id == "" {
 		return nil, fmt.Errorf("sentry: issue webhook with no issue id")
 	}
-	app := is.Project.Slug
+	// The project slug is the app, here and on the event-alert path both: the
+	// two routes describe the same crashes and have to agree about which app
+	// they belong to. See appFromEvent.
+	app := firstNonEmpty(is.Project.Slug, is.Project.Name)
 	if app == "" {
-		app = is.Project.Name
+		app = fallbackApp
 	}
 
 	occurred := parseSentryTime(is.LastSeen, now)
@@ -353,7 +361,7 @@ func eventAlertEvents(ev event, action string, now time.Time) ([]core.Event, err
 		occurred = time.Unix(sec, int64((ev.Timestamp-float64(sec))*1e9)).UTC()
 	}
 
-	app := projectFromURL(ev.WebURL)
+	app := appFromEvent(ev)
 	payload := core.CrashPayload{
 		Version:    strings.TrimSpace(ev.Release),
 		IssueID:    issueID,
@@ -454,26 +462,112 @@ func issueURL(is issue) string {
 	return firstNonEmpty(is.WebURL, is.Permalink)
 }
 
-// projectFromURL digs the project slug out of an event's web_url. Event alerts
-// do not carry the project object that issue webhooks do, and a fight with no
-// app cannot be baselined.
-func projectFromURL(raw string) string {
-	// .../organizations/<org>/issues/... on old-style URLs, or
-	// https://<org>.sentry.io/issues/... on new ones. Neither carries the
-	// project, so fall back to the organization: it is at least stable, and
-	// the issue title carries the rest of the story.
-	trimmed := strings.TrimPrefix(strings.TrimPrefix(raw, "https://"), "http://")
-	if i := strings.Index(trimmed, "/organizations/"); i >= 0 {
-		rest := trimmed[i+len("/organizations/"):]
-		if j := strings.Index(rest, "/"); j > 0 {
-			return rest[:j]
+// fallbackApp is what an event alert is filed under when Sentry told us
+// nothing about which project it came from. It is deliberately the source's
+// own name and never the *organization* slug: an org is not an app, every
+// project in it shares one, and filing them together gave the boss detector a
+// baseline made of unrelated projects' crashes.
+const fallbackApp = Name
+
+// appFromEvent works out which project an alerting event belongs to, in the
+// order the payload is worth trusting.
+//
+// This has to agree with the issue webhook's `data.issue.project.slug`, or the
+// same crash reaches Loot as two different apps depending on which route it
+// took — two baselines, two bosses, and two names for one bug.
+func appFromEvent(ev event) string {
+	if slug := strings.TrimSpace(ev.ProjectSlug); slug != "" {
+		return slug
+	}
+	// `project` is a slug on some payload versions and a numeric id on others.
+	// A slug identifies the project; an id is a number nobody would recognize
+	// on a card, so it is left alone.
+	if slug := projectSlugField(ev.Project); slug != "" {
+		return slug
+	}
+	if slug := tagValue(ev.Tags, "project"); slug != "" {
+		return slug
+	}
+	// Old-style URLs carry the project as the second path segment:
+	// https://sentry.io/<org>/<project>/issues/... — the newer
+	// /organizations/<org>/issues/... and <org>.sentry.io forms carry only
+	// the organization, which is exactly what must not be used.
+	if slug := projectFromURL(ev.WebURL); slug != "" {
+		return slug
+	}
+	if slug := projectFromURL(ev.IssueURL); slug != "" {
+		return slug
+	}
+	return fallbackApp
+}
+
+// projectSlugField reads `data.event.project` when, and only when, it is a
+// string that is not just a number.
+func projectSlugField(raw json.RawMessage) string {
+	if len(raw) == 0 {
+		return ""
+	}
+	var s string
+	if err := json.Unmarshal(raw, &s); err != nil {
+		return ""
+	}
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return ""
+	}
+	if _, err := strconv.Atoi(s); err == nil {
+		return "" // a project id, not a slug
+	}
+	return s
+}
+
+// tagValue reads one of Sentry's [name, value] tag pairs.
+func tagValue(tags [][]any, want string) string {
+	for _, tag := range tags {
+		if len(tag) < 2 {
+			continue
 		}
-		return rest
+		name, ok := tag[0].(string)
+		if !ok || !strings.EqualFold(strings.TrimSpace(name), want) {
+			continue
+		}
+		if v, ok := tag[1].(string); ok {
+			return strings.TrimSpace(v)
+		}
 	}
-	if i := strings.Index(trimmed, ".sentry.io"); i > 0 {
-		return trimmed[:i]
+	return ""
+}
+
+// projectFromURL digs a project slug out of an event URL, returning "" when
+// the URL does not carry one.
+//
+// Only the old-style https://sentry.io/<org>/<project>/... form does. The
+// /organizations/<org>/issues/... and https://<org>.sentry.io/issues/... forms
+// name the organization and nothing else, and an organization slug used as an
+// app is worse than no answer at all.
+func projectFromURL(raw string) string {
+	trimmed := strings.TrimPrefix(strings.TrimPrefix(strings.TrimSpace(raw), "https://"), "http://")
+	if trimmed == "" {
+		return ""
 	}
-	return "sentry"
+	host, rest, ok := strings.Cut(trimmed, "/")
+	if !ok || !strings.EqualFold(host, "sentry.io") {
+		// A per-organization host (<org>.sentry.io) or a self-hosted install:
+		// the path is /issues/... with no project in it.
+		return ""
+	}
+	parts := strings.Split(rest, "/")
+	if len(parts) < 3 || parts[0] == "" || parts[1] == "" {
+		return ""
+	}
+	if parts[0] == "organizations" || parts[0] == "issues" || parts[0] == "api" {
+		return ""
+	}
+	// <org>/<project>/issues/...
+	if parts[2] != "issues" && parts[2] != "events" {
+		return ""
+	}
+	return parts[1]
 }
 
 // parseSentryTime reads one of Sentry's ISO timestamps, falling back to now.

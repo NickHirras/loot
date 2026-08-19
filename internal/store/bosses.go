@@ -31,17 +31,25 @@ const (
 	CrashResolvedKind = core.KindCrashResolved
 )
 
-// BossSeriesKey identifies one fight: a source, an app, and whichever of
-// version and issue that source knows about.
+// BossSeriesKey identifies one fight: a source, an app, whichever of version
+// and issue that source knows about, and what kind of failure it is.
+//
+// Kind is part of the identity, not decoration. A crash and an ANR in the same
+// version of the same app are two different bugs — different symptom,
+// different fix — and grouping them together added their counts into a health
+// bar that measured neither.
 type BossSeriesKey struct {
 	Source  string `json:"source"`
 	App     string `json:"app"`
 	Version string `json:"version"`
 	Issue   string `json:"issue"`
+	Kind    string `json:"kind,omitempty"`
 }
 
 // Key renders the series key as the boss key stored on the row.
-func (k BossSeriesKey) Key() string { return core.BossKey(k.Source, k.App, k.Version, k.Issue) }
+func (k BossSeriesKey) Key() string {
+	return core.BossKey(k.Source, k.App, k.Version, k.Issue, k.Kind)
+}
 
 // BossDay is one day of one fight.
 type BossDay struct {
@@ -64,6 +72,19 @@ func crashJSON(path string) string {
 	return `COALESCE(CAST(json_extract(e.payload, '` + path + `') AS TEXT), '')`
 }
 
+// crashKindSQL normalises a crash row's kind into exactly the two buckets a
+// boss can be. It is done in SQL rather than in Go because kind is a *grouping*
+// column: a source that writes "anr" on some rows, "ANR" on others and nothing
+// at all on the rest must still produce one crash series and one ANR series,
+// not five.
+//
+// Every query below aliases it `crash_kind` rather than `kind`, because
+// `events` already has a column of that name and SQLite resolves a bare `kind`
+// in GROUP BY to the column rather than to the alias — which silently grouped
+// every crash row together again.
+var crashKindSQL = `CASE WHEN LOWER(` + crashJSON("$.kind") + `) = '` + core.BossKindANR +
+	`' THEN '` + core.BossKindANR + `' ELSE '` + core.BossKindCrash + `' END`
+
 // CrashSeries returns every fight's daily counts over the inclusive window
 // [from, to], each series ordered oldest first. Days with no rows are simply
 // absent; the detector densifies, because a day with no crashes is the best
@@ -73,15 +94,15 @@ func (s *Store) CrashSeries(ctx context.Context, from, to string) (map[BossSerie
         SELECT e.source, e.app,
                `+crashJSON("$.version")+` AS version,
                `+crashJSON("$.issue_id")+` AS issue,
+               `+crashKindSQL+` AS crash_kind,
                e.day,
                COALESCE(SUM(e.quantity), 0),
                COALESCE(MAX(CAST(json_extract(e.payload, '$.users_affected') AS INTEGER)), 0),
                COALESCE(MAX(CAST(json_extract(e.payload, '$.issue_title') AS TEXT)), ''),
-               COALESCE(MAX(CAST(json_extract(e.payload, '$.url') AS TEXT)), ''),
-               COALESCE(MAX(CAST(json_extract(e.payload, '$.kind') AS TEXT)), '')
+               COALESCE(MAX(CAST(json_extract(e.payload, '$.url') AS TEXT)), '')
         FROM events e
         WHERE e.kind = ? AND e.day BETWEEN ? AND ?
-        GROUP BY e.source, e.app, version, issue, e.day
+        GROUP BY e.source, e.app, version, issue, crash_kind, e.day
         ORDER BY e.day ASC`, CrashKind, from, to)
 	if err != nil {
 		return nil, fmt.Errorf("crash series: %w", err)
@@ -94,10 +115,11 @@ func (s *Store) CrashSeries(ctx context.Context, from, to string) (map[BossSerie
 			key BossSeriesKey
 			day BossDay
 		)
-		if err := rows.Scan(&key.Source, &key.App, &key.Version, &key.Issue, &day.Day,
-			&day.Crashes, &day.UsersAffected, &day.Title, &day.URL, &day.Kind); err != nil {
+		if err := rows.Scan(&key.Source, &key.App, &key.Version, &key.Issue, &key.Kind, &day.Day,
+			&day.Crashes, &day.UsersAffected, &day.Title, &day.URL); err != nil {
 			return nil, fmt.Errorf("scan crash series: %w", err)
 		}
+		day.Kind = key.Kind
 		out[key] = append(out[key], day)
 	}
 	if err := rows.Err(); err != nil {
@@ -143,23 +165,53 @@ func (s *Store) CrashTotals(ctx context.Context, from, to string) (map[SeriesKey
 }
 
 // CrashReportedDays returns, per (source, app), the days on which the source
-// said anything at all about crashes — including a `crash_day` heartbeat
-// carrying a count of zero.
+// said anything at all about crashes — a `crash` row for some issue, or a
+// `crash_day` heartbeat carrying a count of zero.
 //
-// This is the difference between "no crashes today" and "no data today", and
-// the whole boss mechanic turns on it. A polling source that can attest to a
-// quiet day (Play vitals) emits the heartbeat, so a fight whose crashes
-// genuinely stopped is *slain*. A push-only source (Sentry, the generic
-// webhook) cannot attest to silence, so its abandoned fights quietly fade
-// instead of claiming a kill nobody earned.
+// This is the difference between "we heard from this source" and "we did not",
+// and it is what the *fade* test turns on: a fight whose source has said
+// nothing for a fortnight is one Loot has lost sight of.
+//
+// It is deliberately **not** what the *slay* test turns on. See
+// CrashAttestedDays.
 func (s *Store) CrashReportedDays(ctx context.Context, from, to string) (map[SeriesKey][]string, error) {
+	return s.crashDays(ctx, "crash reported days", from, to, CrashKind, CrashDayKind)
+}
+
+// CrashAttestedDays returns, per (source, app), the days on which the source
+// positively attested to the whole app's crash total — the `crash_day`
+// heartbeat, emitted even when that total is zero.
+//
+// The whole boss mechanic turns on the difference between this and
+// CrashReportedDays. "No crashes today" is a claim only a source that looked
+// can make. A polling source (Play vitals) emits the heartbeat, so a fight
+// whose crashes genuinely stopped is *slain*. A push-only source (Sentry, the
+// generic webhook) never emits one: it only ever says "here is a crash", and a
+// day it happened to say nothing about *this* issue is not evidence the issue
+// stopped — it is silence. Counting that silence as a quiet day let one noisy
+// issue's rows spawn a boss for another issue and then kill it in the same
+// pass, paying a legendary drop nobody earned. Such fights quietly fade
+// instead.
+func (s *Store) CrashAttestedDays(ctx context.Context, from, to string) (map[SeriesKey][]string, error) {
+	return s.crashDays(ctx, "crash attested days", from, to, CrashDayKind)
+}
+
+// crashDays is the shared body of the two above: the distinct days each
+// (source, app) has rows of the given kinds on, ascending.
+func (s *Store) crashDays(ctx context.Context, what, from, to string, kinds ...string) (map[SeriesKey][]string, error) {
+	args := make([]any, 0, len(kinds)+2)
+	for _, k := range kinds {
+		args = append(args, k)
+	}
+	args = append(args, from, to)
+
 	rows, err := s.q.QueryContext(ctx, `
         SELECT DISTINCT e.source, e.app, e.day
         FROM events e
-        WHERE e.kind IN (?, ?) AND e.day BETWEEN ? AND ?
-        ORDER BY e.day ASC`, CrashKind, CrashDayKind, from, to)
+        WHERE e.kind IN (`+placeholders(len(kinds))+`) AND e.day BETWEEN ? AND ?
+        ORDER BY e.day ASC`, args...)
 	if err != nil {
-		return nil, fmt.Errorf("crash reported days: %w", err)
+		return nil, fmt.Errorf("%s: %w", what, err)
 	}
 	defer rows.Close()
 
@@ -170,12 +222,12 @@ func (s *Store) CrashReportedDays(ctx context.Context, from, to string) (map[Ser
 			day string
 		)
 		if err := rows.Scan(&key.Source, &key.App, &day); err != nil {
-			return nil, fmt.Errorf("scan crash reported day: %w", err)
+			return nil, fmt.Errorf("scan %s: %w", what, err)
 		}
 		out[key] = append(out[key], day)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate crash reported days: %w", err)
+		return nil, fmt.Errorf("iterate %s: %w", what, err)
 	}
 	return out, nil
 }
@@ -189,10 +241,11 @@ func (s *Store) CrashResolutions(ctx context.Context, from string) (map[string]s
         SELECT e.source, e.app,
                `+crashJSON("$.version")+` AS version,
                `+crashJSON("$.issue_id")+` AS issue,
+               `+crashKindSQL+` AS crash_kind,
                MAX(e.day)
         FROM events e
         WHERE e.kind = ? AND e.day >= ?
-        GROUP BY e.source, e.app, version, issue`, CrashResolvedKind, from)
+        GROUP BY e.source, e.app, version, issue, crash_kind`, CrashResolvedKind, from)
 	if err != nil {
 		return nil, fmt.Errorf("crash resolutions: %w", err)
 	}
@@ -202,7 +255,7 @@ func (s *Store) CrashResolutions(ctx context.Context, from string) (map[string]s
 	for rows.Next() {
 		var key BossSeriesKey
 		var day string
-		if err := rows.Scan(&key.Source, &key.App, &key.Version, &key.Issue, &day); err != nil {
+		if err := rows.Scan(&key.Source, &key.App, &key.Version, &key.Issue, &key.Kind, &day); err != nil {
 			return nil, fmt.Errorf("scan crash resolution: %w", err)
 		}
 		out[key.Key()] = day
@@ -221,11 +274,12 @@ func (s *Store) ForcedBossKeys(ctx context.Context, from string) (map[string]str
         SELECT e.source, e.app,
                `+crashJSON("$.version")+` AS version,
                `+crashJSON("$.issue_id")+` AS issue,
+               `+crashKindSQL+` AS crash_kind,
                MIN(e.day)
         FROM events e
         WHERE e.kind = ? AND e.day >= ?
               AND json_extract(e.payload, '$.boss') IN (1, 'true')
-        GROUP BY e.source, e.app, version, issue`, CrashKind, from)
+        GROUP BY e.source, e.app, version, issue, crash_kind`, CrashKind, from)
 	if err != nil {
 		return nil, fmt.Errorf("forced boss keys: %w", err)
 	}
@@ -235,7 +289,7 @@ func (s *Store) ForcedBossKeys(ctx context.Context, from string) (map[string]str
 	for rows.Next() {
 		var key BossSeriesKey
 		var day string
-		if err := rows.Scan(&key.Source, &key.App, &key.Version, &key.Issue, &day); err != nil {
+		if err := rows.Scan(&key.Source, &key.App, &key.Version, &key.Issue, &key.Kind, &day); err != nil {
 			return nil, fmt.Errorf("scan forced boss: %w", err)
 		}
 		out[key.Key()] = day

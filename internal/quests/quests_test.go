@@ -443,3 +443,108 @@ func TestFixedTargetCountsFromNow(t *testing.T) {
 		t.Errorf("the quest was already met the moment it was written: %v of %v", progress, quest.Target)
 	}
 }
+
+// The Monday problem: generation runs minutes after midnight, when every one
+// of last week's quests is still active. Counting them towards the cap left no
+// room for the new week's — and because `lastGen` latches for the day, the
+// board stayed short until the next midnight. Expiry has to happen first.
+func TestMondayGenerationRetiresLastWeekFirst(t *testing.T) {
+	ctx := context.Background()
+	st := newStore(t)
+
+	// Two weeks of history, so each week has a previous week to beat.
+	insert(t, st,
+		ledgerRow("appstore", "2026-08-05", 40, 200, "ls:1"),
+		ledgerRow("appstore", "2026-08-12", 50, 250, "ls:2"),
+		installRow("flathub", "2026-08-06", 400, "in:1"),
+		installRow("flathub", "2026-08-13", 500, "in:2"),
+	)
+
+	g := newGenerator(st)
+	// Revenue, units and installs are the only metrics with history, so three
+	// is a full board.
+	g.MaxActive = 3
+
+	sunday := time.Date(2026, 8, 16, 18, 0, 0, 0, time.UTC)
+	g.Now = func() time.Time { return sunday }
+	created, err := g.Run(ctx)
+	if err != nil {
+		t.Fatalf("sunday generate: %v", err)
+	}
+	if len(created) != 3 {
+		t.Fatalf("sunday created %d quests, want 3 (a full board)", len(created))
+	}
+
+	// Five past midnight on Monday, exactly when maybeGenerate fires.
+	monday := time.Date(2026, 8, 17, 0, 5, 0, 0, time.UTC)
+	g.Now = func() time.Time { return monday }
+	created, err = g.Run(ctx)
+	if err != nil {
+		t.Fatalf("monday generate: %v", err)
+	}
+	if len(created) != 3 {
+		t.Fatalf("monday created %d quests, want 3 — the board was left short", len(created))
+	}
+	for _, q := range created {
+		if q.WindowStart != "2026-08-17" || q.WindowEnd != "2026-08-23" {
+			t.Errorf("%s window = %s..%s, want the new week", q.Title, q.WindowStart, q.WindowEnd)
+		}
+	}
+
+	active, err := st.ListQuests(ctx, store.QuestQuery{Statuses: []string{core.QuestActive}})
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	if len(active) != 3 {
+		t.Fatalf("%d active quests on Monday, want 3", len(active))
+	}
+	for _, q := range active {
+		if q.WindowEnd < "2026-08-17" {
+			t.Errorf("last week's quest %q is still active", q.Title)
+		}
+	}
+}
+
+// A quest window is a run of *local* days, so the completion Loot mints for
+// itself has to be filed under the local day too. Stamped with the UTC day, a
+// Sunday-evening completion west of Greenwich lands on Monday — outside the
+// very window it just satisfied, where the XP quest running alongside it
+// cannot see it.
+func TestCompletionEventUsesTheLocalDay(t *testing.T) {
+	ctx := context.Background()
+	st := newStore(t)
+	rec := &recorder{xp: 200}
+	svc := newService(t, st, rec, newSpy())
+
+	// Sunday evening five hours behind UTC: locally the last day of the week,
+	// in UTC already Monday.
+	west := time.FixedZone("UTC-5", -5*60*60)
+	sundayEvening := time.Date(2026, 8, 23, 21, 0, 0, 0, west)
+	svc.Now = func() time.Time { return sundayEvening }
+	svc.Generator.Now = svc.Now
+
+	insert(t, st, ledgerRow("appstore", "2026-08-21", 12, 120, "as:west"))
+
+	q, err := svc.Create(ctx, quests.CustomRequest{
+		Metric: core.MetricRevenue, Target: 100, Window: "week", Title: "Make $100",
+	})
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if q.WindowEnd != "2026-08-23" {
+		t.Fatalf("window end = %q, want the local Sunday", q.WindowEnd)
+	}
+
+	if _, err := svc.Check(ctx); err != nil {
+		t.Fatalf("check: %v", err)
+	}
+	if len(rec.events) != 1 {
+		t.Fatalf("want one event ingested, got %d", len(rec.events))
+	}
+	if got := rec.events[0].Day; got != "2026-08-23" {
+		t.Errorf("completion day = %q, want the local day 2026-08-23", got)
+	}
+	if got := rec.events[0].Day; got > q.WindowEnd {
+		t.Errorf("completion day %q falls outside its own window %s..%s", got, q.WindowStart, q.WindowEnd)
+	}
+}

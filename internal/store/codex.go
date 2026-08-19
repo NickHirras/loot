@@ -265,8 +265,12 @@ type CodexAggregates struct {
 	// QuestDays and MysteryDays count completions and solutions per day.
 	QuestDays   []DayValue
 	MysteryDays []DayValue
-	// StarDays counts GitHub stars per day.
+	// StarDays counts GitHub stars per day: one entry per star *event*, so it
+	// only knows about stars that arrived while Loot was watching.
 	StarDays []DayValue
+	// StarTotalDays is the reported stargazer level per day, summed over the
+	// repos that reported it — how many stars the repos actually have.
+	StarTotalDays []DayValue
 	// SubscriberDays is the reported active subscriber level per day.
 	SubscriberDays []DayValue
 
@@ -340,6 +344,18 @@ func (s *Store) CodexAggregates(ctx context.Context) (CodexAggregates, error) {
 	if agg.StarDays, err = s.codexDayValues(ctx, `
         SELECT day, COALESCE(SUM(CASE WHEN quantity > 0 THEN quantity ELSE 1 END), 0)
         FROM events WHERE kind = 'star' GROUP BY day ORDER BY day`); err != nil {
+		return agg, err
+	}
+	// Star *events* only exist for stars Loot watched arrive. The daily
+	// `stars_total` snapshot is where the repo actually stands, which is what
+	// keeps a repo that had three thousand stars before Loot was installed
+	// from reading as having none. A level, so the day's figure is the sum
+	// over the repos that reported it.
+	if agg.StarTotalDays, err = s.codexDayValues(ctx, `
+        SELECT day, COALESCE(SUM(v), 0) FROM (
+            SELECT day AS day, MAX(quantity) AS v FROM events
+            WHERE kind = 'stars_total' GROUP BY app, day)
+        GROUP BY day ORDER BY day`); err != nil {
 		return agg, err
 	}
 	// A snapshot is a level, not a flow: a day's subscribers is the sum over
@@ -527,11 +543,18 @@ func (s *Store) codexCursedRecovery(ctx context.Context) (string, error) {
 	var at sql.NullInt64
 	// Asked as an EXISTS over an indexed range rather than a join, so the
 	// answer costs one short range scan per cursed drop instead of a product.
+	// Both halves are filtered to drops that have actually been seen, exactly
+	// as every other Codex query is: a drop still sealed in an unopened chest
+	// has not happened yet, and awarding "it turned around" for a turnaround
+	// nobody has watched is the same mistake as dating "your first drop" from
+	// a chest that is still shut.
 	err := s.q.QueryRowContext(ctx, `
         SELECT MIN(c.created_at) FROM drops c
         WHERE c.rarity = 'cursed'
+          AND NOT (c.chest_date <> '' AND c.revealed_at IS NULL)
           AND EXISTS (SELECT 1 FROM drops r
                       WHERE r.rarity IN ('rare', 'epic', 'legendary')
+                        AND NOT (r.chest_date <> '' AND r.revealed_at IS NULL)
                         AND r.created_at >  c.created_at
                         AND r.created_at <= c.created_at + ?)`,
 		cursedRecoveryWindow).Scan(&at)

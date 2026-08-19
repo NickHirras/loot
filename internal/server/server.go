@@ -145,7 +145,9 @@ func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, "stats", err)
 		return
 	}
-	activeQuests, err := s.Store.CountActiveQuests(r.Context(), "")
+	// Every active row, closed windows included: the badge should agree with
+	// the board beside it, and the board lists a quest until expiry retires it.
+	activeQuests, err := s.Store.CountActiveQuests(r.Context(), "", "")
 	if err != nil {
 		s.fail(w, "stats", err)
 		return

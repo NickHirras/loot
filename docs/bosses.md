@@ -27,7 +27,9 @@ Everything lives in the **Boss fights** section at the top of the Quests tab, an
 
 ### The key
 
-A fight is identified by `<source>:<app>:<version>|<issue>`. Whichever of version and issue a source knows about goes in; Play vitals knows versions, Sentry knows issues, the generic webhook can supply both or neither.
+A fight is identified by `<source>:<app>:<version>|<issue>`, with `|anr` appended when the failure is an ANR rather than a crash. Whichever of version and issue a source knows about goes in; Play vitals knows versions, Sentry knows issues, the generic webhook can supply both or neither.
+
+A crash and an ANR in the same version are two fights, not one: different symptom, different fix, and adding their counts together gave a health bar that measured neither. Only ANRs take the suffix, so every crash key ever written is spelled exactly as it always was.
 
 The key is unique across the whole table, forever. A fight is one row for its entire life — from the cursed spawn to the epic kill — so history reads as *"you fought this and won"* rather than as a pile of near-identical monsters. A version that starts crashing again months later is a new fight only if it is a new version, which it almost always is.
 
@@ -75,12 +77,12 @@ If a day is **worse** than the spawn day, HP rises — but never past **1.5× hp
 
 | how | what happens |
 |---|---|
-| **recovered** — two consecutive completed days at ≤ 10% of hp_max | slain |
+| **recovered** — two consecutive *attested* days at ≤ 10% of hp_max | slain |
 | **resolved** — the source said the issue was closed (a Sentry `resolved`, a `"resolved": true` on the webhook) | slain |
 | **manual** — you clicked *Mark slain* | slain |
 | **faded** — the source said nothing at all for 14 days | closed quietly |
 
-Two quiet days rather than one, because one quiet day is a weekend.
+Two quiet days rather than one, because one quiet day is a weekend. *Attested* is the load-bearing word: only a `crash_day` heartbeat counts towards the run. A `crash` row about some other issue is not a statement that this one stopped — and counting it as one let a single noisy issue's daily rows spawn a boss for a different issue and slay it in the same pass, paying a legendary drop nobody earned.
 
 The kill is **epic**, worth 500 XP — or **legendary**, worth 1,500, when the fight opened at 500 or more, hit 500 or more people, or took a week or longer to win. Either half qualifies on its own: a crash that hit five hundred people mattered, and so did one you chased for a week.
 

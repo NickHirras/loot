@@ -249,6 +249,38 @@ func TestCompleteQuestOnlyOnce(t *testing.T) {
 	}
 }
 
+// A quest whose window has closed is history, whatever its status column still
+// says. Counting last week's six towards this week's cap is what used to leave
+// a Monday board empty all day.
+func TestCountActiveQuestsExcludesClosedWindows(t *testing.T) {
+	ctx := context.Background()
+	st := newStore(t)
+
+	lastWeek := newQuest(core.MetricRevenue, 100, "2026-08-10", "2026-08-16", "auto:last")
+	thisWeek := newQuest(core.MetricUnits, 50, "2026-08-17", "2026-08-23", "auto:this")
+	for _, q := range []core.Quest{lastWeek, thisWeek} {
+		if _, err := st.InsertQuest(ctx, q); err != nil {
+			t.Fatalf("insert: %v", err)
+		}
+	}
+
+	all, err := st.CountActiveQuests(ctx, "", "")
+	if err != nil {
+		t.Fatalf("count: %v", err)
+	}
+	if all != 2 {
+		t.Errorf("count with no day = %d, want both rows", all)
+	}
+
+	open, err := st.CountActiveQuests(ctx, core.QuestAuto, "2026-08-17")
+	if err != nil {
+		t.Fatalf("count: %v", err)
+	}
+	if open != 1 {
+		t.Errorf("count on Monday = %d, want 1 — last week's window has closed", open)
+	}
+}
+
 // TestExpireQuestsIsQuiet checks the shame-free ending: an unmet quest becomes
 // history with its progress intact, and nothing else about it changes.
 func TestExpireQuestsIsQuiet(t *testing.T) {

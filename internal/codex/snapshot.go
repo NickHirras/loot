@@ -1,6 +1,7 @@
 package codex
 
 import (
+	"math"
 	"sort"
 
 	"github.com/nickhirras/loot/internal/store"
@@ -92,7 +93,13 @@ func NewSnapshot(agg store.CodexAggregates, today, currency string) *Snapshot {
 	s.Chests = cumulative(agg.ChestDays)
 	s.Quests = cumulative(agg.QuestDays)
 	s.Mysteries = cumulative(agg.MysteryDays)
-	s.Stars = cumulative(agg.StarDays)
+	// Stars are counted two ways and the kinder answer wins. Star *events* are
+	// the ones Loot watched arrive; `stars_total` is what the repo actually
+	// has. Neither alone is right: a fresh install of Loot on a repo with
+	// three thousand stars has no events, and a repo whose polling gaps ate a
+	// snapshot still earned the stars it collected. Both series only climb, so
+	// the maximum of the two climbs too and no trophy can ever be un-earned.
+	s.Stars = maxSeries(cumulative(agg.StarDays), runningMax(agg.StarTotalDays))
 
 	s.Subscribers = runningMax(agg.SubscriberDays)
 	s.RevenueRun = runningMax(revenueRunLengths(fromMap(revenueByDay)))
@@ -146,6 +153,46 @@ func cumulative(series []store.DayValue) []store.DayValue {
 	for _, p := range series {
 		total += p.Value
 		out = append(out, store.DayValue{Day: p.Day, Value: total})
+	}
+	return out
+}
+
+// maxSeries merges two non-decreasing day series into their pointwise maximum
+// over the union of their days, where each series' value on a day it does not
+// mention is its most recent earlier value.
+func maxSeries(a, b []store.DayValue) []store.DayValue {
+	if len(a) == 0 {
+		return b
+	}
+	if len(b) == 0 {
+		return a
+	}
+	days := make(map[string]bool, len(a)+len(b))
+	for _, p := range a {
+		days[p.Day] = true
+	}
+	for _, p := range b {
+		days[p.Day] = true
+	}
+	all := make([]string, 0, len(days))
+	for day := range days {
+		all = append(all, day)
+	}
+	sort.Strings(all)
+
+	out := make([]store.DayValue, 0, len(all))
+	var i, j int
+	var av, bv float64
+	for _, day := range all {
+		for i < len(a) && a[i].Day <= day {
+			av = a[i].Value
+			i++
+		}
+		for j < len(b) && b[j].Day <= day {
+			bv = b[j].Value
+			j++
+		}
+		out = append(out, store.DayValue{Day: day, Value: math.Max(av, bv)})
 	}
 	return out
 }

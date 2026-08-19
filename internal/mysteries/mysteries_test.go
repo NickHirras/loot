@@ -537,3 +537,85 @@ func TestSolveAndDismiss(t *testing.T) {
 		}
 	}
 }
+
+// crashRows writes one silent crash row per day from `from` days back through
+// `to`, which is what a crash source's ordinary week looks like from here.
+func crashRows(t *testing.T, st *store.Store, source, app string, from, to int) {
+	t.Helper()
+	for i := from; i >= to; i-- {
+		d := day(i)
+		occurred, _ := time.Parse(core.DayLayout, d)
+		insert(t, st, core.Event{
+			ID: core.NewID(), Source: source, Kind: core.KindCrash, App: app,
+			Day: d, OccurredAt: occurred, ObservedAt: occurred,
+			Quantity: 3, Silent: true,
+			DedupeKey: source + ":crash:" + app + ":" + d,
+		})
+	}
+}
+
+// Two ways the casebook used to cry wolf about the crash sources, both fixed
+// by knowing what kind of source it is looking at.
+//
+// Play's vitals API has a freshness window of a couple of days, so the newest
+// day it will ever hand back sits about three behind the calendar — perfectly
+// healthy, and flagged every single morning against a flat two-day rule. And
+// Sentry never polls at all: a fortnight with no Sentry deliveries is a
+// fortnight with no new crashes, which is the best news on the page.
+func TestSilenceSkipsFreshLagAndPushOnlySources(t *testing.T) {
+	ctx := context.Background()
+	st := newStore(t)
+
+	// Play vitals, entirely healthy: daily rows, newest two completed days
+	// back, exactly as its freshness window implies.
+	crashRows(t, st, "playvitals", "com.example.app", 39, 2)
+	// Sentry, silent for a week and a half — because nothing crashed.
+	crashRows(t, st, "sentry", "backend", 39, 10)
+	// And a store that really has stopped: App Store Connect publishes
+	// yesterday's report each morning, so three days back is a gap.
+	for i := 39; i >= 3; i-- {
+		ledgerRow(t, st, "appstore", "Notes", day(i), "sale", 20, 200, 1)
+	}
+
+	found, err := newDetector(st, newSpy()).Run(ctx)
+	if err != nil {
+		t.Fatalf("run: %v", err)
+	}
+
+	var quietSources []string
+	for _, m := range found {
+		if m.Kind == core.MysterySilence {
+			quietSources = append(quietSources, m.Source)
+		}
+	}
+	for _, source := range quietSources {
+		switch source {
+		case "playvitals":
+			t.Errorf("healthy Play vitals reported quiet at its own freshness lag:\n%s", titles(found))
+		case "sentry":
+			t.Errorf("a push-only source was reported quiet for not pushing:\n%s", titles(found))
+		}
+	}
+	if len(quietSources) != 1 || quietSources[0] != "appstore" {
+		t.Errorf("quiet sources = %v, want just appstore:\n%s", quietSources, titles(found))
+	}
+}
+
+// The names come from core's one map, so a mystery title spells a source the
+// same way the drop beside it does.
+func TestSourceLabelsComeFromCore(t *testing.T) {
+	for source, want := range map[string]string{
+		"playvitals": core.SourceDisplayName("playvitals"),
+		"sentry":     "Sentry",
+		"crash":      core.SourceDisplayName("crash"),
+		"appstore":   "App Store",
+		"":           "Loot",
+	} {
+		if got := mysteries.SourceLabel(source); got != want {
+			t.Errorf("SourceLabel(%q) = %q, want %q", source, got, want)
+		}
+		if source != "" && want == source {
+			t.Errorf("SourceLabel(%q) has no display name of its own", source)
+		}
+	}
+}

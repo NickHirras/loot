@@ -690,3 +690,144 @@ func TestMonthsPicker(t *testing.T) {
 		t.Errorf("last period = %+v, want the 2026 season", periods[12])
 	}
 }
+
+// A trophy earned on a day that is not today is *dated* then — a milestone
+// crossed on a day whose report only settled overnight is genuinely
+// yesterday's — but it is still news. Only the very first pass over a database
+// full of history is a backfill; treating every past-dated unlock as one
+// posted live achievements silently into a chest instead of the feed.
+func TestPastDatedUnlockOnALaterPassIsLive(t *testing.T) {
+	ctx := context.Background()
+	st := newStore(t)
+	rec := &recorder{}
+	svc := newService(t, st, rec, newSpy())
+
+	// An empty database, so the first pass backfills nothing.
+	res, err := svc.Evaluate(ctx)
+	if err != nil {
+		t.Fatalf("first evaluate: %v", err)
+	}
+	if len(res.Unlocked) != 0 {
+		t.Fatalf("an empty database unlocked %d achievements", len(res.Unlocked))
+	}
+
+	// Now a report lands for *yesterday*: five countries, all settled then.
+	yesterday := core.DayOf(today.AddDate(0, 0, -1))
+	for _, country := range []string{"US", "GB", "DE", "FR", "JP"} {
+		ev := ledgerRow("appstore", yesterday, country, 3, 40, "row-"+country)
+		insert(t, st, ev)
+		dropFor(t, st, ev, core.Common, 10)
+	}
+
+	res, err = svc.Evaluate(ctx)
+	if err != nil {
+		t.Fatalf("second evaluate: %v", err)
+	}
+	if res.Backfilled {
+		t.Fatal("a later pass reported itself as a backfill")
+	}
+
+	ev, ok := rec.eventForKey("settler_1")
+	if !ok {
+		t.Fatalf("settler_1 paid no drop")
+	}
+	if ev.Chest {
+		t.Error("a live unlock earned yesterday was filed into a chest, not the feed")
+	}
+	var meta struct {
+		EarnedDay  string `json:"earned_day"`
+		Backfilled bool   `json:"backfilled"`
+	}
+	board, _ := svc.List(ctx)
+	settler := find(t, board, "settler_1")
+	if err := json.Unmarshal(settler.Meta, &meta); err != nil {
+		t.Fatalf("meta: %v", err)
+	}
+	if meta.Backfilled {
+		t.Errorf("meta = %s, want backfilled:false", settler.Meta)
+	}
+	// It is still dated when it was actually earned.
+	if meta.EarnedDay != yesterday {
+		t.Errorf("earned_day = %q, want %q", meta.EarnedDay, yesterday)
+	}
+	if got := settler.UnlockedAt.Format(core.DayLayout); got != yesterday {
+		t.Errorf("unlocked_at = %s, want %s", got, yesterday)
+	}
+}
+
+// starsTotal is the daily "this repo has N stars" snapshot the GitHub poller
+// emits, which is where a repo that was already popular before Loot existed
+// gets its star count from.
+func starsTotal(repo, day string, total int) core.Event {
+	occurred, _ := time.Parse(core.DayLayout, day)
+	return core.Event{
+		ID: core.NewID(), Source: "github", Kind: "stars_total", App: repo,
+		Day: day, OccurredAt: occurred, ObservedAt: occurred,
+		Quantity: total, Silent: true,
+		DedupeKey: "github:stars_total:" + repo + ":" + day,
+	}
+}
+
+func starEvent(repo, day, user string) core.Event {
+	occurred, _ := time.Parse(core.DayLayout, day)
+	return core.Event{
+		ID: core.NewID(), Source: "github", Kind: "star", App: repo,
+		Day: day, OccurredAt: occurred, ObservedAt: occurred, Quantity: 1,
+		DedupeKey: "github:star:" + repo + ":" + user,
+	}
+}
+
+// Star achievements used to count only the stars Loot watched arrive, so
+// pointing it at a repo with three thousand stars left "1,000 GitHub stars"
+// locked at 0/1,000 next to a repo that had passed it years earlier.
+func TestStarsCountTheRepoAndNotOnlyWhatLootWatched(t *testing.T) {
+	ctx := context.Background()
+	st := newStore(t)
+	svc := newService(t, st, &recorder{}, newSpy())
+
+	insert(t, st,
+		starsTotal("o/big", core.DayOf(today.AddDate(0, 0, -1)), 900),
+		starsTotal("o/big", core.DayOf(today), 1_100),
+		starsTotal("o/small", core.DayOf(today), 40),
+	)
+
+	if _, err := svc.Evaluate(ctx); err != nil {
+		t.Fatalf("evaluate: %v", err)
+	}
+	board, err := svc.List(ctx)
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	galaxy := find(t, board, "stars_1000")
+	if galaxy.ProgressValue < 1_140 {
+		t.Errorf("stars = %v, want the repos' own totals summed (1,140)", galaxy.ProgressValue)
+	}
+	if !galaxy.Unlocked() {
+		t.Error("a repo with more than a thousand stars did not unlock Galaxy")
+	}
+}
+
+// Neither source of truth may take a star away: a poll that missed a day, or a
+// repo that lost a star, must not un-earn a trophy.
+func TestStarsTakeTheKinderOfTheTwoCounts(t *testing.T) {
+	ctx := context.Background()
+	st := newStore(t)
+	svc := newService(t, st, &recorder{}, newSpy())
+
+	// Twelve stars watched arriving, and a snapshot that only ever saw three.
+	for i := 0; i < 12; i++ {
+		insert(t, st, starEvent("o/r", core.DayOf(today.AddDate(0, 0, -2)), core.NewID()))
+	}
+	insert(t, st, starsTotal("o/r", core.DayOf(today), 3))
+
+	if _, err := svc.Evaluate(ctx); err != nil {
+		t.Fatalf("evaluate: %v", err)
+	}
+	board, _ := svc.List(ctx)
+	if got := find(t, board, "stars_10").ProgressValue; got < 12 {
+		t.Errorf("stars = %v, want the 12 events rather than the 3 reported", got)
+	}
+	if !find(t, board, "stars_10").Unlocked() {
+		t.Error("Stargazer was not unlocked by twelve watched stars")
+	}
+}

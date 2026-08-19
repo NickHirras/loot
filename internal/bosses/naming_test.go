@@ -12,7 +12,7 @@ import (
 // determinism is not a nicety: a name that drifted would rename a monster
 // mid-fight.
 func TestNameIsDeterministic(t *testing.T) {
-	key := core.BossKey("playvitals", "com.example.app", "4.2.0", "")
+	key := core.BossKey("playvitals", "com.example.app", "4.2.0", "", core.BossKindCrash)
 	first := bosses.Name(key, "4.2.0", core.BossKindCrash)
 	for i := 0; i < 50; i++ {
 		if got := bosses.Name(key, "4.2.0", core.BossKindCrash); got != first {
@@ -33,7 +33,7 @@ func TestNameVariesWithKey(t *testing.T) {
 	for _, app := range []string{"com.a.one", "com.b.two", "com.c.three", "com.d.four"} {
 		for _, version := range []string{"1.0.0", "2.3.1", "4.2.0", "10.0.1", "4812"} {
 			for _, issue := range []string{"", "abc123", "zz9"} {
-				key := core.BossKey("playvitals", app, version, issue)
+				key := core.BossKey("playvitals", app, version, issue, core.BossKindCrash)
 				name := bosses.Name(key, version, core.BossKindCrash)
 				seen[name]++
 				firstWord[strings.Fields(name)[0]]++
@@ -56,7 +56,7 @@ func TestNameVariesWithKey(t *testing.T) {
 func TestNameCallsANRsANRs(t *testing.T) {
 	found := false
 	for _, app := range []string{"a", "b", "c", "d", "e", "f", "g", "h"} {
-		key := core.BossKey("playvitals", app, "1.0.0", "")
+		key := core.BossKey("playvitals", app, "1.0.0", "", core.BossKindANR)
 		if strings.Contains(bosses.Name(key, "1.0.0", core.BossKindANR), "ANR") {
 			found = true
 			break
@@ -72,7 +72,7 @@ func TestNamesAreNeverMean(t *testing.T) {
 	banned := []string{"sloppy", "careless", "lazy", "stupid", "idiot", "amateur", "incompetent"}
 	for _, app := range []string{"a", "b", "c", "d", "e", "f", "g", "h", "i", "j"} {
 		for _, v := range []string{"1.0.0", "2.0.0", "3.0.0"} {
-			name := strings.ToLower(bosses.Name(core.BossKey("s", app, v, ""), v, core.BossKindCrash))
+			name := strings.ToLower(bosses.Name(core.BossKey("s", app, v, "", core.BossKindCrash), v, core.BossKindCrash))
 			for _, word := range banned {
 				if strings.Contains(name, word) {
 					t.Fatalf("name %q contains %q", name, word)

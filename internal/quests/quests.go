@@ -142,6 +142,9 @@ func (s *Service) Run(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
+			// Generation retires the closed windows itself before it counts
+			// the board, so this order is safe: the new week's quests are
+			// created and then measured by the Check below, in one pass.
 			s.maybeGenerate(ctx)
 		case <-s.trigger:
 		}
@@ -312,6 +315,13 @@ func (s *Service) award(ctx context.Context, q core.Quest) (int, error) {
 		return 0, fmt.Errorf("quest payload: %w", err)
 	}
 
+	// Timestamps are UTC, as every stored instant is — but the *day* is the
+	// local one. A quest window is a week or a month as the person reading it
+	// lives them (see WeekWindow), and progress is measured over `day BETWEEN
+	// window_start AND window_end`. Stamping the completion with the UTC day
+	// would file a quest finished at 9pm in Auckland on tomorrow's business
+	// day, outside the very window it just satisfied — so the XP it paid would
+	// not count towards the XP quest running alongside it.
 	now := s.now().UTC()
 	drop, err := s.Ingest.Ingest(ctx, core.Event{
 		Source:     eventSource,
@@ -319,7 +329,7 @@ func (s *Service) award(ctx context.Context, q core.Quest) (int, error) {
 		App:        q.App,
 		OccurredAt: now,
 		ObservedAt: now,
-		Day:        core.DayOf(now),
+		Day:        s.today(),
 		DedupeKey:  completeDedupePfx + q.ID,
 		Payload:    payload,
 	})
@@ -510,6 +520,18 @@ func (s *Service) Delete(ctx context.Context, id string) error {
 	s.publish()
 	return nil
 }
+
+// Window semantics, in one place because two clocks meet here.
+//
+// A quest window is a pair of inclusive *local* days: the week and the month as
+// the person reading the board lives them, not as UTC has them. Progress is
+// then measured with `events.day BETWEEN window_start AND window_end`, and
+// `events.day` is whatever business day each source filed a row under — a
+// store's own reporting day for a sale, and the local day for anything Loot
+// mints for itself. The two agree because both are days rather than instants;
+// what must never happen is a UTC *timestamp* being turned into a day here,
+// which would put an evening completion in a timezone ahead of UTC outside its
+// own window. See award.
 
 // WeekWindow returns the Monday..Sunday window containing t, in local days.
 func WeekWindow(t time.Time) (string, string) {

@@ -261,19 +261,24 @@ func (s *Store) GetQuest(ctx context.Context, id string) (core.Quest, error) {
 
 // CountActiveQuests counts active quests of a kind ("" for every kind). The
 // generator uses it to keep the board from becoming a to-do list.
-func (s *Store) CountActiveQuests(ctx context.Context, kind string) (int, error) {
-	var (
-		n   int
-		err error
-	)
-	if kind == "" {
-		err = s.q.QueryRowContext(ctx,
-			`SELECT COUNT(*) FROM quests WHERE status = ?`, core.QuestActive).Scan(&n)
-	} else {
-		err = s.q.QueryRowContext(ctx,
-			`SELECT COUNT(*) FROM quests WHERE status = ? AND kind = ?`, core.QuestActive, kind).Scan(&n)
+//
+// `today` excludes quests whose window has already closed; "" counts every
+// active row. A closed window is history whether or not ExpireQuests has got
+// to it yet, and counting last week's six quests towards this week's cap is
+// what used to leave a Monday board empty all day.
+func (s *Store) CountActiveQuests(ctx context.Context, kind, today string) (int, error) {
+	query := `SELECT COUNT(*) FROM quests WHERE status = ?`
+	args := []any{core.QuestActive}
+	if kind != "" {
+		query += ` AND kind = ?`
+		args = append(args, kind)
 	}
-	if err != nil {
+	if today != "" {
+		query += ` AND window_end >= ?`
+		args = append(args, today)
+	}
+	var n int
+	if err := s.q.QueryRowContext(ctx, query, args...).Scan(&n); err != nil {
 		return 0, fmt.Errorf("count active quests: %w", err)
 	}
 	return n, nil

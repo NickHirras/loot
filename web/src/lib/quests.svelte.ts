@@ -25,6 +25,13 @@ class QuestsState {
   casebook = $state<Casebook>({ open: [], resolved: [] })
   loading = $state(true)
   error = $state('')
+  /**
+   * True once a fetch has actually succeeded. The header badge prefers this
+   * casebook over the stats poll's count from then on — including when the
+   * answer is zero, which is exactly the moment that matters: solving the last
+   * mystery must clear the badge, not fall back to a stat that still says one.
+   */
+  loaded = $state(false)
   /** Ids of quests that finished while the page was watching. */
   flashing = $state<string[]>([])
   /** Ids with a request in flight, so a button can disable itself. */
@@ -85,6 +92,7 @@ class QuestsState {
       this.#celebrate(board.recent)
       this.board = board
       this.casebook = casebook
+      this.loaded = true
       this.error = ''
     } catch (err) {
       this.error = err instanceof Error ? err.message : String(err)

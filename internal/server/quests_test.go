@@ -324,6 +324,65 @@ func TestMysteriesAPI(t *testing.T) {
 	}
 }
 
+// A note that cannot be read is a mistake worth reporting. Swallowing the
+// decode error solved the mystery with an empty note instead — the explanation
+// the person typed silently thrown away, and a success returned for it.
+func TestMysterySolveRejectsUnreadableBodies(t *testing.T) {
+	h := newQuestHarness(t)
+	ctx := context.Background()
+
+	for i := 0; i < 40; i++ {
+		day := core.DayOf(time.Now().UTC().AddDate(0, 0, -1-i))
+		occurred, _ := time.Parse(core.DayLayout, day)
+		qty := 20
+		if i == 1 {
+			qty = 4000
+		}
+		if _, err := h.store.InsertEvent(ctx, core.Event{
+			ID: core.NewID(), Source: "appstore", Kind: "install", App: "Notes",
+			Day: day, OccurredAt: occurred, ObservedAt: occurred,
+			Quantity: qty, Silent: true,
+			DedupeKey: "bad-body:" + day,
+		}); err != nil {
+			t.Fatalf("seed: %v", err)
+		}
+	}
+	if _, err := h.detector.Run(ctx); err != nil {
+		t.Fatalf("detect: %v", err)
+	}
+
+	_, body := h.get(t, "/api/mysteries")
+	open := body["open"].([]any)
+	if len(open) == 0 {
+		t.Fatal("nothing detected to solve")
+	}
+	id := open[0].(map[string]any)["id"].(string)
+
+	resp, _ := h.post(t, "/api/mysteries/"+id+"/solve", `{"note": not json}`)
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("malformed body: status %d, want 400", resp.StatusCode)
+	}
+
+	// And it really was not solved behind our back.
+	_, body = h.get(t, "/api/mysteries")
+	stillOpen := false
+	for _, raw := range body["open"].([]any) {
+		if raw.(map[string]any)["id"] == id {
+			stillOpen = true
+		}
+	}
+	if !stillOpen {
+		t.Error("a rejected solve closed the mystery anyway")
+	}
+
+	// An empty body is still fine: solving without writing anything down is
+	// allowed.
+	resp, _ = h.post(t, "/api/mysteries/"+id+"/solve", "")
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("empty body: status %d, want 200", resp.StatusCode)
+	}
+}
+
 // TestQuestEndpointsWithoutServices proves the API is honest on a server built
 // without Quest 5 wired in: empty, not broken.
 func TestQuestEndpointsWithoutServices(t *testing.T) {

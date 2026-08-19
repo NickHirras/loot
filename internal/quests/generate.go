@@ -95,8 +95,20 @@ type candidate struct {
 // Run creates whatever the current week and month are missing. It returns the
 // quests it actually created — an already-present quest is not an error and
 // not a creation.
+//
+// It retires last window's quests *first*. Generation happens minutes after
+// midnight, and on a Monday every one of last week's quests is still active at
+// that moment: counting them towards MaxActive would leave the board with no
+// room for the new week's, and because `lastGen` latches for the day the board
+// would stay short until the next midnight. Expiry is idempotent and silent,
+// so running it here as well as in Check costs nothing.
 func (g *Generator) Run(ctx context.Context) ([]core.Quest, error) {
 	now := g.now()
+	today := now.Format(core.DayLayout)
+	if _, err := g.Store.ExpireQuests(ctx, today, now.UTC()); err != nil {
+		return nil, err
+	}
+
 	weekStart, weekEnd := WeekWindow(now)
 	monthStart, monthEnd := MonthWindow(now)
 	prevWeekStart, prevWeekEnd := WeekWindow(now.AddDate(0, 0, -7))
@@ -153,7 +165,9 @@ func (g *Generator) Run(ctx context.Context) ([]core.Quest, error) {
 	if maxActive <= 0 {
 		maxActive = DefaultMaxActive
 	}
-	activeAuto, err := g.Store.CountActiveQuests(ctx, core.QuestAuto)
+	// Only quests whose window is still open count towards the cap: a quest
+	// whose week is over is history even if a crash stopped it being marked so.
+	activeAuto, err := g.Store.CountActiveQuests(ctx, core.QuestAuto, today)
 	if err != nil {
 		return nil, err
 	}
