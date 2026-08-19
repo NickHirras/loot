@@ -134,7 +134,22 @@ class LootState {
       } catch {
         return
       }
-      if (msg.type === 'drop' && msg.drop) this.receive(msg.drop)
+      if (msg.type === 'drop' && msg.drop) {
+        // The wire splits drop and originating event; the API returns them
+        // flattened, so merge here to keep one Drop shape everywhere.
+        const ev = msg.event ?? {}
+        this.receive({
+          source: (ev.source as string) ?? '',
+          kind: (ev.kind as string) ?? '',
+          app: (ev.app as string) ?? '',
+          country: (ev.country as string) ?? '',
+          amount: (ev.amount as number) ?? 0,
+          currency: (ev.currency as string) ?? '',
+          quantity: (ev.quantity as number) ?? 0,
+          occurred_at: (ev.occurred_at as string) ?? msg.drop.created_at,
+          ...msg.drop,
+        })
+      }
     }
 
     socket.onclose = () => {

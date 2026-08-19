@@ -62,7 +62,7 @@ export interface SourceInfo {
 /** Websocket envelope from GET /ws. */
 export interface WSMessage {
   type: 'hello' | 'drop'
-  drop?: Drop
+  drop?: Pick<Drop, 'id' | 'event_id' | 'rarity' | 'title' | 'subtitle' | 'xp' | 'created_at'>
   event?: Record<string, unknown>
 }
 

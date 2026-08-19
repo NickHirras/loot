@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "loot",
+      "runtimeExecutable": "/opt/homebrew/bin/go",
+      "runtimeArgs": ["run", "./cmd/loot", "serve", "--dev"],
+      "port": 8080
+    }
+  ]
+}
