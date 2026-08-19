@@ -227,3 +227,10 @@ them; only the newest settled day counts towards the empty-answer streak.
 **Desktop (MSIX/Win32) apps.** These endpoints cover Store apps and games. The
 Windows Desktop Application program has its own installs and errors endpoints,
 which Loot does not read.
+
+
+## Field notes (first real setup, Aug 2026)
+
+- A **personal (individual) developer account has no Entra tenant**. Partner Center → Account settings → Tenants → *Developer* tab → **Create Microsoft Entra ID** makes a free one-person tenant; then **Associate Microsoft Entra ID** on that same *Developer* tab (the tenant created from the Commercial side is *not* automatically associated with the developer program).
+- The **Microsoft Entra applications** tab only appears in User management after you **Sign in with Microsoft Entra ID** (the tenant's admin) *and* the tenant is associated on the Developer tab. Creating the app from there shows it twice (the registration and its service principal) — same Client ID; open the first one for **Add new key**.
+- Right after creation the analytics API answers `401 {"error":"User Unauthorized due to AMS call failure."}` (and sometimes 429/404) until the association propagates. `loot check` explains this; wait a few minutes and retry.

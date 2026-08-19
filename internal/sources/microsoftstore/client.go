@@ -356,6 +356,15 @@ func (s *Source) getJSON(ctx context.Context, endpoint string, out any) error {
 		// which of the two it is from context.
 		return fmt.Errorf("%w (%s)", errNoData, parseAPIError(resp.StatusCode, body).Error())
 	case resp.StatusCode == http.StatusUnauthorized:
+		// Seen in the wild right after creating the Entra application:
+		// {"error":"User Unauthorized due to AMS call failure."} — the token
+		// is fine; Partner Center just doesn't know the application yet.
+		if strings.Contains(string(body), "AMS call failure") {
+			return fmt.Errorf("%w: %s — Partner Center does not recognise this Microsoft Entra application yet. "+
+				"Make sure it is listed under Account settings → User management → Microsoft Entra applications with the Manager role "+
+				"(the tenant must be associated under Account settings → Tenants → Developer first); a freshly added application can take a while to propagate",
+				errNotAssociated, parseAPIError(resp.StatusCode, body).Error())
+		}
 		return fmt.Errorf("%w: %s — the access token was refused; check tenant_id, client_id and client_secret",
 			errCredentials, parseAPIError(resp.StatusCode, body).Error())
 	case resp.StatusCode == http.StatusForbidden:
