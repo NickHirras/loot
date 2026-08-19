@@ -31,6 +31,35 @@ Loot is a single Go binary with an embedded Svelte dashboard and a SQLite databa
 
 </div>
 
+## Try it in 10 seconds (demo mode)
+
+Loot ships with a whole fictional business inside it. `--demo` fills a **separate** database with four months of plausible history for three invented apps — an App Store subscription business, a weather app that spikes at weekends, a Linux tide clock on Flathub — and then keeps emitting live events while you watch.
+
+```bash
+docker run --rm -p 8080:8080 -e LOOT_DEMO=1 ghcr.io/nickhirras/loot
+# or, from source:
+make build && ./bin/loot serve --demo
+```
+
+Then open <http://localhost:8080>. You get a feed with a few thousand drops behind it, a vault with real curves in it, a globe with forty-odd settlements, an era well into **Kingdom**, and **yesterday's chest still shut**, because opening one is the best thing Loot does and you should get to do it.
+
+What you are looking at:
+
+- **Nothing real is touched.** Demo mode writes to `<data_dir>/demo.db` and never opens `loot.db`. It configures no sources, so it never polls a store, never reads a credential and never accepts a webhook. Every event it stores it invented — but it invented them in the shape the real App Store, Google Play, Flathub and RevenueCat sources emit, and pushed them through the same pipeline, so the drops, chests, settlements and XP are all genuinely Loot's.
+- **The same binary and the same image.** There is no separate demo build; `LOOT_DEMO=1` (or `demo.enabled: true`) is all it takes, and the container needs no volume.
+- **It is reproducible.** The world is generated from a fixed seed (`demo.seed`), so the same seed always produces the same history and the same screenshots.
+- **It keeps up.** Leave it a week and the next start quietly generates the days you missed, up to yesterday.
+
+A few knobs:
+
+```bash
+./bin/loot serve --demo --demo-pace 5   # five times faster, for recording a video
+./bin/loot serve --demo --demo-reset    # rebuild the demo world from scratch first
+./bin/loot demo reset                   # delete data/demo.db (asks nothing; it is generated data)
+```
+
+`demo.pace` also lives in the config file, along with `demo.seed` and `demo.days`; `LOOT_DEMO`, `LOOT_DEMO_PACE`, `LOOT_DEMO_SEED` and `LOOT_DEMO_DAYS` are the environment equivalents. The dashboard wears a small **demo** pill next to the live indicator the whole time, so nobody mistakes an invented number for one of yours.
+
 ## Quickstart
 
 ### From source
@@ -524,6 +553,8 @@ Adding a source means implementing `core.Source` (and optionally `core.WebhookHa
 | `POST /hooks/{source}` | source webhook receiver |
 | `POST /api/dev/fake` | synthetic drop, only when `dev.enabled` |
 
+`GET /api/stats` also carries `"demo": true` when the server is running on synthetic data, which is what puts the **demo** pill in the header.
+
 The websocket carries four kinds of message:
 
 ```jsonc
@@ -538,6 +569,8 @@ In dev mode, `POST /api/dev/fake` takes `{"rarity","kind","app","country","amoun
 
 ### Security note
 
+Demo mode is the one exception worth stating plainly: it is safe to run anywhere, because it reads no credentials and writes only to `demo.db`.
+
 Loot has no authentication of its own. The RevenueCat webhook secret protects that one endpoint, but the dashboard and API are open to anyone who can reach the port. Put it behind a reverse proxy with TLS and basic auth (or a tunnel like Tailscale) before exposing it to the internet, and keep `dev.enabled` off in production.
 
 ## Roadmap
@@ -551,6 +584,8 @@ Loot ships in quests.
 - **Quest 5 — Quests & Mysteries** — goals worth chasing: streaks, "sell in a country you have never sold in", "beat last month", each with its own reward.
 - **Quest 6 — Codex & Season Recap** — a permanent record of everything that has ever dropped, and a shareable end-of-season summary of the year in loot.
 - **Quest 7 — More Worlds** — Microsoft Store, Snapcraft and GitHub as sources, plus a generic webhook so anything that can POST JSON can drop loot.
+
+Along the way: **demo mode** (`loot serve --demo`) landed with Quest 4's polish — a seeded 120-day world plus a live emitter in a separate `demo.db`, so the project can be tried, screenshotted and recorded without an App Store account.
 
 Further out: RevenueCat as an authoritative ledger for real revenue totals, achievements with permanent trophies, and a shareable read-only "hoard" page.
 

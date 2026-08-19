@@ -23,6 +23,10 @@ COPY . .
 # The compiled SPA replaces the .gitkeep placeholder before the embed runs.
 COPY --from=web /src/web/dist ./web/dist
 
+# An empty, correctly owned data directory, so the image can write its database
+# even when nobody mounts a volume — which is exactly how demo mode is run.
+RUN mkdir -p /data
+
 ARG VERSION=docker
 # modernc.org/sqlite is pure Go, so a static binary needs no cgo toolchain.
 RUN CGO_ENABLED=0 go build -trimpath \
@@ -36,7 +40,10 @@ WORKDIR /
 COPY --from=go /out/loot /loot
 COPY --from=go /src/configs/loot.example.yaml /etc/loot/loot.example.yaml
 
-# Mount a volume here to keep loot.db across restarts.
+COPY --from=go --chown=nonroot:nonroot /data /data
+
+# Mount a volume here to keep loot.db across restarts. Demo mode needs no
+# volume at all: docker run -p 8080:8080 -e LOOT_DEMO=1 ghcr.io/nickhirras/loot
 VOLUME ["/data"]
 ENV LOOT_DATA_DIR=/data \
     LOOT_LISTEN=:8080

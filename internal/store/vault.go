@@ -169,7 +169,7 @@ func (s *Store) vaultTotals(ctx context.Context, from, to string) (VaultTotals, 
 		units   sql.NullInt64
 		refunds sql.NullInt64
 	)
-	err := s.db.QueryRowContext(ctx, `
+	err := s.q.QueryRowContext(ctx, `
         SELECT COALESCE(SUM(e.amount_base), 0),
                COALESCE(SUM(CASE WHEN `+isPaidUnit+` THEN e.quantity ELSE 0 END), 0),
                COALESCE(SUM(CASE WHEN `+isRefund+` THEN ABS(e.quantity) ELSE 0 END), 0)
@@ -182,14 +182,14 @@ func (s *Store) vaultTotals(ctx context.Context, from, to string) (VaultTotals, 
 	t.Units = int(units.Int64)
 	t.Refunds = int(refunds.Int64)
 
-	err = s.db.QueryRowContext(ctx, `
+	err = s.q.QueryRowContext(ctx, `
         SELECT COUNT(*), COUNT(DISTINCT CASE WHEN country <> '' THEN country END)
         FROM events WHERE day BETWEEN ? AND ?`, from, to).Scan(&t.Events, &t.Countries)
 	if err != nil {
 		return t, fmt.Errorf("vault event totals: %w", err)
 	}
 
-	err = s.db.QueryRowContext(ctx, `
+	err = s.q.QueryRowContext(ctx, `
         SELECT COUNT(*) FROM drops d JOIN events e ON e.id = d.event_id
         WHERE NOT `+unrevealed+` AND e.day BETWEEN ? AND ?`, from, to).Scan(&t.Drops)
 	if err != nil {
@@ -212,7 +212,7 @@ func (s *Store) vaultSeries(ctx context.Context, from, to string, days int) ([]V
 		series = append(series, VaultPoint{Day: day, BySource: map[string]float64{}})
 	}
 
-	rows, err := s.db.QueryContext(ctx, `
+	rows, err := s.q.QueryContext(ctx, `
         SELECT e.day, e.source,
                COALESCE(SUM(e.amount_base), 0),
                COALESCE(SUM(CASE WHEN `+isPaidUnit+` THEN e.quantity ELSE 0 END), 0)
@@ -252,7 +252,7 @@ func (s *Store) vaultBreakdowns(ctx context.Context, from, to string, totalReven
 		Key string
 		Slice
 	}, error) {
-		rows, err := s.db.QueryContext(ctx, `
+		rows, err := s.q.QueryContext(ctx, `
             SELECT `+column+`,
                    COALESCE(SUM(e.amount_base), 0),
                    COALESCE(SUM(CASE WHEN `+isPaidUnit+` THEN e.quantity ELSE 0 END), 0)
@@ -328,7 +328,7 @@ func (s *Store) vaultBreakdowns(ctx context.Context, from, to string, totalReven
 // Snapshots are absolute counts, not deltas, so the newest one per app wins
 // and the apps are added together.
 func (s *Store) vaultSubscriptions(ctx context.Context) (VaultSubscriptions, error) {
-	rows, err := s.db.QueryContext(ctx, `
+	rows, err := s.q.QueryContext(ctx, `
         SELECT e.quantity, e.day
         FROM events e
         JOIN (
@@ -373,7 +373,7 @@ func (s *Store) vaultSubscriptions(ctx context.Context) (VaultSubscriptions, err
 func (s *Store) vaultRealtime(ctx context.Context, today string) (VaultRealtime, error) {
 	var rt VaultRealtime
 	var amount sql.NullFloat64
-	err := s.db.QueryRowContext(ctx, `
+	err := s.q.QueryRowContext(ctx, `
         SELECT COUNT(*), COALESCE(SUM(amount_base), 0)
         FROM events
         WHERE source = 'revenuecat' AND kind IN ('purchase', 'renewal') AND day = ?`, today).

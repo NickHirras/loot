@@ -47,7 +47,7 @@ func runFX(args []string) error {
 	}
 
 	ctx := context.Background()
-	st, err := store.Open(ctx, cfg.DBPath())
+	st, err := store.Open(ctx, cfg.ActiveDBPath())
 	if err != nil {
 		return err
 	}

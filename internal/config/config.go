@@ -24,6 +24,14 @@ const DefaultDisplayCurrency = "USD"
 // it without being asked.
 const DefaultChestAutoOpenHours = 36
 
+// Demo mode defaults: a fixed seed so screenshots reproduce, real-time pace,
+// and four months of history.
+const (
+	DefaultDemoSeed = 20260818
+	DefaultDemoDays = 120
+	DefaultDemoPace = 1.0
+)
+
 // Config is the whole of Loot's configuration.
 type Config struct {
 	// Listen is the HTTP bind address, e.g. ":8080".
@@ -46,6 +54,7 @@ type Config struct {
 	Chest   Chest   `yaml:"chest"`
 	Sources Sources `yaml:"sources"`
 	Dev     Dev     `yaml:"dev"`
+	Demo    Demo    `yaml:"demo"`
 
 	// Since optionally overrides the first-run backfill floor for polling
 	// sources (YYYY-MM-DD). Set from `loot serve --since`, not from YAML.
@@ -142,6 +151,25 @@ type Flathub struct {
 	BackfillDays int `yaml:"backfill_days"`
 }
 
+// Demo configures demo mode: a self-contained Loot, full of plausible
+// synthetic data, that never reads a real store and never touches loot.db.
+type Demo struct {
+	// Enabled turns demo mode on. `loot serve --demo` and LOOT_DEMO=1 do the
+	// same thing.
+	Enabled bool `yaml:"enabled"`
+	// Seed fixes the random number generator, so the same seed always
+	// produces the same history and screenshots reproduce. Defaults to
+	// DefaultDemoSeed.
+	Seed int64 `yaml:"seed"`
+	// Pace multiplies how fast the live emitter runs: 1 is real time, 5 is
+	// five times faster, which is what you want when recording a video.
+	// Defaults to 1.
+	Pace float64 `yaml:"pace"`
+	// Days is how much history the first run seeds. Defaults to
+	// DefaultDemoDays.
+	Days int `yaml:"days"`
+}
+
 // Dev gates the synthetic-drop endpoint and the UI's dev panel.
 type Dev struct {
 	Enabled bool `yaml:"enabled"`
@@ -207,6 +235,15 @@ func Load(path string, explicit bool) (Config, error) {
 	if len(cfg.DisplayCurrency) != 3 {
 		return cfg, fmt.Errorf("display_currency %q is not a three letter ISO 4217 code", cfg.DisplayCurrency)
 	}
+	if cfg.Demo.Seed == 0 {
+		cfg.Demo.Seed = DefaultDemoSeed
+	}
+	if cfg.Demo.Days <= 0 {
+		cfg.Demo.Days = DefaultDemoDays
+	}
+	if cfg.Demo.Pace <= 0 {
+		cfg.Demo.Pace = DefaultDemoPace
+	}
 	cfg.HomeCountry = strings.ToUpper(strings.TrimSpace(cfg.HomeCountry))
 	if cfg.HomeCountry != "" && len(cfg.HomeCountry) != 2 {
 		return cfg, fmt.Errorf("home_country %q is not a two letter ISO 3166-1 alpha-2 code", cfg.HomeCountry)
@@ -241,6 +278,24 @@ func applyEnv(cfg *Config) {
 	}
 	if v := os.Getenv("LOOT_DEV_ENABLED"); v != "" {
 		cfg.Dev.Enabled = truthy(v)
+	}
+	if v := os.Getenv("LOOT_DEMO"); v != "" {
+		cfg.Demo.Enabled = truthy(v)
+	}
+	if v := os.Getenv("LOOT_DEMO_SEED"); v != "" {
+		if n, err := strconv.ParseInt(v, 10, 64); err == nil {
+			cfg.Demo.Seed = n
+		}
+	}
+	if v := os.Getenv("LOOT_DEMO_PACE"); v != "" {
+		if f, err := strconv.ParseFloat(v, 64); err == nil {
+			cfg.Demo.Pace = f
+		}
+	}
+	if v := os.Getenv("LOOT_DEMO_DAYS"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			cfg.Demo.Days = n
+		}
 	}
 	if v := os.Getenv("LOOT_REVENUECAT_SECRET"); v != "" {
 		cfg.Sources.RevenueCat.Secret = v
@@ -333,6 +388,22 @@ func truthy(v string) bool {
 
 // DBPath returns the SQLite file path.
 func (c Config) DBPath() string { return filepath.Join(c.DataDir, "loot.db") }
+
+// DemoDBPath returns the SQLite file demo mode writes to. It is deliberately
+// a different file from DBPath: demo mode must never be able to reach real
+// data, and deleting it must never cost anyone their history.
+func (c Config) DemoDBPath() string { return filepath.Join(c.DataDir, "demo.db") }
+
+// ActiveDBPath is the database this configuration actually opens — demo.db in
+// demo mode, loot.db otherwise. Everything that opens the store goes through
+// here, which is what makes "demo mode never touches your database" a property
+// of one function rather than a promise.
+func (c Config) ActiveDBPath() string {
+	if c.Demo.Enabled {
+		return c.DemoDBPath()
+	}
+	return c.DBPath()
+}
 
 // RevenueCatEnabled reports whether the webhook should be mounted. It defaults
 // to on, because an unmounted hook is a confusing 404 for a first-time user.

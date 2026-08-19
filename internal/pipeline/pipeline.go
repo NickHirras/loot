@@ -60,6 +60,14 @@ type Pipeline struct {
 	// many hours old. 0 waits for someone to click.
 	ChestAutoOpenAfterHours int
 
+	// Backdate mints each drop's id and created_at from the event's
+	// OccurredAt rather than from the wall clock. Off by default: a live drop
+	// happened now, whatever timestamp the source put on it. Backfills that
+	// want the feed to read as a timeline — demo mode's seeded history — turn
+	// it on, and because drop ids are ULIDs the feed then paginates in the
+	// order the events actually happened.
+	Backdate bool
+
 	// Now is the clock, swappable in tests.
 	Now func() time.Time
 }
@@ -188,6 +196,11 @@ func (p *Pipeline) mintDrop(ctx context.Context, ev core.Event) (*core.Drop, err
 		return nil, fmt.Errorf("classify %s/%s: %w", ev.Source, ev.Kind, err)
 	}
 
+	if p.Backdate && !ev.OccurredAt.IsZero() {
+		drop.CreatedAt = ev.OccurredAt.UTC()
+		drop.ID = core.NewIDAt(ev.OccurredAt)
+	}
+
 	if ev.Chest && p.ChestEnabled {
 		drop.ChestDate = ev.Day
 		if drop.ChestDate == "" {
@@ -227,11 +240,11 @@ func (p *Pipeline) settle(ctx context.Context, ev core.Event) error {
 		return nil
 	}
 
-	n, err := p.Store.CountryEventCount(ctx, country)
+	first, err := p.Store.CountryFirstEvent(ctx, country)
 	if err != nil {
-		return fmt.Errorf("country event count: %w", err)
+		return fmt.Errorf("country first event: %w", err)
 	}
-	if n != 1 {
+	if !first {
 		return nil
 	}
 

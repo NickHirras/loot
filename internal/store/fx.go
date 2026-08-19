@@ -40,7 +40,7 @@ func (s *Store) PutFXRates(ctx context.Context, base string, rates map[string]fl
 // published. A cold cache returns an empty map and no error.
 func (s *Store) GetFXRates(ctx context.Context, base string) (map[string]float64, string, error) {
 	base = strings.ToUpper(strings.TrimSpace(base))
-	rows, err := s.db.QueryContext(ctx,
+	rows, err := s.q.QueryContext(ctx,
 		`SELECT quote, rate, as_of FROM fx_rates WHERE base = ?`, base)
 	if err != nil {
 		return nil, "", fmt.Errorf("get fx rates: %w", err)
@@ -78,7 +78,7 @@ func (s *Store) BackfillAmountBase(ctx context.Context, displayCurrency string) 
 	if displayCurrency == "" {
 		return 0, nil
 	}
-	res, err := s.db.ExecContext(ctx, `
+	res, err := s.q.ExecContext(ctx, `
         UPDATE events SET amount_base = amount
         WHERE amount <> 0 AND amount_base = 0
           AND (UPPER(currency) = ? OR currency = '')`, displayCurrency)
@@ -97,7 +97,7 @@ func (s *Store) BackfillAmountBase(ctx context.Context, displayCurrency string) 
 // database picks up conversions after FX rates first become available.
 // Conversions that fail leave the row untouched and are counted in skipped.
 func (s *Store) RecomputeAmountBase(ctx context.Context, convert func(amount float64, currency string) (float64, bool)) (updated, skipped int, err error) {
-	rows, err := s.db.QueryContext(ctx,
+	rows, err := s.q.QueryContext(ctx,
 		`SELECT id, amount, currency FROM events WHERE amount <> 0`)
 	if err != nil {
 		return 0, 0, fmt.Errorf("recompute amount_base: %w", err)
@@ -128,7 +128,7 @@ func (s *Store) RecomputeAmountBase(ctx context.Context, convert func(amount flo
 			skipped++
 			continue
 		}
-		if _, err := s.db.ExecContext(ctx,
+		if _, err := s.q.ExecContext(ctx,
 			`UPDATE events SET amount_base = ? WHERE id = ?`, base, r.id); err != nil {
 			return updated, skipped, fmt.Errorf("update amount_base: %w", err)
 		}

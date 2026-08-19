@@ -19,6 +19,7 @@ Usage:
   loot check [flags]        Verify every configured source and exit
   loot chest [open [date]]  List the daily chests waiting, or open one
   loot fx    [recompute]    Show exchange rates, or re-convert stored amounts
+  loot demo  reset          Delete the demo database (data/demo.db); see "loot serve --demo"
   loot version              Print the version
 
 Run "loot <command> -h" for the flags of a command.
@@ -46,6 +47,8 @@ func main() {
 		err = runChest(args)
 	case "fx":
 		err = runFX(args)
+	case "demo":
+		err = runDemo(args)
 	case "version":
 		fmt.Println("loot " + version)
 	case "help", "-h", "--help":

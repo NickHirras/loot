@@ -110,3 +110,21 @@ dev:
   # Mounts POST /api/dev/fake and shows the dev panel in the dashboard, for
   # testing sounds and animations. Keep this off in production.
   enabled: false
+
+demo:
+  # Demo mode fills a *separate* database (<data_dir>/demo.db) with a plausible
+  # four months of history for three fictional apps, then keeps emitting events
+  # while it runs. It never opens loot.db and never contacts a real store, so it
+  # is safe to leave a demo running next to the real thing.
+  #
+  # Usually you want the flag rather than this file: `loot serve --demo`, or
+  # LOOT_DEMO=1 in a container. `loot demo reset` deletes demo.db.
+  enabled: false
+  # Fixing the seed fixes the world: the same seed always produces the same
+  # history, which is what makes screenshots reproducible.
+  seed: 20260818
+  # How fast the live emitter runs. 1 is real time; 5 is five times faster,
+  # which is the setting for recording a video.
+  pace: 1
+  # How much history the first run seeds, in days.
+  days: 120

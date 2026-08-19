@@ -106,6 +106,11 @@ class LootState {
     return this.stats?.dev ?? false
   }
 
+  /** True when the server is serving synthetic demo data. */
+  get demo(): boolean {
+    return this.stats?.demo ?? false
+  }
+
   /** How many drops are waiting in unopened chests. Drives the header badge. */
   get chestCount(): number {
     if (this.#chestsLoaded) return this.chests.reduce((sum, c) => sum + c.count, 0)

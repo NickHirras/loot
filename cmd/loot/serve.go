@@ -2,16 +2,20 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
+	"io/fs"
 	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/nickhirras/loot/internal/bus"
 	"github.com/nickhirras/loot/internal/config"
 	"github.com/nickhirras/loot/internal/core"
+	"github.com/nickhirras/loot/internal/demo"
 	"github.com/nickhirras/loot/internal/fx"
 	"github.com/nickhirras/loot/internal/pipeline"
 	"github.com/nickhirras/loot/internal/rules"
@@ -32,6 +36,9 @@ func runServe(args []string) error {
 		dataDir    = fs.String("data-dir", "", "override data directory")
 		since      = fs.String("since", "", "first-run backfill floor for polling sources (YYYY-MM-DD)")
 		dev        = fs.Bool("dev", false, "enable the dev endpoints and UI panel")
+		demoMode   = fs.Bool("demo", false, "run on synthetic data in data/demo.db; never touches loot.db")
+		demoReset  = fs.Bool("demo-reset", false, "delete data/demo.db before starting (implies --demo)")
+		demoPace   = fs.Float64("demo-pace", 0, "how fast demo mode emits events (1 = real time, 5 = five times faster)")
 		verbose    = fs.Bool("v", false, "verbose (debug) logging")
 	)
 	fs.Usage = func() {
@@ -65,17 +72,33 @@ func runServe(args []string) error {
 	if *dev {
 		cfg.Dev.Enabled = true
 	}
+	if *demoMode || *demoReset {
+		cfg.Demo.Enabled = true
+	}
+	if *demoPace > 0 {
+		cfg.Demo.Pace = *demoPace
+	}
 	cfg.Since = *since
+
+	if cfg.Demo.Enabled {
+		if *demoReset {
+			if err := removeDemoDB(cfg); err != nil {
+				return err
+			}
+			log.Info("demo database reset", "path", cfg.DemoDBPath())
+		}
+		log.Info("DEMO MODE — synthetic data in " + cfg.DemoDBPath() + "; your " + cfg.DBPath() + " is untouched")
+	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	st, err := store.Open(ctx, cfg.DBPath())
+	st, err := store.Open(ctx, cfg.ActiveDBPath())
 	if err != nil {
 		return err
 	}
 	defer st.Close()
-	log.Info("store ready", "path", cfg.DBPath())
+	log.Info("store ready", "path", cfg.ActiveDBPath())
 
 	// Events stored before there was a base amount, but already in the display
 	// currency, need no rates to catch up.
@@ -111,17 +134,46 @@ func runServe(args []string) error {
 	pipe.FX = converter
 	pipe.ChestEnabled = cfg.ChestEnabled()
 	pipe.ChestAutoOpenAfterHours = cfg.ChestAutoOpenAfterHours()
+	if cfg.Demo.Enabled {
+		// A demo that opens its own chest before anyone arrives has given away
+		// the best thing it had to show.
+		pipe.ChestEnabled = true
+		pipe.ChestAutoOpenAfterHours = 0
+	}
 	go pipe.RunChestAutoOpen(ctx)
 
 	var sources []core.Source
-	if cfg.RevenueCatEnabled() {
+	if cfg.Demo.Enabled {
+		// Demo mode mounts no real source at all: no credentials are read, no
+		// store is polled and /hooks/revenuecat receives nothing. These are
+		// labels for the dashboard header, and their Poll returns nothing.
+		sources = demo.Sources()
+
+		d := demo.New(st, pipe, cfg.RulesPath, demo.Options{
+			Seed: cfg.Demo.Seed,
+			Pace: cfg.Demo.Pace,
+			Days: cfg.Demo.Days,
+		}, log)
+		res, err := d.Seed(ctx)
+		if err != nil {
+			return err
+		}
+		if res.Generated > 0 {
+			log.Info("demo history seeded",
+				"days", res.Generated, "from", res.From, "to", res.To,
+				"events", res.Events, "drops", res.Drops, "countries", res.Countries,
+				"xp", res.XP, "took", res.Took.Round(time.Millisecond).String())
+		}
+		go d.Run(ctx)
+	}
+	if !cfg.Demo.Enabled && cfg.RevenueCatEnabled() {
 		rc := revenuecat.New(cfg.Sources.RevenueCat.Secret, log)
 		sources = append(sources, rc)
 		if cfg.Sources.RevenueCat.Secret == "" {
 			log.Warn("revenuecat webhook has no secret; anyone who can reach /hooks/revenuecat can post drops")
 		}
 	}
-	if len(cfg.Sources.Flathub.Apps) > 0 {
+	if !cfg.Demo.Enabled && len(cfg.Sources.Flathub.Apps) > 0 {
 		sources = append(sources, flathub.New(
 			cfg.Sources.Flathub.Apps,
 			cfg.Sources.Flathub.BackfillDays,
@@ -131,7 +183,7 @@ func runServe(args []string) error {
 		log.Info("flathub source configured",
 			"apps", cfg.Sources.Flathub.Apps, "backfill_days", cfg.Sources.Flathub.BackfillDays)
 	}
-	if cfg.Sources.AppStore.Configured() {
+	if !cfg.Demo.Enabled && cfg.Sources.AppStore.Configured() {
 		src, err := appstore.New(cfg.Sources.AppStore, log)
 		if err != nil {
 			// A source that cannot start is worth a loud warning, not a dead
@@ -145,7 +197,7 @@ func runServe(args []string) error {
 				"backfill_days", cfg.Sources.AppStore.BackfillDays)
 		}
 	}
-	if cfg.Sources.GooglePlay.Configured() {
+	if !cfg.Demo.Enabled && cfg.Sources.GooglePlay.Configured() {
 		src, err := googleplay.New(cfg.Sources.GooglePlay, log)
 		if err != nil {
 			log.Warn("google play source unavailable", "error", err)
@@ -166,6 +218,18 @@ func runServe(args []string) error {
 
 	srv := server.New(cfg, st, b, pipe, sources, web.DistFS(), log)
 	return srv.ListenAndServe(ctx)
+}
+
+// removeDemoDB deletes the demo database and its write-ahead log. It asks no
+// questions: demo data is generated, and the real database is a different file
+// that this function cannot name.
+func removeDemoDB(cfg config.Config) error {
+	for _, suffix := range []string{"", "-wal", "-shm"} {
+		if err := os.Remove(cfg.DemoDBPath() + suffix); err != nil && !errors.Is(err, fs.ErrNotExist) {
+			return fmt.Errorf("remove %s: %w", cfg.DemoDBPath()+suffix, err)
+		}
+	}
+	return nil
 }
 
 // flagSet reports whether the named flag was actually provided on the command

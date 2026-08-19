@@ -115,7 +115,10 @@ func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {
 		"chest_dates":      st.ChestDates,
 		"display_currency": s.displayCurrency(),
 		"dev":              s.Cfg.Dev.Enabled,
-		"listeners":        s.Bus.Subscribers(),
+		// demo tells the dashboard to wear its "synthetic data" pill, so
+		// nobody mistakes a demo for their own numbers.
+		"demo":      s.Cfg.Demo.Enabled,
+		"listeners": s.Bus.Subscribers(),
 	})
 }
 

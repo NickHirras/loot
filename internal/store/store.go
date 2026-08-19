@@ -19,9 +19,21 @@ import (
 	"github.com/nickhirras/loot/internal/core"
 )
 
+// querier is the subset of *sql.DB that every repository method needs, so the
+// same method bodies can run either directly on the pool or inside one
+// transaction (see WithTx).
+type querier interface {
+	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
+	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
+	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
+}
+
 // Store is the repository. It is safe for concurrent use.
 type Store struct {
 	db *sql.DB
+	// q is where reads and writes go: the pool for a normal store, a
+	// *sql.Tx for the store handed to WithTx.
+	q querier
 }
 
 // Open opens (creating if needed) the SQLite database at path and applies all
@@ -49,7 +61,7 @@ func Open(ctx context.Context, path string) (*Store, error) {
 		return nil, fmt.Errorf("ping sqlite: %w", err)
 	}
 
-	s := &Store{db: db}
+	s := &Store{db: db, q: db}
 	if err := s.migrate(ctx); err != nil {
 		db.Close()
 		return nil, err
@@ -121,7 +133,7 @@ func (s *Store) InsertEvent(ctx context.Context, ev core.Event) (exists bool, er
 		day = core.DayOf(ev.OccurredAt)
 	}
 
-	res, err := s.db.ExecContext(ctx, `
+	res, err := s.q.ExecContext(ctx, `
         INSERT INTO events (id, source, kind, app, occurred_at, observed_at, day, country,
                             amount, currency, amount_base, quantity, dedupe_key,
                             is_ledger, silent, chest, payload)
@@ -149,7 +161,7 @@ func (s *Store) InsertDrop(ctx context.Context, d core.Drop) error {
 	if d.RevealedAt != nil {
 		revealed = d.RevealedAt.UTC().UnixMilli()
 	}
-	_, err := s.db.ExecContext(ctx, `
+	_, err := s.q.ExecContext(ctx, `
         INSERT INTO drops (id, event_id, rarity, title, subtitle, xp, created_at, chest_date, revealed_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		d.ID, d.EventID, string(d.Rarity), d.Title, d.Subtitle, d.XP,
@@ -158,6 +170,57 @@ func (s *Store) InsertDrop(ctx context.Context, d core.Drop) error {
 		return fmt.Errorf("insert drop: %w", err)
 	}
 	return nil
+}
+
+// WithTx runs fn against a Store whose reads and writes all go through one
+// transaction, committing when fn returns nil and rolling back otherwise. It
+// exists for bulk work — seeding demo mode writes tens of thousands of rows,
+// and one commit instead of one per row is the difference between a second and
+// half a minute.
+//
+// Two rules follow from Loot opening SQLite with a single connection:
+//
+//   - the *Store passed to fn is only valid until fn returns;
+//   - nothing else may touch the outer Store while fn runs, including
+//     indirectly (a rules engine holding it as its Lookup, say) — the call
+//     would block waiting for the connection the transaction is holding.
+//     Build collaborators against the store fn is given instead.
+func (s *Store) WithTx(ctx context.Context, fn func(tx *Store) error) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin transaction: %w", err)
+	}
+	if err := fn(&Store{db: s.db, q: tx}); err != nil {
+		tx.Rollback()
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit transaction: %w", err)
+	}
+	return nil
+}
+
+// CountryFirstEvent reports whether exactly one stored event carries the given
+// country — which, called after the event is inserted, means "this one was the
+// first ever from there". It stops counting at two, so founding a settlement
+// stays cheap no matter how many customers a country has since sent.
+func (s *Store) CountryFirstEvent(ctx context.Context, country string) (bool, error) {
+	country = strings.ToUpper(strings.TrimSpace(country))
+	if country == "" {
+		return false, nil
+	}
+	var n int
+	// The `country <> ''` clause is not redundant: events_country_idx is a
+	// partial index over exactly those rows, and SQLite will only use it when
+	// the query proves the row qualifies — which it cannot do from a bound
+	// parameter alone. Without the clause this is a table scan per event.
+	err := s.q.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM (
+             SELECT 1 FROM events WHERE country = ? AND country <> '' LIMIT 2)`, country).Scan(&n)
+	if err != nil {
+		return false, fmt.Errorf("country first event: %w", err)
+	}
+	return n == 1, nil
 }
 
 // CountryEventCount returns how many stored events carry the given country.
@@ -169,7 +232,9 @@ func (s *Store) CountryEventCount(ctx context.Context, country string) (int, err
 		return 0, nil
 	}
 	var n int
-	err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM events WHERE country = ?`, country).Scan(&n)
+	// See CountryFirstEvent on why the second clause has to be spelled out.
+	err := s.q.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM events WHERE country = ? AND country <> ''`, country).Scan(&n)
 	if err != nil {
 		return 0, fmt.Errorf("country event count: %w", err)
 	}
@@ -183,20 +248,32 @@ func (s *Store) IsRecordQuantity(ctx context.Context, ev core.Event) (bool, erro
 	if ev.Quantity <= 0 {
 		return false, nil
 	}
-	var best sql.NullInt64
-	err := s.db.QueryRowContext(ctx, `
-        SELECT MAX(quantity) FROM events
-        WHERE source = ? AND app = ? AND kind = ? AND id <> ?`,
-		ev.Source, ev.App, ev.Kind, ev.ID).Scan(&best)
+	// Asked as "is there anything at least this big?" rather than "what is the
+	// biggest?", the events_record_idx range scan stops at the first row it
+	// finds instead of walking every event the source has ever produced —
+	// which matters when the answer is wanted for every drop of a long
+	// backfill. The two questions are equivalent: a strict record is exactly
+	// an event no other event ties or beats.
+	var (
+		any    int
+		beaten int
+	)
+	err := s.q.QueryRowContext(ctx, `
+        SELECT EXISTS (SELECT 1 FROM events
+                       WHERE source = ? AND app = ? AND kind = ? AND id <> ?),
+               EXISTS (SELECT 1 FROM events
+                       WHERE source = ? AND app = ? AND kind = ? AND quantity >= ? AND id <> ?)`,
+		ev.Source, ev.App, ev.Kind, ev.ID,
+		ev.Source, ev.App, ev.Kind, ev.Quantity, ev.ID).Scan(&any, &beaten)
 	if err != nil {
 		return false, fmt.Errorf("record quantity: %w", err)
 	}
-	if !best.Valid {
+	if any == 0 {
 		// No prior history at all: the first day is not a "record", it is just
 		// the first day. Avoids an epic drop on every source's very first poll.
 		return false, nil
 	}
-	return int64(ev.Quantity) > best.Int64, nil
+	return beaten == 0, nil
 }
 
 // EventCount returns the number of stored events for a source ("" = all).
@@ -206,9 +283,9 @@ func (s *Store) EventCount(ctx context.Context, source string) (int, error) {
 		err error
 	)
 	if source == "" {
-		err = s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM events`).Scan(&n)
+		err = s.q.QueryRowContext(ctx, `SELECT COUNT(*) FROM events`).Scan(&n)
 	} else {
-		err = s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM events WHERE source = ?`, source).Scan(&n)
+		err = s.q.QueryRowContext(ctx, `SELECT COUNT(*) FROM events WHERE source = ?`, source).Scan(&n)
 	}
 	if err != nil {
 		return 0, fmt.Errorf("event count: %w", err)
@@ -299,7 +376,7 @@ func (s *Store) ListDrops(ctx context.Context, q DropQuery) ([]DropView, error) 
 	query += ` ORDER BY d.id DESC LIMIT ?`
 	args = append(args, limit)
 
-	rows, err := s.db.QueryContext(ctx, query, args...)
+	rows, err := s.q.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("list drops: %w", err)
 	}
@@ -356,7 +433,7 @@ type Chest struct {
 // ChestSummaries returns one row per unopened chest, oldest day first. This is
 // the cheap query behind the UI badge and the `chest` bus message.
 func (s *Store) ChestSummaries(ctx context.Context) ([]core.ChestSummary, error) {
-	rows, err := s.db.QueryContext(ctx, `
+	rows, err := s.q.QueryContext(ctx, `
         SELECT chest_date, rarity, COUNT(*), COALESCE(SUM(xp), 0)
         FROM drops d
         WHERE `+unrevealed+`
@@ -398,7 +475,7 @@ func (s *Store) ChestSummaries(ctx context.Context) ([]core.ChestSummary, error)
 // ListChest returns every unopened chest with its drops, oldest day first.
 // Drops within a chest come back in reveal order (see core.RevealRank).
 func (s *Store) ListChest(ctx context.Context) ([]Chest, error) {
-	rows, err := s.db.QueryContext(ctx, dropSelect+`
+	rows, err := s.q.QueryContext(ctx, dropSelect+`
         WHERE `+unrevealed+`
         ORDER BY d.chest_date ASC, `+revealOrder+`, d.created_at ASC, d.id ASC`)
 	if err != nil {
@@ -445,7 +522,7 @@ const revealOrder = `CASE d.rarity
 // OldestChestDate returns the day of the oldest unopened chest, or "".
 func (s *Store) OldestChestDate(ctx context.Context) (string, error) {
 	var date sql.NullString
-	err := s.db.QueryRowContext(ctx,
+	err := s.q.QueryRowContext(ctx,
 		`SELECT MIN(chest_date) FROM drops d WHERE `+unrevealed).Scan(&date)
 	if err != nil {
 		return "", fmt.Errorf("oldest chest date: %w", err)
@@ -471,7 +548,7 @@ func (s *Store) RevealChest(ctx context.Context, chestDate string, now time.Time
 
 	// Select before update: once revealed_at is stamped the rows no longer
 	// match "unrevealed", and we still need to hand them back in order.
-	rows, err := s.db.QueryContext(ctx, dropSelect+`
+	rows, err := s.q.QueryContext(ctx, dropSelect+`
         WHERE `+unrevealed+` AND d.chest_date = ?
         ORDER BY `+revealOrder+`, d.created_at ASC, d.id ASC`, chestDate)
 	if err != nil {
@@ -487,7 +564,7 @@ func (s *Store) RevealChest(ctx context.Context, chestDate string, now time.Time
 	}
 
 	stamp := now.UTC()
-	if _, err := s.db.ExecContext(ctx, `
+	if _, err := s.q.ExecContext(ctx, `
         UPDATE drops SET revealed_at = ?
         WHERE chest_date = ? AND revealed_at IS NULL`, stamp.UnixMilli(), chestDate); err != nil {
 		return nil, fmt.Errorf("mark chest revealed: %w", err)
@@ -528,20 +605,20 @@ func (s *Store) Stats(ctx context.Context) (Stats, error) {
 		st.ByRarity[string(r)] = 0
 	}
 
-	if err := s.db.QueryRowContext(ctx,
+	if err := s.q.QueryRowContext(ctx,
 		`SELECT COUNT(*), COALESCE(SUM(xp), 0) FROM drops d WHERE NOT `+unrevealed).
 		Scan(&st.TotalDrops, &st.TotalXP); err != nil {
 		return st, fmt.Errorf("stats totals: %w", err)
 	}
-	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM events`).Scan(&st.TotalEvents); err != nil {
+	if err := s.q.QueryRowContext(ctx, `SELECT COUNT(*) FROM events`).Scan(&st.TotalEvents); err != nil {
 		return st, fmt.Errorf("stats events: %w", err)
 	}
-	if err := s.db.QueryRowContext(ctx,
+	if err := s.q.QueryRowContext(ctx,
 		`SELECT COUNT(*) FROM drops d WHERE `+unrevealed).Scan(&st.UnrevealedCount); err != nil {
 		return st, fmt.Errorf("stats unrevealed: %w", err)
 	}
 
-	rarityRows, err := s.db.QueryContext(ctx,
+	rarityRows, err := s.q.QueryContext(ctx,
 		`SELECT rarity, COUNT(*) FROM drops d WHERE NOT `+unrevealed+` GROUP BY rarity`)
 	if err != nil {
 		return st, fmt.Errorf("stats rarity: %w", err)
@@ -559,7 +636,7 @@ func (s *Store) Stats(ctx context.Context) (Stats, error) {
 		return st, fmt.Errorf("iterate rarity: %w", err)
 	}
 
-	sourceRows, err := s.db.QueryContext(ctx, `
+	sourceRows, err := s.q.QueryContext(ctx, `
         SELECT e.source, COUNT(*) FROM drops d JOIN events e ON e.id = d.event_id
         WHERE NOT `+unrevealed+` GROUP BY e.source`)
 	if err != nil {
@@ -578,7 +655,7 @@ func (s *Store) Stats(ctx context.Context) (Stats, error) {
 		return st, fmt.Errorf("iterate source: %w", err)
 	}
 
-	countryRows, err := s.db.QueryContext(ctx,
+	countryRows, err := s.q.QueryContext(ctx,
 		`SELECT DISTINCT country FROM events WHERE country <> '' ORDER BY country`)
 	if err != nil {
 		return st, fmt.Errorf("stats countries: %w", err)
@@ -619,7 +696,7 @@ type SourceState struct {
 // never run returns a nil blob and no error.
 func (s *Store) GetSourceState(ctx context.Context, source string) ([]byte, error) {
 	var blob []byte
-	err := s.db.QueryRowContext(ctx, `SELECT state FROM source_state WHERE source = ?`, source).Scan(&blob)
+	err := s.q.QueryRowContext(ctx, `SELECT state FROM source_state WHERE source = ?`, source).Scan(&blob)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
@@ -631,7 +708,7 @@ func (s *Store) GetSourceState(ctx context.Context, source string) ([]byte, erro
 
 // SetSourceState stores the cursor blob for a source.
 func (s *Store) SetSourceState(ctx context.Context, source string, state []byte) error {
-	_, err := s.db.ExecContext(ctx, `
+	_, err := s.q.ExecContext(ctx, `
         INSERT INTO source_state (source, state) VALUES (?, ?)
         ON CONFLICT(source) DO UPDATE SET state = excluded.state`, source, state)
 	if err != nil {
@@ -647,7 +724,7 @@ func (s *Store) RecordPoll(ctx context.Context, source string, at time.Time, pol
 	if pollErr != nil {
 		msg = pollErr.Error()
 	}
-	_, err := s.db.ExecContext(ctx, `
+	_, err := s.q.ExecContext(ctx, `
         INSERT INTO source_state (source, last_poll_at, last_error) VALUES (?, ?, ?)
         ON CONFLICT(source) DO UPDATE SET last_poll_at = excluded.last_poll_at, last_error = excluded.last_error`,
 		source, at.UTC().UnixMilli(), msg)
@@ -659,7 +736,7 @@ func (s *Store) RecordPoll(ctx context.Context, source string, at time.Time, pol
 
 // SourceStates returns health rows for every source that has state.
 func (s *Store) SourceStates(ctx context.Context) (map[string]SourceState, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT source, last_poll_at, last_error FROM source_state`)
+	rows, err := s.q.QueryContext(ctx, `SELECT source, last_poll_at, last_error FROM source_state`)
 	if err != nil {
 		return nil, fmt.Errorf("source states: %w", err)
 	}

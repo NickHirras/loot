@@ -31,6 +31,9 @@
       <span class="conn" class:live={loot.connected} title={loot.connected ? 'Live' : 'Reconnecting…'}>
         <span class="dot"></span>{loot.connected ? 'live' : 'offline'}
       </span>
+      {#if loot.demo}
+        <span class="demo" title="Synthetic data — see the README to connect real stores">demo</span>
+      {/if}
     </div>
 
     <nav class="tabs" aria-label="Sections">
@@ -176,6 +179,19 @@
     50% {
       opacity: 0.45;
     }
+  }
+
+  .demo {
+    font-size: 0.62rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.09em;
+    padding: 0.1rem 0.4rem;
+    border-radius: 999px;
+    color: var(--epic);
+    border: 1px solid color-mix(in oklab, var(--epic) 45%, transparent);
+    background: color-mix(in oklab, var(--epic) 12%, transparent);
+    cursor: help;
   }
 
   .tabs {

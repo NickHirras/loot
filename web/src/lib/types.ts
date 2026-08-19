@@ -68,6 +68,8 @@ export interface Stats {
   chest_dates: string[]
   display_currency: string
   dev: boolean
+  /** True when this Loot is running on synthetic demo data. */
+  demo: boolean
   listeners: number
 }
 

@@ -6,6 +6,12 @@
       "runtimeExecutable": "/opt/homebrew/bin/go",
       "runtimeArgs": ["run", "./cmd/loot", "serve", "--dev"],
       "port": 8080
+    },
+    {
+      "name": "loot-demo",
+      "runtimeExecutable": "/opt/homebrew/bin/go",
+      "runtimeArgs": ["run", "./cmd/loot", "serve", "--demo", "--listen", ":8081"],
+      "port": 8081
     }
   ]
 }

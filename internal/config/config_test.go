@@ -326,3 +326,71 @@ func TestHomeCountryNormalizedAndValidated(t *testing.T) {
 		t.Fatal("want an error for a non ISO 3166-1 alpha-2 home_country")
 	}
 }
+
+func TestDemoDefaultsOff(t *testing.T) {
+	cfg, err := config.Load("does-not-exist.yaml", false)
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if cfg.Demo.Enabled {
+		t.Error("demo mode must default to off")
+	}
+	if cfg.Demo.Seed != config.DefaultDemoSeed {
+		t.Errorf("demo seed = %d, want the default %d", cfg.Demo.Seed, config.DefaultDemoSeed)
+	}
+	if cfg.Demo.Pace != config.DefaultDemoPace || cfg.Demo.Days != config.DefaultDemoDays {
+		t.Errorf("demo pace/days = %v/%d", cfg.Demo.Pace, cfg.Demo.Days)
+	}
+	if cfg.ActiveDBPath() != cfg.DBPath() {
+		t.Errorf("without demo mode the active database is %q, want %q", cfg.ActiveDBPath(), cfg.DBPath())
+	}
+}
+
+// The single most important property of demo mode: it cannot open the real
+// database, because the path it is given is a different file.
+func TestDemoUsesItsOwnDatabase(t *testing.T) {
+	path := writeConfig(t, `
+data_dir: /var/lib/loot
+demo:
+  enabled: true
+  seed: 99
+  pace: 5
+`)
+	cfg, err := config.Load(path, true)
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if !cfg.Demo.Enabled {
+		t.Fatal("demo.enabled was not read")
+	}
+	if cfg.Demo.Seed != 99 || cfg.Demo.Pace != 5 {
+		t.Errorf("demo seed/pace = %d/%v", cfg.Demo.Seed, cfg.Demo.Pace)
+	}
+	if want := filepath.Join("/var/lib/loot", "demo.db"); cfg.ActiveDBPath() != want {
+		t.Errorf("active db = %q, want %q", cfg.ActiveDBPath(), want)
+	}
+	if cfg.ActiveDBPath() == cfg.DBPath() {
+		t.Error("demo mode is pointed at the real database")
+	}
+}
+
+func TestDemoEnvOverrides(t *testing.T) {
+	t.Setenv("LOOT_DEMO", "1")
+	t.Setenv("LOOT_DEMO_SEED", "1234")
+	t.Setenv("LOOT_DEMO_PACE", "2.5")
+	t.Setenv("LOOT_DEMO_DAYS", "45")
+
+	cfg, err := config.Load("does-not-exist.yaml", false)
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if !cfg.Demo.Enabled {
+		t.Error("LOOT_DEMO=1 did not enable demo mode")
+	}
+	if cfg.Demo.Seed != 1234 || cfg.Demo.Pace != 2.5 || cfg.Demo.Days != 45 {
+		t.Errorf("demo = %+v", cfg.Demo)
+	}
+	if cfg.ActiveDBPath() != cfg.DemoDBPath() {
+		t.Errorf("active db = %q, want the demo database", cfg.ActiveDBPath())
+	}
+}

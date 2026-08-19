@@ -165,7 +165,7 @@ func (s *Store) Hearth(ctx context.Context, homeCountry, displayCurrency string)
 
 	out.Capital = pickCapital(homeCountry, countries, events)
 
-	if err := s.db.QueryRowContext(ctx,
+	if err := s.q.QueryRowContext(ctx,
 		`SELECT COALESCE(SUM(xp), 0) FROM drops d WHERE NOT `+unrevealed).Scan(&out.TotalXP); err != nil {
 		return out, fmt.Errorf("hearth xp: %w", err)
 	}
@@ -202,7 +202,7 @@ func pickCapital(homeCountry string, countries []HearthCountry, events map[strin
 func (s *Store) hearthCountries(ctx context.Context) ([]HearthCountry, map[string]int, HearthUnknown, error) {
 	var unknown HearthUnknown
 
-	rows, err := s.db.QueryContext(ctx, `
+	rows, err := s.q.QueryContext(ctx, `
         SELECT e.country,
                COALESCE(SUM(`+hearthPopulation+`), 0),
                COALESCE(SUM(CASE WHEN `+ledgerRows+` THEN e.amount_base ELSE 0 END), 0),
@@ -252,7 +252,7 @@ func (s *Store) hearthCountries(ctx context.Context) ([]HearthCountry, map[strin
 // still waiting in an unopened chest are excluded, exactly as they are from
 // the feed and from XP.
 func (s *Store) hearthDropCounts(ctx context.Context) (map[string]int, error) {
-	rows, err := s.db.QueryContext(ctx, `
+	rows, err := s.q.QueryContext(ctx, `
         SELECT e.country, COUNT(*)
         FROM drops d JOIN events e ON e.id = d.event_id
         WHERE NOT `+unrevealed+` AND e.country <> ''
@@ -282,7 +282,7 @@ func (s *Store) hearthDropCounts(ctx context.Context) (map[string]int, error) {
 // hearthRecent returns the newest visible drops that carry a country — the
 // arrivals ticker, and what the globe replays as arcs on a cold load.
 func (s *Store) hearthRecent(ctx context.Context) ([]HearthDrop, error) {
-	rows, err := s.db.QueryContext(ctx, `
+	rows, err := s.q.QueryContext(ctx, `
         SELECT d.id, d.rarity, d.title, d.subtitle, d.created_at, e.country, e.kind
         FROM drops d JOIN events e ON e.id = d.event_id
         WHERE NOT `+unrevealed+` AND e.country <> ''
