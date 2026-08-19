@@ -111,12 +111,28 @@ func parseLoginDirect(text string) (credentials, error) {
 		if err := json.Unmarshal([]byte(text), &obj); err != nil {
 			return credentials{}, fmt.Errorf("%w: %v", errUnrecognised, err)
 		}
+		// snapcraft 7+ `export-login` (seen in the wild with 9.0.1): base64 of
+		// {"t":"u1-macaroon","v":{"r":<root>,"d":<unbound discharge>}}; the
+		// base64 wrapper is peeled by the caller. candid exports use
+		// {"t":"macaroon","v":<token>}.
+		format := "JSON export"
+		if t, _ := obj["t"].(string); t != "" {
+			format = "snapcraft export (" + t + ")"
+			switch v := obj["v"].(type) {
+			case map[string]any:
+				obj = v
+			case string:
+				if t == "macaroon" {
+					return credentials{Header: "Macaroon " + v, Format: format}, nil
+				}
+			}
+		}
 		root := firstString(obj, "macaroon", "root", "r")
 		discharge := firstString(obj, "unbound_discharge", "discharge", "d")
 		if root == "" || discharge == "" {
 			return credentials{}, errUnrecognised
 		}
-		return buildUbuntuOne(root, discharge, "JSON export",
+		return buildUbuntuOne(root, discharge, format,
 			firstString(obj, "email"), firstString(obj, "expires"))
 
 	case strings.HasPrefix(text, "["):

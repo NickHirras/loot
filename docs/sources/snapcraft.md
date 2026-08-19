@@ -9,6 +9,8 @@ There is no webhook and no public API here: everything comes from
 `https://dashboard.snapcraft.io/dev/api/snaps/metrics`, authenticated with a
 macaroon you export once from your own account.
 
+> Verified against snapcraft 9.0.1: `export-login` writes base64 of `{"t":"u1-macaroon","v":{"r":…,"d":…}}`; Loot reads that, the older INI/JSON forms, and candid `{"t":"macaroon","v":…}` exports.
+
 ## 1. Export a login
 
 Snapcraft can hand out a *scoped, expiring* credential that does nothing except

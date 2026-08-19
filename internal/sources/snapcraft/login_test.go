@@ -252,3 +252,32 @@ func TestLoadLoginReadsFile(t *testing.T) {
 		t.Errorf("header = %q", c.Header)
 	}
 }
+
+// Seen in the wild with snapcraft 9.0.1: `export-login` writes base64 of
+// {"t":"u1-macaroon","v":{"r":<root>,"d":<unbound discharge>}}. Before this
+// was recognised the file fell through to the "bare candid token" branch and
+// the store answered 401 macaroon-authorization-required.
+func TestParseLoginSnapcraft9TypedExport(t *testing.T) {
+	body := fmt.Sprintf(`{"t":"u1-macaroon","v":{"r":%q,"d":%q}}`, rootMac, dischargeMac)
+	wrapped := base64.StdEncoding.EncodeToString([]byte(body))
+	c, err := parseLogin([]byte(wrapped))
+	if err != nil {
+		t.Fatalf("parseLogin: %v", err)
+	}
+	if c.Header != wantHeader(t) {
+		t.Errorf("header = %q", c.Header)
+	}
+	if !strings.Contains(c.Format, "u1-macaroon") {
+		t.Errorf("format = %q", c.Format)
+	}
+
+	// And the candid flavour of the same envelope.
+	candid := base64.StdEncoding.EncodeToString([]byte(`{"t":"macaroon","v":"MDAxY2xvY2F0aW9u"}`))
+	c, err = parseLogin([]byte(candid))
+	if err != nil {
+		t.Fatalf("candid parseLogin: %v", err)
+	}
+	if c.Header != "Macaroon MDAxY2xvY2F0aW9u" {
+		t.Errorf("candid header = %q", c.Header)
+	}
+}
