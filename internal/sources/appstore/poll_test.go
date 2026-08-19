@@ -36,6 +36,9 @@ type fakeASC struct {
 	sales map[string][]byte
 	// subs maps a report date to a subscription TSV body.
 	subs map[string][]byte
+	// empty lists dates Apple answers with its definitive "There were no
+	// sales for the date specified" 404 (as opposed to "not available yet").
+	empty map[string]bool
 	// status, when non-zero, overrides every response.
 	status int
 	// requests records every (reportType, date) asked for, in order.
@@ -82,8 +85,13 @@ func (f *fakeASC) handler() http.Handler {
 			body, ok = f.subs[date]
 		}
 		if !ok {
+			if f.empty[date] {
+				writeAPIError(w, http.StatusNotFound, "NOT_FOUND",
+					"There were no sales for the date specified.")
+				return
+			}
 			writeAPIError(w, http.StatusNotFound, "NOT_FOUND",
-				"There were no sales for the date specified")
+				"Report is not available yet. Daily reports for the Americas are available by 5 am Pacific Time; Japan, Australia, and New Zealand by 5 am Japan Standard Time; and 5 am Central European Time for all other territories.")
 			return
 		}
 
@@ -621,5 +629,40 @@ func TestSourceContract(t *testing.T) {
 func TestNewRejectsIncompleteConfig(t *testing.T) {
 	if _, err := appstore.New(config.AppStore{KeyID: "2X9R4HXF34"}, quietLogger()); err == nil {
 		t.Fatal("expected an error for a half-filled config")
+	}
+}
+
+// Seen on first real contact: Apple answers an empty day with a 404 whose
+// detail is "There were no sales for the date specified." Loot treated that
+// like "not generated yet" and stopped walking, so a quiet Friday blocked the
+// whole weekend's reports (and the Kenyan download waiting in them).
+func TestPollWalksPastADefinitiveNoSalesDay(t *testing.T) {
+	fixture := readFixture(t, salesFixture)
+	fake := &fakeASC{
+		sales: map[string][]byte{"2026-08-15": fixture, "2026-08-17": fixture},
+		empty: map[string]bool{"2026-08-16": true},
+	}
+	src := newTestSource(t, fake, 3)
+
+	events, state, err := src.Poll(context.Background(), nil)
+	if err != nil {
+		t.Fatalf("poll: %v", err)
+	}
+	days := map[string]bool{}
+	for _, ev := range events {
+		days[ev.Day] = true
+	}
+	if !days["2026-08-15"] || !days["2026-08-17"] {
+		t.Fatalf("got days %v, want the 15th and the 17th — the empty 16th must not block the walk", days)
+	}
+	st := decodeTestState(t, state)
+	if st["last_complete_day"] != "2026-08-17" {
+		t.Fatalf("cursor = %v, want 2026-08-17", st["last_complete_day"])
+	}
+	if pending, _ := st["pending_days"].([]any); len(pending) != 0 {
+		t.Fatalf("pending = %v, want none", pending)
+	}
+	if skipped, _ := st["skipped_days"].(map[string]any); len(skipped) != 0 {
+		t.Fatalf("a definitive empty day must not be retried, got skipped=%v", skipped)
 	}
 }

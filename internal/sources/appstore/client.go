@@ -51,6 +51,11 @@ func (r reportSpec) String() string {
 // advancing its cursor and tries again on the next poll.
 var errNotReady = errors.New("report not available yet")
 
+// errNoSales is Apple's definitive "nothing happened that day": the 404 whose
+// detail reads "There were no sales for the date specified." Unlike
+// errNotReady it is final — the walk can step over the day at once.
+var errNoSales = errors.New("no sales for that day")
+
 // errCredentials means the key, the issuer or the vendor number is wrong, or
 // the key lacks the reports role. Retrying will not help; `loot check` and the
 // sources API surface it so the user can fix the config.
@@ -151,8 +156,15 @@ func (s *Source) fetchReport(ctx context.Context, spec reportSpec, date string) 
 		return gunzip(body)
 	case resp.StatusCode == http.StatusNotFound || resp.StatusCode == http.StatusGone:
 		// Both "the report is not generated yet" and "nothing happened that
-		// day" arrive as a 404. Keep Apple's detail for the debug log.
-		return nil, fmt.Errorf("%w (%s %s: %s)", errNotReady, spec, date, parseAPIError(resp.StatusCode, body).Error())
+		// day" arrive as a 404, but Apple's detail text tells them apart.
+		// Seen in the wild: "There were no sales for the date specified."
+		// for an empty day versus "Report is not available yet…" for a day
+		// still being generated.
+		detail := parseAPIError(resp.StatusCode, body).Error()
+		if strings.Contains(strings.ToLower(detail), "no sales for the date") {
+			return nil, fmt.Errorf("%w (%s %s: %s)", errNoSales, spec, date, detail)
+		}
+		return nil, fmt.Errorf("%w (%s %s: %s)", errNotReady, spec, date, detail)
 	case resp.StatusCode == http.StatusUnauthorized:
 		return nil, fmt.Errorf("%w: %s — check key_id, issuer_id and that private_key_path is the matching .p8",
 			errCredentials, parseAPIError(resp.StatusCode, body).Error())

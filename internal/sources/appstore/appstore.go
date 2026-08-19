@@ -216,7 +216,7 @@ func (s *Source) Check(ctx context.Context) error {
 	for _, day := range []string{addDays(today, -1), addDays(today, -2)} {
 		_, err := s.fetchReport(ctx, salesSummaryDaily, day)
 		switch {
-		case err == nil:
+		case err == nil, errors.Is(err, errNoSales):
 			return nil
 		case errors.Is(err, errNotReady):
 			lastErr = nil
@@ -261,6 +261,13 @@ func (s *Source) Poll(ctx context.Context, raw []byte) ([]core.Event, []byte, er
 	for i, day := range days {
 		report, err := s.fetchReport(ctx, salesSummaryDaily, day)
 		if err != nil {
+			if errors.Is(err, errNoSales) {
+				// Apple says, in so many words, that nothing happened. That is
+				// an answer, not a delay: settle the day and keep walking.
+				st.LastCompleteDay = maxDay(st.LastCompleteDay, day)
+				delete(st.SkippedDays, day)
+				continue
+			}
 			if errors.Is(err, errNotReady) {
 				// Old enough that "not generated yet" is no longer credible:
 				// the day was probably empty, so step over it — but write it
@@ -338,7 +345,7 @@ func (s *Source) fetchSubscriptions(ctx context.Context, day string, observed ti
 	report, err := s.fetchReport(ctx, subscriptionSummaryDaily, day)
 	switch {
 	case err == nil:
-	case errors.Is(err, errNotReady):
+	case errors.Is(err, errNotReady), errors.Is(err, errNoSales):
 		st.SubsUnavailableStreak++
 		if st.SubsUnavailableStreak >= maxSubsUnavailable {
 			st.SubsDisabledSince = day
