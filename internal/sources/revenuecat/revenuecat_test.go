@@ -286,3 +286,53 @@ func TestSourceContract(t *testing.T) {
 		t.Errorf("Poll = %v, %v, %v; want all nil", events, state, err)
 	}
 }
+
+func TestPayloadIsScrubbedOfCustomerPII(t *testing.T) {
+	body := []byte(`{"api_version":"1.0","event":{"id":"evt-pii","type":"INITIAL_PURCHASE","app_user_id":"u-1","original_app_user_id":"u-1","aliases":["u-1","u-2"],"product_id":"pro","price":4.99,"currency":"USD","country_code":"US","subscriber_attributes":{"$email":{"value":"a@b.c"},"$phoneNumber":{"value":"+1555"}},"environment":"PRODUCTION","app_id":"app1"}}`)
+	ev, err := revenuecat.ParseEvent(body, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := string(ev.Payload)
+	for _, bad := range []string{"subscriber_attributes", "$email", "+1555", "aliases", "app_user_id", "u-2"} {
+		if strings.Contains(p, bad) {
+			t.Errorf("payload still contains %q: %s", bad, p)
+		}
+	}
+	for _, keep := range []string{`"type":"INITIAL_PURCHASE"`, `"product_id":"pro"`, `"country_code":"US"`} {
+		if !strings.Contains(p, keep) {
+			t.Errorf("payload lost %s: %s", keep, p)
+		}
+	}
+}
+
+func TestSandboxEventsAreSilentAndCountrylessByDefault(t *testing.T) {
+	src := revenuecat.New("", nil)
+	body := `{"api_version":"1.0","event":{"id":"evt-sb","type":"INITIAL_PURCHASE","product_id":"pro","price":4.99,"currency":"USD","country_code":"DE","environment":"SANDBOX","app_id":"app1"}}`
+	var got core.Event
+	rec := httptest.NewRecorder()
+	src.HandleWebhook(rec, httptest.NewRequest(http.MethodPost, "/hooks/revenuecat", strings.NewReader(body)), func(e core.Event) { got = e })
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status %d: %s", rec.Code, rec.Body)
+	}
+	if !got.Silent || got.Country != "" {
+		t.Fatalf("sandbox event should be silent and countryless, got silent=%v country=%q", got.Silent, got.Country)
+	}
+
+	src.IncludeSandbox = true
+	src.HandleWebhook(httptest.NewRecorder(), httptest.NewRequest(http.MethodPost, "/hooks/revenuecat", strings.NewReader(body)), func(e core.Event) { got = e })
+	if got.Silent || got.Country != "DE" {
+		t.Fatalf("include_sandbox should keep the event live, got silent=%v country=%q", got.Silent, got.Country)
+	}
+}
+
+func TestTestPingHasNoCountryAndAppsAreMapped(t *testing.T) {
+	src := revenuecat.New("", nil)
+	src.Apps = map[string]string{"app1": "Nistis"}
+	body := `{"api_version":"1.0","event":{"id":"evt-t","type":"TEST","country_code":"US","environment":"SANDBOX","app_id":"app1"}}`
+	var got core.Event
+	src.HandleWebhook(httptest.NewRecorder(), httptest.NewRequest(http.MethodPost, "/hooks/revenuecat", strings.NewReader(body)), func(e core.Event) { got = e })
+	if got.Kind != "test" || got.Country != "" || got.Silent || got.App != "Nistis" {
+		t.Fatalf("got kind=%s country=%q silent=%v app=%q", got.Kind, got.Country, got.Silent, got.App)
+	}
+}

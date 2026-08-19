@@ -30,6 +30,12 @@ type Source struct {
 	// Secret, when non-empty, must be presented as `Authorization: Bearer <secret>`.
 	Secret string
 	Log    *slog.Logger
+	// Apps maps RevenueCat app ids (app_id in the webhook, "app1234…") to the
+	// names you want on drops. Unmapped ids are shown as-is.
+	Apps map[string]string
+	// IncludeSandbox lets SANDBOX-environment events mint drops and found
+	// settlements. Off by default: a TestFlight purchase is not a customer.
+	IncludeSandbox bool
 }
 
 // New returns a RevenueCat webhook source.
@@ -154,14 +160,22 @@ func ParseEvent(body []byte, now time.Time) (core.Event, error) {
 		quantity = 1
 	}
 
+	kind := Kind(e.Type)
+	country := strings.ToUpper(strings.TrimSpace(e.CountryCode))
+	// A TEST ping carries a made-up customer; it should confirm the wiring
+	// works and nothing else — no country, no settlement.
+	if kind == "test" {
+		country = ""
+	}
+
 	return core.Event{
 		ID:         core.NewIDAt(occurred),
 		Source:     Name,
-		Kind:       Kind(e.Type),
+		Kind:       kind,
 		App:        app,
 		OccurredAt: occurred,
 		ObservedAt: now.UTC(),
-		Country:    strings.ToUpper(strings.TrimSpace(e.CountryCode)),
+		Country:    country,
 		Amount:     amount,
 		Currency:   currency,
 		Quantity:   quantity,
@@ -169,8 +183,52 @@ func ParseEvent(body []byte, now time.Time) (core.Event, error) {
 		// RevenueCat mirrors store data and is not itself the money ledger:
 		// treat its amounts as signal, not accounting truth.
 		IsLedger: false,
-		Payload:  json.RawMessage(body),
+		Payload:  scrubPayload(body),
 	}, nil
+}
+
+// IsSandbox reports whether the raw webhook body is a SANDBOX-environment
+// event (TestFlight, Play testing tracks, RevenueCat test pings).
+func IsSandbox(body []byte) bool {
+	var wh webhook
+	if json.Unmarshal(body, &wh) != nil {
+		return false
+	}
+	return strings.EqualFold(strings.TrimSpace(wh.Event.Environment), "SANDBOX")
+}
+
+// scrubbedKeys are removed from the stored payload: they carry customer PII
+// (email, name, phone, custom attributes) or identifiers Loot has no use for.
+// Loot keeps what it needs to describe the drop, never the customer.
+var scrubbedKeys = []string{"subscriber_attributes", "aliases", "app_user_id", "original_app_user_id", "customer_info"}
+
+// scrubPayload returns body with PII-bearing fields removed from event (and
+// from the top level, defensively). On any parse trouble it returns an empty
+// object rather than risk storing the raw body.
+func scrubPayload(body []byte) json.RawMessage {
+	var top map[string]json.RawMessage
+	if err := json.Unmarshal(body, &top); err != nil {
+		return json.RawMessage(`{}`)
+	}
+	for _, k := range scrubbedKeys {
+		delete(top, k)
+	}
+	if raw, ok := top["event"]; ok {
+		var ev map[string]json.RawMessage
+		if err := json.Unmarshal(raw, &ev); err == nil {
+			for _, k := range scrubbedKeys {
+				delete(ev, k)
+			}
+			if b, err := json.Marshal(ev); err == nil {
+				top["event"] = b
+			}
+		}
+	}
+	out, err := json.Marshal(top)
+	if err != nil {
+		return json.RawMessage(`{}`)
+	}
+	return out
 }
 
 // dedupeKey prefers RevenueCat's own event id, then the transaction id, and
@@ -210,11 +268,22 @@ func (s *Source) HandleWebhook(w http.ResponseWriter, r *http.Request, emit func
 		return
 	}
 
+	if name, ok := s.Apps[ev.App]; ok && name != "" {
+		ev.App = name
+	}
+	sandbox := IsSandbox(body)
+	if sandbox && ev.Kind != "test" && !s.IncludeSandbox {
+		// Stored (so the webhook visibly works and /api/sources counts it)
+		// but silent and countryless: no drop, no settlement, no population.
+		ev.Silent = true
+		ev.Country = ""
+	}
+
 	emit(ev)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	_ = json.NewEncoder(w).Encode(map[string]any{"ok": true, "kind": ev.Kind, "dedupe_key": ev.DedupeKey})
+	_ = json.NewEncoder(w).Encode(map[string]any{"ok": true, "kind": ev.Kind, "dedupe_key": ev.DedupeKey, "sandbox": sandbox})
 }
 
 // authorized checks the optional shared secret in constant time.

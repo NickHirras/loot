@@ -61,6 +61,13 @@ sources:
     # Strongly recommended: without it, anyone who can reach the endpoint can
     # inject drops. Leave empty only on a trusted private network.
     secret: ""
+    # Optional: show app names instead of RevenueCat app ids on drops.
+    apps: {}
+    # app1234abcd: "My App (iOS)"
+    # SANDBOX events (TestFlight, Play test tracks, RevenueCat test pings) are
+    # stored silently and never found settlements unless this is true.
+    include_sandbox: false
+
 
   flathub:
     # Flatpak application IDs to watch. Loot polls the public stats API hourly

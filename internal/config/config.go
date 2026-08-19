@@ -137,6 +137,11 @@ type Crash struct {
 	Enabled bool `yaml:"enabled"`
 	// Secret, when set, is required as `Authorization: Bearer <secret>`.
 	Secret string `yaml:"secret"`
+	// Apps maps RevenueCat app ids ("app1234abcd") to display names.
+	Apps map[string]string `yaml:"apps"`
+	// IncludeSandbox lets SANDBOX events mint drops and settlements. Default
+	// false: sandbox events are stored silently so the webhook visibly works.
+	IncludeSandbox bool `yaml:"include_sandbox"`
 }
 
 // MicrosoftStore configures the Partner Center analytics source (Microsoft
@@ -199,6 +204,11 @@ type Webhook struct {
 	Enabled bool `yaml:"enabled"`
 	// Secret, when set, is required as `Authorization: Bearer <secret>`.
 	Secret string `yaml:"secret"`
+	// Apps maps RevenueCat app ids ("app1234abcd") to display names.
+	Apps map[string]string `yaml:"apps"`
+	// IncludeSandbox lets SANDBOX events mint drops and settlements. Default
+	// false: sandbox events are stored silently so the webhook visibly works.
+	IncludeSandbox bool `yaml:"include_sandbox"`
 }
 
 // AppStore configures the App Store Connect sales-report source. Loot needs an
@@ -251,6 +261,11 @@ type RevenueCat struct {
 	Enabled *bool `yaml:"enabled"`
 	// Secret, when set, is required as `Authorization: Bearer <secret>`.
 	Secret string `yaml:"secret"`
+	// Apps maps RevenueCat app ids ("app1234abcd") to display names.
+	Apps map[string]string `yaml:"apps"`
+	// IncludeSandbox lets SANDBOX events mint drops and settlements. Default
+	// false: sandbox events are stored silently so the webhook visibly works.
+	IncludeSandbox bool `yaml:"include_sandbox"`
 }
 
 // Flathub configures the polling source.

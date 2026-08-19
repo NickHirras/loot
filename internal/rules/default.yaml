@@ -87,6 +87,16 @@ rules:
       subtitle: "{{.AmountFmt}}{{if .App}} · {{.App}}{{end}}"
       xp: 10
 
+  - name: revenuecat-test
+    match:
+      source: revenuecat
+      kind: test
+    then:
+      rarity: common
+      title: "RevenueCat webhook test received"
+      subtitle: "the wiring works{{if .App}} · {{.App}}{{end}}"
+      xp: 0
+
   - name: revenuecat-product-change
     match:
       source: revenuecat

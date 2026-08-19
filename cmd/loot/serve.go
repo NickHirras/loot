@@ -258,6 +258,8 @@ func runServe(args []string) error {
 	}
 	if !cfg.Demo.Enabled && cfg.RevenueCatEnabled() {
 		rc := revenuecat.New(cfg.Sources.RevenueCat.Secret, log)
+		rc.Apps = cfg.Sources.RevenueCat.Apps
+		rc.IncludeSandbox = cfg.Sources.RevenueCat.IncludeSandbox
 		sources = append(sources, rc)
 		if cfg.Sources.RevenueCat.Secret == "" {
 			log.Warn("revenuecat webhook has no secret; anyone who can reach /hooks/revenuecat can post drops")
