@@ -1,0 +1,13 @@
+.git
+.github
+data
+bin
+loot
+loot.yaml
+web/node_modules
+web/dist
+*.db
+*.db-wal
+*.db-shm
+.DS_Store
+README.md

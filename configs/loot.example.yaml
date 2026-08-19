@@ -1,0 +1,45 @@
+# Loot configuration.
+#
+# Copy to ./loot.yaml (the default path) or pass --config <path>.
+# Every field has a sensible default; an empty file is a valid config.
+#
+# Environment variables override the file. Useful in Docker:
+#   LOOT_LISTEN, LOOT_DATA_DIR, LOOT_RULES_PATH, LOOT_DEV_ENABLED,
+#   LOOT_REVENUECAT_SECRET, LOOT_REVENUECAT_ENABLED,
+#   LOOT_FLATHUB_APPS (comma separated), LOOT_FLATHUB_BACKFILL_DAYS
+
+# HTTP bind address for the API, websocket and dashboard.
+listen: ":8080"
+
+# Where loot.db lives. Mount this as a volume in Docker.
+data_dir: "./data"
+
+# Optional path to a custom rarity rules file. Leave empty to use the rules
+# embedded in the binary (see internal/rules/default.yaml for the format).
+rules_path: ""
+
+sources:
+  revenuecat:
+    # The webhook is mounted at POST /hooks/revenuecat unless disabled.
+    enabled: true
+    # When set, RevenueCat must send `Authorization: Bearer <secret>`.
+    # Strongly recommended: without it, anyone who can reach the endpoint can
+    # inject drops. Leave empty only on a trusted private network.
+    secret: ""
+
+  flathub:
+    # Flatpak application IDs to watch. Loot polls the public stats API hourly
+    # and emits one "install" event per app per completed day.
+    apps: []
+    # - org.gnome.Calculator
+    # - org.example.YourApp
+
+    # How many past days the very first poll emits, so a fresh install does not
+    # fire six months of drops at once. 0 seeds the cursor and emits nothing.
+    # Override once at startup with `loot serve --since 2026-01-01`.
+    backfill_days: 7
+
+dev:
+  # Mounts POST /api/dev/fake and shows the dev panel in the dashboard, for
+  # testing sounds and animations. Keep this off in production.
+  enabled: false

@@ -1,0 +1,29 @@
+# Runtime data (SQLite database and WAL files)
+data/
+*.db
+*.db-wal
+*.db-shm
+
+# Local config
+/loot.yaml
+
+# Build output
+bin/
+# The compiled binary at the repo root only — anchored so it does not swallow
+# the cmd/loot package directory.
+/loot
+
+# Frontend
+web/node_modules/
+web/dist/*
+!web/dist/.gitkeep
+
+# Go
+*.test
+coverage.out
+
+# Editors / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp

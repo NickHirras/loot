@@ -1,0 +1,158 @@
+# Loot default rarity rules.
+#
+# Evaluation order:
+#   1. The first non-floor rule whose `match` holds wins and sets the drop.
+#   2. Every matching `floor: true` rule may then RAISE the rarity (never lower
+#      it) and relabel the drop. That is how "a first-ever country is at least
+#      rare" works without repeating it in every rule.
+#   3. If nothing matched, `fallback` applies.
+#
+# Match fields (all optional, all must hold):
+#   source / sources, kind / kinds, app, min_amount, max_amount, min_quantity,
+#   is_ledger, has_country, country_first, record_high, payload_match.
+#
+# `country_first` is true when this is the first event ever stored from that
+# country. `record_high` is true when the event's quantity beats every previous
+# event for the same source+app+kind. `payload_match` takes dotted JSON paths
+# into the raw source payload.
+#
+# Title and subtitle are Go templates over:
+#   .Source .Kind .App .Country .Flag .Amount .AmountFmt .Currency
+#   .Quantity .QuantityFmt .Payload .BaseTitle (floor rules only)
+
+rules:
+  # ---------------------------------------------------------------- RevenueCat
+  # Bad news first, so churn is never mistaken for revenue.
+  - name: revenuecat-churn
+    match:
+      source: revenuecat
+      kinds: [cancellation, expiration, billing_issue]
+    then:
+      rarity: cursed
+      title: "Subscriber lost"
+      subtitle: "{{.Kind}}{{if .App}} · {{.App}}{{end}}"
+      xp: 5
+
+  - name: revenuecat-winback
+    match:
+      source: revenuecat
+      kind: uncancellation
+    then:
+      rarity: rare
+      title: "A subscriber returns"
+      subtitle: "{{.App}}"
+      xp: 120
+
+  - name: revenuecat-annual
+    match:
+      source: revenuecat
+      kinds: [purchase]
+      payload_match:
+        event.period_type: ANNUAL
+    then:
+      rarity: rare
+      title: "New annual subscriber"
+      subtitle: "{{.AmountFmt}}{{if .App}} · {{.App}}{{end}}"
+      xp: 150
+
+  - name: revenuecat-high-value
+    match:
+      source: revenuecat
+      kinds: [purchase]
+      min_amount: 20
+    then:
+      rarity: rare
+      title: "New subscriber"
+      subtitle: "{{.AmountFmt}}{{if .App}} · {{.App}}{{end}}"
+      xp: 120
+
+  - name: revenuecat-purchase
+    match:
+      source: revenuecat
+      kinds: [purchase]
+    then:
+      rarity: uncommon
+      title: "New subscriber"
+      subtitle: "{{.AmountFmt}}{{if .App}} · {{.App}}{{end}}"
+      xp: 25
+
+  - name: revenuecat-renewal
+    match:
+      source: revenuecat
+      kind: renewal
+    then:
+      rarity: common
+      title: "Renewal"
+      subtitle: "{{.AmountFmt}}{{if .App}} · {{.App}}{{end}}"
+      xp: 10
+
+  - name: revenuecat-product-change
+    match:
+      source: revenuecat
+      kind: product_change
+    then:
+      rarity: uncommon
+      title: "Plan changed"
+      subtitle: "{{.App}}"
+      xp: 20
+
+  # ------------------------------------------------------------------- Flathub
+  - name: flathub-record-day
+    match:
+      source: flathub
+      kind: install
+      record_high: true
+    then:
+      rarity: epic
+      title: "Best day ever on Flathub"
+      subtitle: "{{.QuantityFmt}} installs of {{.App}}"
+      xp: 300
+
+  - name: flathub-installs
+    match:
+      source: flathub
+      kind: install
+    then:
+      rarity: common
+      title: "{{.QuantityFmt}} installs on Flathub"
+      subtitle: "{{.App}}"
+      xp: 10
+
+  # ----------------------------------------------------- Dev / synthetic drops
+  # POST /api/dev/fake emits source=dev with kind set to the desired rarity, so
+  # the UI and sound design can be exercised without waiting for real money.
+  - name: dev-cursed
+    match: {source: dev, kind: cursed}
+    then: {rarity: cursed, title: "A cursed drop", subtitle: "synthetic test event"}
+  - name: dev-legendary
+    match: {source: dev, kind: legendary}
+    then: {rarity: legendary, title: "A legendary drop", subtitle: "synthetic test event"}
+  - name: dev-epic
+    match: {source: dev, kind: epic}
+    then: {rarity: epic, title: "An epic drop", subtitle: "synthetic test event"}
+  - name: dev-rare
+    match: {source: dev, kind: rare}
+    then: {rarity: rare, title: "A rare drop", subtitle: "synthetic test event"}
+  - name: dev-uncommon
+    match: {source: dev, kind: uncommon}
+    then: {rarity: uncommon, title: "An uncommon drop", subtitle: "synthetic test event"}
+  - name: dev-common
+    match: {source: dev, kind: common}
+    then: {rarity: common, title: "A common drop", subtitle: "synthetic test event"}
+
+  # -------------------------------------------------------------- Floor rules
+  # Applied after a winner is chosen; only ever raises rarity.
+  - name: new-country
+    floor: true
+    match:
+      country_first: true
+    then:
+      rarity: rare
+      title: "New settlement: {{.Flag}} {{.Country}}"
+      xp: 250
+
+fallback:
+  rarity: common
+  title: "{{.Source}} · {{.Kind}}"
+  subtitle: "{{.App}}"
+  xp: 10
