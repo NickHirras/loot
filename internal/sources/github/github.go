@@ -83,6 +83,9 @@ type Source struct {
 	// Now is swappable for tests.
 	Now func() time.Time
 
+	// warnAnonStars gates the tokenless-stargazers notice to one log line.
+	warnAnonStars sync.Once
+
 	mu sync.Mutex
 	// resetAt is when the exhausted rate limit frees up. Zero means "not
 	// limited". Guarded by mu because the webhook handler and the poller run
@@ -337,7 +340,18 @@ func (s *Source) pollStars(ctx context.Context, r repoRef, rs *repoState, now ti
 	}
 
 	var stars []stargazer
-	if total > 0 {
+	// Seen in the wild (Aug 2026): GitHub answers the stargazers listing with
+	// 401 "Requires authentication" even for public repositories, while the
+	// repository endpoint above stays anonymous. Without a token there are no
+	// per-star drops — but stars_total (and the milestones it drives) still
+	// work from the repository metadata, so skip the walk rather than fail
+	// the poll.
+	if s.cfg.Token == "" {
+		s.warnAnonStars.Do(func() {
+			s.log.Info("github: no token configured; skipping per-stargazer drops (GitHub requires auth for the stargazers API) — star totals and milestones still work")
+		})
+		total = meta.StargazersCount
+	} else if total > 0 {
 		pages := (total + perPage - 1) / perPage
 		for page, walked := pages, 0; page >= 1 && walked < maxStarPages; page, walked = page-1, walked+1 {
 			var batch []stargazer

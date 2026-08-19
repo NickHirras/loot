@@ -52,6 +52,9 @@ type fakeAPI struct {
 	rateReset     string
 	// status, when non-zero, replaces the status of every response.
 	status int
+	// starsRequireAuth mirrors api.github.com since Aug 2026: the stargazers
+	// listing answers 401 unless an Authorization header is present.
+	starsRequireAuth bool
 
 	// Observed traffic.
 	starPages      []int
@@ -88,6 +91,11 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, `{"full_name":"o/r","stargazers_count":%d,"forks_count":2}`, len(f.stars))
 
 	case path == "/repos/o/r/stargazers":
+		if f.starsRequireAuth && r.Header.Get("Authorization") == "" {
+			w.WriteHeader(http.StatusUnauthorized)
+			_, _ = io.WriteString(w, `{"message":"Requires authentication","status":"401"}`)
+			return
+		}
 		page, _ := strconv.Atoi(r.URL.Query().Get("page"))
 		if page < 1 {
 			page = 1
@@ -303,7 +311,7 @@ func TestPollStarsWalksBackwardsAndHonoursBackfillWindow(t *testing.T) {
 
 func TestPollStarsMilestoneOnSecondRun(t *testing.T) {
 	api := &fakeAPI{stars: append(filler(t, 100), star(t, "u101", "2026-08-17T00:00:00Z"))}
-	s, _ := newTestSource(t, api, config.GitHub{BackfillDays: 30})
+	s, _ := newTestSource(t, api, config.GitHub{BackfillDays: 30, Token: "tok"})
 
 	_, state, err := s.Poll(context.Background(), nil)
 	if err != nil {
@@ -374,7 +382,7 @@ func TestPollIssuesClassifiesIssuesAndPullRequests(t *testing.T) {
 			4: `{"number":4,"merged":false,"merged_at":null}`,
 		},
 	}
-	s, _ := newTestSource(t, api, config.GitHub{BackfillDays: 30})
+	s, _ := newTestSource(t, api, config.GitHub{BackfillDays: 30, Token: "tok"})
 
 	events, newState, err := s.Poll(context.Background(), nil)
 	if err != nil {
@@ -441,7 +449,7 @@ func TestPollReleases(t *testing.T) {
 	   "draft":false,"prerelease":true,"published_at":"2026-08-01T05:00:00Z"},
 	  {"id":1,"tag_name":"v1.0.0","name":"First","draft":false,"prerelease":false,"published_at":"2026-01-01T00:00:00Z"}
 	]`}
-	s, _ := newTestSource(t, api, config.GitHub{BackfillDays: 30})
+	s, _ := newTestSource(t, api, config.GitHub{BackfillDays: 30, Token: "tok"})
 
 	events, state, err := s.Poll(context.Background(), nil)
 	if err != nil {
@@ -485,7 +493,7 @@ func TestPollForks(t *testing.T) {
 	  {"full_name":"alice/r","html_url":"https://github.com/alice/r","created_at":"2026-08-18T01:00:00Z","owner":{"login":"alice"}},
 	  {"full_name":"bob/r","html_url":"https://github.com/bob/r","created_at":"2026-01-01T00:00:00Z","owner":{"login":"bob"}}
 	]`}
-	s, _ := newTestSource(t, api, config.GitHub{BackfillDays: 30})
+	s, _ := newTestSource(t, api, config.GitHub{BackfillDays: 30, Token: "tok"})
 
 	events, state, err := s.Poll(context.Background(), nil)
 	if err != nil {
@@ -516,7 +524,7 @@ func TestPollBacksOffWhenRateLimited(t *testing.T) {
 		rateRemaining: "0",
 		rateReset:     strconv.FormatInt(testNow.Add(time.Hour).Unix(), 10),
 	}
-	s, _ := newTestSource(t, api, config.GitHub{BackfillDays: 30})
+	s, _ := newTestSource(t, api, config.GitHub{BackfillDays: 30, Token: "tok"})
 
 	events, newState, err := s.Poll(context.Background(), []byte(`{"repos":{}}`))
 	if err != nil {
@@ -556,7 +564,7 @@ func TestPollBacksOffWhenRateLimited(t *testing.T) {
 
 func TestCheck(t *testing.T) {
 	api := &fakeAPI{}
-	s, _ := newTestSource(t, api, config.GitHub{})
+	s, _ := newTestSource(t, api, config.GitHub{Token: "tok"})
 	if err := s.Check(context.Background()); err != nil {
 		t.Fatalf("Check: %v", err)
 	}
@@ -658,7 +666,7 @@ func TestEmittedEventsRenderWithTheDefaultRules(t *testing.T) {
 		forks:    `[{"full_name":"alice/r","created_at":"2026-08-18T01:00:00Z","owner":{"login":"alice"}}]`,
 		releases: `[{"id":3,"tag_name":"v1.2.0","name":"Sharpened","published_at":"2026-08-18T05:00:00Z"}]`,
 	}
-	s, _ := newTestSource(t, api, config.GitHub{BackfillDays: 30})
+	s, _ := newTestSource(t, api, config.GitHub{BackfillDays: 30, Token: "tok"})
 
 	events, _, err := s.Poll(context.Background(), nil)
 	if err != nil {
@@ -745,7 +753,7 @@ func TestPollIssuesWalksEveryPage(t *testing.T) {
 	   "created_at":"2026-08-17T09:00:00Z","updated_at":"2026-08-17T09:00:00Z","user":{"login":"bob"}}
 	]`
 	api := &fakeAPI{issuePages: []string{first, second}}
-	s, _ := newTestSource(t, api, config.GitHub{BackfillDays: 30})
+	s, _ := newTestSource(t, api, config.GitHub{BackfillDays: 30, Token: "tok"})
 
 	events, state, err := s.Poll(context.Background(), nil)
 	if err != nil {
@@ -777,7 +785,7 @@ func TestPollIssuesCappedHoldsTheCursorBack(t *testing.T) {
 		pages[i] = fullIssuePage(t, 10_000-i*perPage, base.Add(-time.Duration(i*perPage)*time.Minute))
 	}
 	api := &fakeAPI{issuePages: pages}
-	s, _ := newTestSource(t, api, config.GitHub{BackfillDays: 30})
+	s, _ := newTestSource(t, api, config.GitHub{BackfillDays: 30, Token: "tok"})
 
 	_, state, err := s.Poll(context.Background(), nil)
 	if err != nil {
@@ -811,7 +819,7 @@ func TestPollForksWalksEveryPage(t *testing.T) {
 	  {"full_name":"zoe/r","html_url":"https://github.com/zoe/r","created_at":"2026-08-17T12:00:00Z","owner":{"login":"zoe"}}
 	]`
 	api := &fakeAPI{forkPages: []string{first, second}}
-	s, _ := newTestSource(t, api, config.GitHub{BackfillDays: 30})
+	s, _ := newTestSource(t, api, config.GitHub{BackfillDays: 30, Token: "tok"})
 
 	events, state, err := s.Poll(context.Background(), nil)
 	if err != nil {
@@ -859,7 +867,7 @@ func TestPollEmitsAStarsTotalSnapshot(t *testing.T) {
 		api.stars[i].StarredAt = mustTime(t, "2020-01-01T00:00:00Z").Add(time.Duration(i) * time.Minute)
 		api.stars[i].User.Login = fmt.Sprintf("u%d", i)
 	}
-	s, _ := newTestSource(t, api, config.GitHub{BackfillDays: 30})
+	s, _ := newTestSource(t, api, config.GitHub{BackfillDays: 30, Token: "tok"})
 
 	events, _, err := s.Poll(context.Background(), nil)
 	if err != nil {
@@ -885,5 +893,38 @@ func TestPollEmitsAStarsTotalSnapshot(t *testing.T) {
 	// No star drops: none of these stars is new.
 	if got := byKind(events, "star"); len(got) != 0 {
 		t.Errorf("emitted %d star events for a repo with no new stars", len(got))
+	}
+}
+
+// GitHub now answers the stargazers listing with 401 for anonymous callers
+// (seen in the wild, Aug 2026). Without a token the walk is skipped — no
+// failed poll, no per-star drops — while stars_total still flows from the
+// repository metadata.
+func TestTokenlessPollSkipsStargazersButKeepsTotals(t *testing.T) {
+	api := &fakeAPI{}
+	for i := 0; i < 42; i++ {
+		api.stars = append(api.stars, star(t, fmt.Sprintf("u%d", i), "2026-08-10T00:00:00Z"))
+	}
+	api.starsRequireAuth = true
+	s, _ := newTestSource(t, api, config.GitHub{BackfillDays: 30})
+
+	events, _, err := s.Poll(context.Background(), nil)
+	if err != nil {
+		t.Fatalf("tokenless poll must not fail: %v", err)
+	}
+	var sawStar, sawTotal bool
+	for _, ev := range events {
+		if ev.Kind == "star" {
+			sawStar = true
+		}
+		if ev.Kind == "stars_total" && ev.Quantity == 42 {
+			sawTotal = true
+		}
+	}
+	if sawStar {
+		t.Fatal("per-star events without a token should be impossible")
+	}
+	if !sawTotal {
+		t.Fatal("stars_total should still be emitted from repo metadata")
 	}
 }

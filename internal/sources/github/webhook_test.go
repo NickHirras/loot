@@ -179,7 +179,7 @@ func TestWebhookAndPollingAgreeOnDedupeKeys(t *testing.T) {
 		releases: `[{"id":3,"tag_name":"v1.2.0","name":"Sharpened","draft":false,
 			"published_at":"2026-08-18T05:00:00Z"}]`,
 	}
-	s, _ := newTestSource(t, api, config.GitHub{BackfillDays: 30})
+	s, _ := newTestSource(t, api, config.GitHub{BackfillDays: 30, Token: "tok"})
 
 	polled, _, err := s.Poll(context.Background(), nil)
 	if err != nil {
