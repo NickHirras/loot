@@ -3,6 +3,7 @@ package codex
 import (
 	"context"
 	"encoding/json"
+	"github.com/nickhirras/loot/internal/debounce"
 	"log/slog"
 	"sort"
 	"strconv"
@@ -33,9 +34,9 @@ const (
 	// ingest nudge; this catches the ones that depend on the calendar rather
 	// than on an event (a run of days completing at midnight, say).
 	sweepInterval = 10 * time.Minute
-	// debounce is how long a nudge waits before evaluating, so a chest
+	// debounceWait is how long a nudge waits before evaluating, so a chest
 	// cascade of forty drops costs one pass rather than forty.
-	debounce = 2 * time.Second
+	debounceWait = 2 * time.Second
 )
 
 // Board is the whole of GET /api/codex.
@@ -139,34 +140,22 @@ func (s *Service) Run(ctx context.Context) {
 	// One timer, armed by the first nudge of a burst and reused forever after.
 	// A timer per nudge would be simpler to read and would leak one every time
 	// a chest cascaded, since this loop outlives the process's interest in it.
-	quiet := time.NewTimer(debounce)
-	if !quiet.Stop() {
-		<-quiet.C
-	}
+	quiet := debounce.New(debounceWait)
 	defer quiet.Stop()
-	armed := false
 
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-s.trigger:
-			if !armed {
-				quiet.Reset(debounce)
-				armed = true
-			}
+			quiet.Arm()
 			continue
-		case <-quiet.C:
-			armed = false
+		case <-quiet.C():
+			quiet.Fired()
 		case <-sweep.C:
 			// The sweep is about to do the work a pending nudge asked for;
 			// leaving the timer armed would swallow every later nudge.
-			if armed {
-				if !quiet.Stop() {
-					<-quiet.C
-				}
-				armed = false
-			}
+			quiet.Disarm()
 		}
 		if _, err := s.Evaluate(ctx); err != nil {
 			s.log().Error("codex evaluation failed", "error", err)

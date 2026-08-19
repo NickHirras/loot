@@ -30,6 +30,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/nickhirras/loot/internal/debounce"
 	"log/slog"
 	"time"
 
@@ -58,9 +59,9 @@ const (
 	// driven — a day completes and the fight moves — so the ticker matters
 	// more here than it does for quests.
 	sweepInterval = time.Hour
-	// debounce is how long a nudge waits, so a poll that ingests four hundred
+	// debounceWait is how long a nudge waits, so a poll that ingests four hundred
 	// crash rows costs one evaluation rather than four hundred.
-	debounce = 3 * time.Second
+	debounceWait = 3 * time.Second
 	// recentLimit is how many finished fights the board remembers.
 	recentLimit = 20
 )
@@ -160,88 +161,28 @@ func (s *Service) Run(ctx context.Context) {
 	// One timer, armed by the first nudge of a burst and reused afterwards —
 	// the same shape the Codex uses, and for the same reason: a timer per
 	// nudge would leak one per ingested crash row.
-	quiet := newDebouncer(debounce)
-	defer quiet.stop()
+	quiet := debounce.New(debounceWait)
+	defer quiet.Stop()
 
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-s.trigger:
-			quiet.arm()
+			quiet.Arm()
 			continue
 		case <-quiet.C():
-			quiet.fired()
+			quiet.Fired()
 		case <-sweep.C:
 			// The sweep is about to do exactly what a pending nudge was
 			// waiting to ask for, so cancel it rather than evaluating twice
 			// seconds apart.
-			quiet.disarm()
+			quiet.Disarm()
 		}
 		if _, err := s.Evaluate(ctx); err != nil {
 			s.log().Error("boss evaluation failed", "error", err)
 		}
 	}
-}
-
-// debouncer is Run's nudge timer and the one bit of bookkeeping around it: a
-// single reused timer, armed by the first nudge of a burst and disarmed by
-// whatever gets there first.
-//
-// It is a type rather than three lines inline because the state machine has
-// exactly one hazard and it is easy to get wrong. Stopping a timer that has
-// already fired leaves a value sitting in its channel, and an `armed` flag left
-// true after some other branch did the work means every later nudge is
-// swallowed by "a pass is already pending" and the timer is never rearmed —
-// which is a service that stops responding to the pipeline entirely, an hour
-// after the first sweep to land on a pending nudge.
-type debouncer struct {
-	timer *time.Timer
-	wait  time.Duration
-	armed bool
-}
-
-// newDebouncer returns a stopped debouncer with an empty channel.
-func newDebouncer(wait time.Duration) *debouncer {
-	t := time.NewTimer(wait)
-	if !t.Stop() {
-		<-t.C
-	}
-	return &debouncer{timer: t, wait: wait}
-}
-
-// C is the channel that fires once a burst of nudges has gone quiet.
-func (d *debouncer) C() <-chan time.Time { return d.timer.C }
-
-// arm starts the wait, unless it is already running: the *first* nudge of a
-// burst sets the deadline and the rest ride along behind it.
-func (d *debouncer) arm() {
-	if d.armed {
-		return
-	}
-	d.timer.Reset(d.wait)
-	d.armed = true
-}
-
-// fired records that the wait elapsed and its value has been received.
-func (d *debouncer) fired() { d.armed = false }
-
-// disarm cancels a pending wait because something else is about to do the
-// work, draining the channel if the timer beat us to it.
-func (d *debouncer) disarm() {
-	if !d.armed {
-		return
-	}
-	if !d.timer.Stop() {
-		<-d.timer.C
-	}
-	d.armed = false
-}
-
-// stop releases the timer for good.
-func (d *debouncer) stop() {
-	d.timer.Stop()
-	d.armed = false
 }
 
 // Startup runs one evaluation before the server starts serving, so a fresh
