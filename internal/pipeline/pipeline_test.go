@@ -3,6 +3,7 @@ package pipeline_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"path/filepath"
@@ -433,9 +434,13 @@ func TestRevealChestCascadesInOrder(t *testing.T) {
 	ctx := context.Background()
 	p, st, b := newPipeline(t)
 
-	// One quiet day for app c first, so its next day can be a record.
-	if _, err := p.Ingest(ctx, salesDay("com.example.c", "2026-08-16", 5, 10, "USD")); err != nil {
-		t.Fatalf("seed: %v", err)
+	// A week of quiet days for app c first, so its next day can be a record
+	// (a series needs store.MinRecordHistory prior days before "best ever"
+	// counts).
+	for d := 1; d <= store.MinRecordHistory; d++ {
+		if _, err := p.Ingest(ctx, salesDay("com.example.c", fmt.Sprintf("2026-08-%02d", d), 5, 10, "USD")); err != nil {
+			t.Fatalf("seed: %v", err)
+		}
 	}
 
 	// Three drops in one chest, deliberately minted out of reveal order.

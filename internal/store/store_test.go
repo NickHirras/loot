@@ -2,6 +2,7 @@ package store_test
 
 import (
 	"context"
+	"fmt"
 	"path/filepath"
 	"strconv"
 	"sync"
@@ -130,13 +131,27 @@ func TestIsRecordQuantity(t *testing.T) {
 		return ev
 	}
 
-	// The very first day has no history to beat, so it is not a record.
+	// The very first day has no history to beat, so it is not a record — and
+	// neither are the next few: a series needs MinRecordHistory prior days
+	// before "best ever" means anything (day two beats day one by construction).
 	first := mk("2026-01-01", 100)
 	if _, err := st.InsertEvent(ctx, first); err != nil {
 		t.Fatalf("insert: %v", err)
 	}
 	if ok, err := st.IsRecordQuantity(ctx, first); err != nil || ok {
 		t.Fatalf("first ever day: got %v, %v; want false, nil", ok, err)
+	}
+	early := mk("2025-12-31", 500) // bigger than everything, but too little history
+	if _, err := st.InsertEvent(ctx, early); err != nil {
+		t.Fatalf("insert: %v", err)
+	}
+	if ok, err := st.IsRecordQuantity(ctx, early); err != nil || ok {
+		t.Fatalf("second ever day: got %v, %v; want false (not enough history)", ok, err)
+	}
+	for i := 0; i < store.MinRecordHistory; i++ {
+		if _, err := st.InsertEvent(ctx, mk(fmt.Sprintf("2025-12-%02d", 10+i), 10)); err != nil {
+			t.Fatalf("insert history: %v", err)
+		}
 	}
 
 	lower := mk("2026-01-02", 50)
@@ -147,7 +162,7 @@ func TestIsRecordQuantity(t *testing.T) {
 		t.Fatalf("lower day: got %v, %v; want false, nil", ok, err)
 	}
 
-	best := mk("2026-01-03", 101)
+	best := mk("2026-01-03", 501)
 	if _, err := st.InsertEvent(ctx, best); err != nil {
 		t.Fatalf("insert: %v", err)
 	}
@@ -156,11 +171,11 @@ func TestIsRecordQuantity(t *testing.T) {
 		t.Fatalf("record check: %v", err)
 	}
 	if !ok {
-		t.Fatal("101 installs should beat the previous best of 100")
+		t.Fatal("501 installs should beat the previous best of 500")
 	}
 
 	// A tie is not a record.
-	tie := mk("2026-01-04", 101)
+	tie := mk("2026-01-04", 501)
 	if _, err := st.InsertEvent(ctx, tie); err != nil {
 		t.Fatalf("insert: %v", err)
 	}

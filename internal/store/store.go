@@ -266,26 +266,31 @@ func (s *Store) IsRecordQuantity(ctx context.Context, ev core.Event) (bool, erro
 	// backfill. The two questions are equivalent: a strict record is exactly
 	// an event no other event ties or beats.
 	var (
-		any    int
+		prior  int
 		beaten int
 	)
 	err := s.q.QueryRowContext(ctx, `
-        SELECT EXISTS (SELECT 1 FROM events
-                       WHERE source = ? AND app = ? AND kind = ? AND id <> ?),
+        SELECT (SELECT COUNT(*) FROM (SELECT 1 FROM events
+                       WHERE source = ? AND app = ? AND kind = ? AND id <> ? LIMIT ?)),
                EXISTS (SELECT 1 FROM events
                        WHERE source = ? AND app = ? AND kind = ? AND quantity >= ? AND id <> ?)`,
-		ev.Source, ev.App, ev.Kind, ev.ID,
-		ev.Source, ev.App, ev.Kind, ev.Quantity, ev.ID).Scan(&any, &beaten)
+		ev.Source, ev.App, ev.Kind, ev.ID, MinRecordHistory,
+		ev.Source, ev.App, ev.Kind, ev.Quantity, ev.ID).Scan(&prior, &beaten)
 	if err != nil {
 		return false, fmt.Errorf("record quantity: %w", err)
 	}
-	if any == 0 {
-		// No prior history at all: the first day is not a "record", it is just
-		// the first day. Avoids an epic drop on every source's very first poll.
+	if prior < MinRecordHistory {
+		// Too little history for "best ever" to mean anything: the first few
+		// days of a new series beat each other by construction (seen for real:
+		// a 30-day Snapcraft backfill minted epics on days two and three).
 		return false, nil
 	}
 	return beaten == 0, nil
 }
+
+// MinRecordHistory is how many prior events a (source, app, kind) series needs
+// before a new high counts as a record.
+const MinRecordHistory = 7
 
 // EventCount returns the number of stored events for a source ("" = all).
 func (s *Store) EventCount(ctx context.Context, source string) (int, error) {
