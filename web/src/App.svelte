@@ -3,6 +3,7 @@
   import DevPanel from './lib/DevPanel.svelte'
   import Feed from './lib/Feed.svelte'
   import Header from './lib/Header.svelte'
+  import HearthPage from './lib/HearthPage.svelte'
   import VaultPage from './lib/VaultPage.svelte'
   import { router } from './lib/route.svelte'
   import { loot } from './lib/state.svelte'
@@ -17,6 +18,12 @@
   // Browsers will not start an AudioContext without a gesture, so the banner
   // stays until the user clicks (or explicitly mutes).
   const needsUnlock = $derived(!loot.audioReady && !loot.muted)
+
+  // Ambient mode is the Hearth alone on the screen: no header, no footer, no
+  // dev panel — nothing that would spoil a globe left running on a spare
+  // monitor. The sound banner still shows, because a muted ambient globe is
+  // half the experience and one click fixes it.
+  const bare = $derived(router.ambient)
 </script>
 
 <svelte:window
@@ -33,9 +40,13 @@
   </button>
 {/if}
 
-<Header />
+{#if !bare}
+  <Header />
+{/if}
 
-{#if router.tab === 'vault'}
+{#if router.tab === 'hearth'}
+  <HearthPage />
+{:else if router.tab === 'vault'}
   <VaultPage />
 {:else}
   <Feed />
@@ -45,14 +56,16 @@
   <ChestOverlay />
 {/if}
 
-{#if loot.devEnabled}
+{#if loot.devEnabled && !bare}
   <DevPanel />
 {/if}
 
-<footer>
-  <span>Loot · self-hosted loot tracking for indie devs</span>
-  <span class="hint">press <kbd>m</kbd> to mute</span>
-</footer>
+{#if !bare}
+  <footer>
+    <span>Loot · self-hosted loot tracking for indie devs</span>
+    <span class="hint">press <kbd>m</kbd> to mute</span>
+  </footer>
+{/if}
 
 <style>
   .unlock {

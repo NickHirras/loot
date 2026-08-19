@@ -295,3 +295,34 @@ func TestQuest2EnvOverrides(t *testing.T) {
 		t.Errorf("packages = %v", cfg.Sources.GooglePlay.Packages)
 	}
 }
+
+func TestHomeCountryNormalizedAndValidated(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "loot.yaml")
+
+	if err := os.WriteFile(path, []byte("home_country: \" us \"\n"), 0o600); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+	cfg, err := config.Load(path, true)
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if cfg.HomeCountry != "US" {
+		t.Fatalf("home_country = %q, want US", cfg.HomeCountry)
+	}
+
+	// The env override wins, and is normalized the same way.
+	t.Setenv("LOOT_HOME_COUNTRY", "nz")
+	if cfg, err = config.Load(path, true); err != nil {
+		t.Fatalf("load with env: %v", err)
+	}
+	if cfg.HomeCountry != "NZ" {
+		t.Fatalf("home_country = %q, want NZ", cfg.HomeCountry)
+	}
+
+	// A country name instead of a code is a typo, not a silent fallback.
+	t.Setenv("LOOT_HOME_COUNTRY", "Sweden")
+	if _, err := config.Load(path, true); err == nil {
+		t.Fatal("want an error for a non ISO 3166-1 alpha-2 home_country")
+	}
+}

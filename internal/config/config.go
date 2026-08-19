@@ -36,6 +36,11 @@ type Config struct {
 	// (ISO 4217, e.g. "USD"). Events keep their original amount and currency;
 	// amount_base is the converted copy.
 	DisplayCurrency string `yaml:"display_currency"`
+	// HomeCountry is where you are: the ISO 3166-1 alpha-2 code of the
+	// Hearth's capital, the settlement every live drop arcs towards. Empty
+	// means "the biggest settlement", which needs no configuring and is right
+	// for most people.
+	HomeCountry string `yaml:"home_country"`
 
 	FX      FX      `yaml:"fx"`
 	Chest   Chest   `yaml:"chest"`
@@ -202,6 +207,10 @@ func Load(path string, explicit bool) (Config, error) {
 	if len(cfg.DisplayCurrency) != 3 {
 		return cfg, fmt.Errorf("display_currency %q is not a three letter ISO 4217 code", cfg.DisplayCurrency)
 	}
+	cfg.HomeCountry = strings.ToUpper(strings.TrimSpace(cfg.HomeCountry))
+	if cfg.HomeCountry != "" && len(cfg.HomeCountry) != 2 {
+		return cfg, fmt.Errorf("home_country %q is not a two letter ISO 3166-1 alpha-2 code", cfg.HomeCountry)
+	}
 	if cfg.Sources.AppStore.PrivateKeyPath != "" {
 		if _, err := os.Stat(cfg.Sources.AppStore.PrivateKeyPath); err != nil {
 			return cfg, fmt.Errorf("sources.appstore.private_key_path %s: %w", cfg.Sources.AppStore.PrivateKeyPath, err)
@@ -250,6 +259,9 @@ func applyEnv(cfg *Config) {
 	}
 	if v := os.Getenv("LOOT_DISPLAY_CURRENCY"); v != "" {
 		cfg.DisplayCurrency = v
+	}
+	if v := os.Getenv("LOOT_HOME_COUNTRY"); v != "" {
+		cfg.HomeCountry = v
 	}
 	if v := os.Getenv("LOOT_FX_ENABLED"); v != "" {
 		b := truthy(v)

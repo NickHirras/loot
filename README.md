@@ -14,6 +14,8 @@ Shipping an indie app means watching numbers scattered across half a dozen dashb
 
 Money that arrives a whole day at a time — App Store and Play sales reports — does not interrupt the feed. It goes into a **daily chest** that you open when you are ready, and the drops cascade out one by one, quietest first, so the day ends on its best news. Every amount is also converted into one display currency, so the **vault** can answer "how did this month go?" in a single number.
 
+Every country you sell in becomes a settlement on a slowly turning globe — the **Hearth** — that grows from an outpost to a metropolis as customers arrive, and flies each new drop home to your capital as an arc of light. Leave it full screen on a spare monitor and it will tell you how the day is going without you reading a single number.
+
 Loot is a single Go binary with an embedded Svelte dashboard and a SQLite database. There is no cloud service, no account, and no telemetry — you run it on a VPS, a Raspberry Pi or your laptop, point your webhooks at it, and leave the feed open on a second monitor. Sources push or poll into one pipeline: every event is deduplicated, stored, classified into a rarity by a YAML rules engine, and streamed live to every connected browser over a websocket. `loot tail` does the same thing in your terminal, and rings the bell when something good lands.
 
 <div align="center">
@@ -350,6 +352,68 @@ The dashboard's **Vault** tab draws this: a range picker (7d/30d/90d/365d, remem
 
 `series` is zero-filled, one point per day, so a chart never has holes. `by_country` lists the top 25 and folds the tail into a row called `other`. `subscriptions` sums the newest `subscription_snapshot` event of each (source, app), and is `null` when no source has ever reported one.
 
+## The Hearth
+
+The **Hearth** tab is the map of what you have built: a slowly turning globe where every country you have ever sold in has a settlement, lit up like a city seen from orbit. The night side of the planet is real — the terminator is computed from the sun's actual position — and settlements on the dark side glow brighter, because that is when city lights show. Drag to turn the world, scroll to zoom, double click to go home, hover a city for its numbers.
+
+When a drop lands, it *arrives*: an arc leaves its country and flies to your capital in its rarity's colour, bursting on impact while the origin pulses. A country's first ever customer founds a settlement, with an expanding ring and a label. A cancellation does not fly anywhere — it flashes red where it happened, and stays there.
+
+### Population
+
+A settlement's size is its **population**: not money, not events, but a count of people who arrived.
+
+| counted as one person | where it comes from |
+|---|---|
+| each unit on a ledger row of kind `sale`, `iap`, `subscription` or `download` | App Store and Google Play financial reports |
+| each `install` | Google Play's per-country install statistics, Flathub |
+| each RevenueCat `purchase` | the RevenueCat webhook |
+
+Only positive quantities count, so **a settlement never shrinks**: a refund nets out of revenue but does not evict a citizen. Deliberately excluded are the `sales_day` and `installs_day` rollups (they are a summary of the rows beside them), cancellations and expirations (bad news does not add people), `active_devices` and `subscription_snapshot` (they are absolute snapshots, not arrivals), and Loot's own synthetic `settlement` event. Revenue per country follows the vault's rule exactly: ledger rows only, signed, `sales_day` excluded.
+
+### Tiers
+
+A settlement's tier is **relative to your biggest country**, not an absolute headcount — so the map looks the same whether you have 300 customers or three million, and growth shows up as a changing skyline instead of everything maxing out at once.
+
+| tier | share of the largest settlement |
+|---|---|
+| **metropolis** | ≥ 50% |
+| **city** | ≥ 15% |
+| **town** | ≥ 5% |
+| **village** | ≥ 1% |
+| **hamlet** | ≥ 0.2% |
+| **outpost** | anything else — one customer is still a place on the map |
+
+### Eras
+
+The whole account sits on an era ladder, unlocked by total XP. Each rung costs roughly four times the last, so an era is a milestone rather than a weekly event.
+
+| era | XP | era | XP |
+|---|---|---|---|
+| Camp | 0 | Kingdom | 75,000 |
+| Village | 1,000 | Empire | 250,000 |
+| Town | 5,000 | Dynasty | 1,000,000 |
+| City | 20,000 | | |
+
+Both tables live in [`internal/core/hearth.go`](internal/core/hearth.go), which is the only place to tune them.
+
+### The capital, and unknown lands
+
+Every arc flies to your **capital**. By default that is your biggest settlement, which needs no configuring; set `home_country` if you would rather it were where *you* are:
+
+```yaml
+home_country: "NZ"   # ISO 3166-1 alpha-2, or "" for the biggest settlement
+```
+
+`LOOT_HOME_COUNTRY` overrides it. A country you have never sold in is still a valid capital — it is where you are, not where your customers are.
+
+Events with no country at all are counted apart, as **unknown lands**: Flathub reports how many people installed but never says from where, and those people should not be invented into a country or silently dropped.
+
+### Ambient mode
+
+<http://localhost:8080/#/ambient> (or the **⤢ Ambient** button, or `#/hearth?ambient=1`) is the Hearth with everything else taken away: full-bleed globe on a starfield, the era and its progress in one corner, a ticker of recent arrivals along the bottom, and a cursor that gets out of the way after three seconds. <kbd>Esc</kbd> leaves. It is meant to be left running on a spare monitor or an iPad all day, so the globe idles at 30fps, pauses its own rotation for five seconds after you touch it, and honours `prefers-reduced-motion` by not spinning at all.
+
+`GET /api/hearth` is the aggregate behind all of it — settlements, capital, era, tier ladder and the last 30 country-bearing drops. It is cached for five seconds server-side; the page refetches once a minute and merges live websocket drops in between, so a new country appears the instant its first customer does.
+
 ## Rarity rules
 
 Classification is a small ordered YAML rule list. The defaults are embedded in the binary ([`internal/rules/default.yaml`](internal/rules/default.yaml)); point `rules_path` at your own file to override them.
@@ -453,6 +517,7 @@ Adding a source means implementing `core.Source` (and optionally `core.WebhookHa
 | `GET /api/stats` | XP total, drop counts by rarity and source, countries seen, chests waiting |
 | `GET /api/sources` | source list with last poll time and last error |
 | `GET /api/vault/summary?range=30d` | revenue, units, series and breakdowns in the display currency |
+| `GET /api/hearth` | the globe: settlements with population and tier, capital, era, recent arrivals |
 | `GET /api/chest` | the chests waiting to be opened, oldest first |
 | `POST /api/chest/open` | `{"date":"2026-08-17"}` (or `{}` for the oldest) — reveals and returns the cascade |
 | `GET /ws` | websocket stream, see below |
@@ -480,11 +545,14 @@ Loot has no authentication of its own. The RevenueCat webhook secret protects th
 Loot ships in quests.
 
 - **Quest 1 — First Blood** ✅ — the scaffold: event pipeline, SQLite store, rarity rules engine, RevenueCat webhooks, Flathub polling, live feed with synthesized sounds, `loot tail`.
-- **Quest 2 — The Vault Opens** 🔨 *(you are here)* — the core has landed: silent ledger events, the **daily chest** with its cascade, currency conversion and the vault API, settlement drops, `loot check` / `loot chest` / `loot fx`, and the dashboard's Vault page and chest-opening ritual.
-- **Quest 3 — Know Thy Enemy** — Crashlytics and Sentry as *boss fights*: a crash spike spawns a named boss with a health bar that drains as you ship fixes and the crash-free rate recovers.
-- **Quest 4 — The Hearth** — a rotating globe where every country you have sold in grows a settlement, scaled by revenue and installs. New countries plant a flag with fanfare; lapsed ones dim.
+- **Quest 2 — The Vault Opens** ✅ — silent ledger events, the **daily chest** with its cascade, currency conversion and the vault API, settlement drops, `loot check` / `loot chest` / `loot fx`, and the dashboard's Vault page and chest-opening ritual.
+- **Quest 4 — The Hearth** ✅ *(you are here)* — the globe: a settlement per country that grows with every customer, tiers from outpost to metropolis, eras from Camp to Dynasty, live arcs flying home to your capital, a real day/night terminator, and **ambient mode** for the spare monitor.
+- **Quest 3 — Know Thy Enemy** 🔨 *(next)* — Crashlytics and Sentry as *boss fights*: a crash spike spawns a named boss with a health bar that drains as you ship fixes and the crash-free rate recovers.
+- **Quest 5 — Quests & Mysteries** — goals worth chasing: streaks, "sell in a country you have never sold in", "beat last month", each with its own reward.
+- **Quest 6 — Codex & Season Recap** — a permanent record of everything that has ever dropped, and a shareable end-of-season summary of the year in loot.
+- **Quest 7 — More Worlds** — Microsoft Store, Snapcraft and GitHub as sources, plus a generic webhook so anything that can POST JSON can drop loot.
 
-Further out: Microsoft Store, Snapcraft and GitHub sources, RevenueCat as an authoritative ledger for real revenue totals, achievements with permanent trophies, and a shareable read-only "hoard" page.
+Further out: RevenueCat as an authoritative ledger for real revenue totals, achievements with permanent trophies, and a shareable read-only "hoard" page.
 
 ## License
 

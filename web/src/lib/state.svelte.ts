@@ -85,6 +85,13 @@ class LootState {
   #lastShownAt = 0
   #cascadeTimer: ReturnType<typeof setInterval> | null = null
 
+  /**
+   * Everyone who wants to hear about a drop the moment it lands. The websocket
+   * is opened once, here, so the globe (and anything else that animates an
+   * arrival) subscribes rather than opening a second socket of its own.
+   */
+  #listeners = new Set<(drop: Drop) => void>()
+
   #socket: WebSocket | null = null
   #retry = 0
   #reconnectTimer: ReturnType<typeof setTimeout> | null = null
@@ -130,6 +137,15 @@ class LootState {
       if (better || (rank === bestRank && drop.rarity !== 'cursed' && drop.xp > best.xp)) best = drop
     }
     return best
+  }
+
+  /**
+   * Subscribes to drops as they arrive. Returns the unsubscribe function, so a
+   * component can hand it straight back from an `$effect`.
+   */
+  onDrop(listener: (drop: Drop) => void): () => void {
+    this.#listeners.add(listener)
+    return () => this.#listeners.delete(listener)
   }
 
   /** Loads the initial page and opens the live stream. */
@@ -283,6 +299,14 @@ class LootState {
     if (drop.amount_base || drop.amount) vault.markStale()
 
     if (!this.muted && !quiet) sounds.play(drop.rarity)
+
+    for (const listener of this.#listeners) {
+      try {
+        listener(drop)
+      } catch {
+        // A subscriber that throws must not stall the feed or the cascade.
+      }
+    }
 
     setTimeout(() => {
       const found = this.drops.find((d) => d.id === drop.id)

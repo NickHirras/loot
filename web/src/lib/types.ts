@@ -309,3 +309,78 @@ export interface BreakdownRow {
   units: number
   share: number
 }
+
+// -------------------------------------------------------------- hearth types
+
+/** One rung of the settlement ladder, mirroring internal/core/hearth.go. */
+export interface HearthTier {
+  name: string
+  index: number
+  /** Inclusive lower bound on population / largest country's population. */
+  min_share: number
+}
+
+/** Where the account stands on the era ladder. */
+export interface HearthEra {
+  name: string
+  index: number
+  /** Total XP at which this era began. */
+  min_xp: number
+  /** XP earned inside this era. */
+  xp: number
+  /** The era after this one, or "" at the top of the ladder. */
+  next_name: string
+  /** Total XP the next era starts at; 0 at the top. */
+  next_xp: number
+  /** XP still owed to the next era; 0 at the top. */
+  to_next: number
+  /** 0..1 through the current era. */
+  progress: number
+}
+
+/** One settlement: a country, its people and its money. */
+export interface HearthCountry {
+  country: string
+  population: number
+  revenue_base: number
+  /** Business days: the first and latest event from this country. */
+  first_seen: string
+  last_seen: string
+  drops: number
+  tier: HearthTier
+  /** Population as a fraction of the largest country's. */
+  share: number
+}
+
+/** Events with no country at all — Flathub reports installs but not where. */
+export interface HearthUnknown {
+  population: number
+  revenue_base: number
+}
+
+/** One row of the arrivals ticker. */
+export interface HearthDrop {
+  id: string
+  rarity: Rarity
+  country: string
+  title: string
+  subtitle: string
+  kind: string
+  created_at: string
+}
+
+/** The whole of GET /api/hearth. */
+export interface Hearth {
+  /** ISO2 of the capital: home_country, or the biggest settlement. */
+  capital: string
+  display_currency: string
+  era: HearthEra
+  total_xp: number
+  /** Totals across every country; the unknown bucket is counted apart. */
+  population: number
+  revenue_base: number
+  unknown: HearthUnknown
+  countries: HearthCountry[]
+  tiers: HearthTier[]
+  recent: HearthDrop[]
+}

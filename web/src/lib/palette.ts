@@ -39,3 +39,25 @@ export function seriesColor(name: string): string {
   for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) >>> 0
   return SERIES_COLORS[hash % SERIES_COLORS.length]
 }
+
+/**
+ * The rarity palette, mirroring the CSS custom properties in app.css.
+ *
+ * The canvas has no stylesheet: the globe paints arcs and pulses with these
+ * hex values directly, so a rarity is the same colour on the canvas as it is
+ * on a drop card. Keep the two lists in step — app.css is the source of truth
+ * for the DOM, this is its shadow for anything drawn by hand.
+ */
+export const RARITY_COLORS: Record<string, string> = {
+  common: '#808b9f',
+  uncommon: '#35d07f',
+  rare: '#4c9dfd',
+  epic: '#b06bff',
+  legendary: '#ffc23d',
+  cursed: '#ff4d5e',
+}
+
+/** A rarity's colour, falling back to the common grey for anything unknown. */
+export function rarityColor(rarity: string): string {
+  return RARITY_COLORS[rarity] ?? RARITY_COLORS.common
+}

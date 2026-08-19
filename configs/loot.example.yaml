@@ -5,7 +5,7 @@
 #
 # Environment variables override the file. Useful in Docker:
 #   LOOT_LISTEN, LOOT_DATA_DIR, LOOT_RULES_PATH, LOOT_DEV_ENABLED,
-#   LOOT_DISPLAY_CURRENCY, LOOT_FX_ENABLED,
+#   LOOT_DISPLAY_CURRENCY, LOOT_HOME_COUNTRY, LOOT_FX_ENABLED,
 #   LOOT_CHEST_ENABLED, LOOT_CHEST_AUTO_OPEN_AFTER_HOURS,
 #   LOOT_REVENUECAT_SECRET, LOOT_REVENUECAT_ENABLED,
 #   LOOT_FLATHUB_APPS (comma separated), LOOT_FLATHUB_BACKFILL_DAYS,
@@ -27,6 +27,11 @@ rules_path: ""
 # The currency the vault reports in (ISO 4217). Every event keeps the amount
 # and currency its source reported; Loot stores a converted copy alongside it.
 display_currency: "USD"
+
+# Where you are, as an ISO 3166-1 alpha-2 code. The Hearth's globe flies every
+# live drop home to this country's capital. Leave empty and Loot uses your
+# biggest settlement instead, which is right for most people.
+home_country: ""
 
 fx:
   # Fetch daily reference rates from the ECB (via frankfurter.app, no API key)

@@ -573,3 +573,60 @@ func TestDevFakeSalesDayLandsInAChest(t *testing.T) {
 		t.Fatalf("got %d chests, want 1", len(chests))
 	}
 }
+
+func TestHearthEndpoint(t *testing.T) {
+	h := newHarness(t, true)
+
+	// Two ledger days from two countries, one of them twice as large.
+	h.post(t, "/api/dev/fake", `{"kind":"sales_day","amount":80,"currency":"EUR","quantity":200,"country":"DE"}`)
+	h.post(t, "/api/dev/fake", `{"kind":"sales_day","amount":40,"currency":"EUR","quantity":100,"country":"JP"}`)
+	// A realtime purchase with no country at all: unknown lands.
+	h.post(t, "/api/dev/fake", `{"rarity":"uncommon"}`)
+
+	resp, body := h.get(t, "/api/hearth")
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d", resp.StatusCode)
+	}
+	if body["capital"] != "DE" {
+		t.Fatalf("capital = %v, want DE (the biggest settlement)", body["capital"])
+	}
+	if body["display_currency"] != "USD" {
+		t.Fatalf("display_currency = %v", body["display_currency"])
+	}
+
+	countries, _ := body["countries"].([]any)
+	if len(countries) != 2 {
+		t.Fatalf("countries = %v, want DE and JP", countries)
+	}
+	de, _ := countries[0].(map[string]any)
+	if de["country"] != "DE" || de["population"].(float64) != 200 {
+		t.Fatalf("first settlement = %v, want DE with 200 people", de)
+	}
+	// 80 EUR at 0.8 to the dollar; the sales_day rollup must not double it.
+	if de["revenue_base"].(float64) != 100 {
+		t.Fatalf("DE revenue = %v, want 100", de["revenue_base"])
+	}
+	deTier, _ := de["tier"].(map[string]any)
+	if deTier["name"] != "metropolis" {
+		t.Fatalf("DE tier = %v, want metropolis", deTier)
+	}
+	jp, _ := countries[1].(map[string]any)
+	jpTier, _ := jp["tier"].(map[string]any)
+	if jp["share"].(float64) != 0.5 || jpTier["name"] != "metropolis" {
+		t.Fatalf("JP = %v, want half of DE and still a metropolis", jp)
+	}
+
+	era, _ := body["era"].(map[string]any)
+	if era["name"] != "Camp" || era["next_name"] != "Village" {
+		t.Fatalf("era = %v, want Camp heading for Village", era)
+	}
+	if tiers, _ := body["tiers"].([]any); len(tiers) != len(core.Tiers) {
+		t.Fatalf("tier ladder = %v", body["tiers"])
+	}
+
+	// The settlement drops carry countries; the countryless fake does not.
+	recent, _ := body["recent"].([]any)
+	if len(recent) != 2 {
+		t.Fatalf("recent = %d drops, want the two settlements", len(recent))
+	}
+}

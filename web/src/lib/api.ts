@@ -1,4 +1,4 @@
-import type { ChestSummary, Drop, SourceInfo, Stats, VaultRange, VaultSummary } from './types'
+import type { ChestSummary, Drop, Hearth, SourceInfo, Stats, VaultRange, VaultSummary } from './types'
 
 async function getJSON<T>(path: string): Promise<T> {
   const res = await fetch(path, { headers: { Accept: 'application/json' } })
@@ -84,4 +84,9 @@ export async function fireFakeDrop(req: FakeDropRequest): Promise<void> {
 export function websocketURL(): string {
   const proto = location.protocol === 'https:' ? 'wss:' : 'ws:'
   return `${proto}//${location.host}/ws`
+}
+
+/** The globe: settlements, era, capital and the recent arrivals ticker. */
+export function fetchHearth(): Promise<Hearth> {
+  return getJSON<Hearth>('/api/hearth')
 }

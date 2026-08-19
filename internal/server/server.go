@@ -30,6 +30,9 @@ type Server struct {
 	Sources  []core.Source
 	Static   fs.FS
 	Logger   *slog.Logger
+
+	// hearth memoizes the globe aggregate; see hearth.go.
+	hearth hearthCache
 }
 
 // New returns a server.
@@ -50,6 +53,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/stats", s.handleStats)
 	mux.HandleFunc("GET /api/sources", s.handleSources)
 	mux.HandleFunc("GET /api/vault/summary", s.handleVaultSummary)
+	mux.HandleFunc("GET /api/hearth", s.handleHearth)
 	mux.HandleFunc("GET /api/chest", s.handleChest)
 	mux.HandleFunc("POST /api/chest/open", s.handleChestOpen)
 	mux.HandleFunc("GET /ws", s.handleWS)
