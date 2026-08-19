@@ -33,9 +33,9 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/nickhirras/loot/internal/debounce"
 	"github.com/nickhirras/loot/internal/bus"
 	"github.com/nickhirras/loot/internal/core"
+	"github.com/nickhirras/loot/internal/debounce"
 	"github.com/nickhirras/loot/internal/store"
 )
 
