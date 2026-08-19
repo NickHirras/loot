@@ -78,6 +78,10 @@
   let dragging = false
   let dragFrom: { x: number; y: number; rotation: [number, number] } | null = null
   let interactingUntil = 0
+  /** Yaw/pitch velocity in degrees per ms, left over from a flick. */
+  let velocity: [number, number] = [0, 0]
+  let lastMove: { x: number; y: number; t: number } | null = null
+  const FLICK_DECAY = 0.0035 // per ms; ~1s of coast
 
   /** An animated rotation, used to bring an arc's origin into view. */
   let turn: { from: [number, number]; to: [number, number]; start: number } | null = null
@@ -538,7 +542,8 @@
   function frame(now: number) {
     raf = requestAnimationFrame(frame)
 
-    const busy = arcs.length > 0 || pulses.length > 0 || dragging || turn !== null
+    const coasting = Math.abs(velocity[0]) > 0.002 || Math.abs(velocity[1]) > 0.002
+    const busy = arcs.length > 0 || pulses.length > 0 || dragging || turn !== null || coasting
     const budget = 1000 / (busy ? BUSY_FPS : IDLE_FPS)
     const elapsed = now - lastFrame
     if (elapsed < budget) return
@@ -552,7 +557,13 @@
         turn.from[1] + (turn.to[1] - turn.from[1]) * eased,
       ]
       if (t >= 1) turn = null
+    } else if (!dragging && (Math.abs(velocity[0]) > 0.002 || Math.abs(velocity[1]) > 0.002)) {
+      const dt = Math.min(elapsed, 100)
+      rotation = [rotation[0] + velocity[0] * dt, Math.max(-80, Math.min(80, rotation[1] + velocity[1] * dt))]
+      const decay = Math.exp(-FLICK_DECAY * dt)
+      velocity = [velocity[0] * decay, velocity[1] * decay]
     } else if (!reduced && !dragging && now > interactingUntil) {
+      velocity = [0, 0]
       rotation = [rotation[0] + (SPIN * Math.min(elapsed, 100)) / 1000, rotation[1]]
     }
 
@@ -627,6 +638,9 @@
     dragging = true
     interactingUntil = performance.now() + INTERACTION_PAUSE_MS
     dragFrom = { x: event.clientX, y: event.clientY, rotation: [...rotation] as [number, number] }
+    lastMove = { x: event.clientX, y: event.clientY, t: performance.now() }
+    velocity = [0, 0]
+    turn = null
     ;(event.currentTarget as HTMLCanvasElement).setPointerCapture(event.pointerId)
   }
 
@@ -637,7 +651,17 @@
       const yaw = dragFrom.rotation[0] + (event.clientX - dragFrom.x) * k
       const pitch = dragFrom.rotation[1] - (event.clientY - dragFrom.y) * k
       rotation = [yaw, Math.max(-80, Math.min(80, pitch))]
-      interactingUntil = performance.now() + INTERACTION_PAUSE_MS
+      const now = performance.now()
+      if (lastMove) {
+        const dt = Math.max(1, now - lastMove.t)
+        // Blend so a jittery last sample doesn't decide the whole flick.
+        velocity = [
+          velocity[0] * 0.4 + (((event.clientX - lastMove.x) * k) / dt) * 0.6,
+          velocity[1] * 0.4 + ((-(event.clientY - lastMove.y) * k) / dt) * 0.6,
+        ]
+      }
+      lastMove = { x: event.clientX, y: event.clientY, t: now }
+      interactingUntil = now + INTERACTION_PAUSE_MS
       turn = null
       hovered = null
       return
@@ -649,6 +673,9 @@
     if (!dragging) return
     dragging = false
     dragFrom = null
+    // A stale sample means the pointer paused before release: no flick.
+    if (!lastMove || performance.now() - lastMove.t > 80) velocity = [0, 0]
+    lastMove = null
     interactingUntil = performance.now() + INTERACTION_PAUSE_MS
     ;(event.currentTarget as HTMLCanvasElement).releasePointerCapture?.(event.pointerId)
   }
@@ -687,6 +714,7 @@
   /** Double click puts the world back where it started, over the capital. */
   function reset() {
     scale = fitScale
+    velocity = [0, 0]
     turn = {
       from: rotation,
       to: capitalPoint ? [-capitalPoint[0], -capitalPoint[1]] : [-20, -12],
@@ -700,10 +728,14 @@
   function resize() {
     if (!host || !canvas) return
     const rect = host.getBoundingClientRect()
-    width = Math.max(240, Math.round(rect.width))
-    height = Math.max(240, Math.round(rect.height))
-
+    const nextWidth = Math.max(240, Math.round(rect.width))
+    const nextHeight = Math.max(240, Math.round(rect.height))
     const dpr = Math.min(window.devicePixelRatio || 1, 2)
+    if (nextWidth === width && nextHeight === height && canvas.width === Math.round(width * dpr)) return
+    const zoom = fitScale ? scale / fitScale : 1
+    width = nextWidth
+    height = nextHeight
+
     canvas.width = Math.round(width * dpr)
     canvas.height = Math.round(height * dpr)
     canvas.style.width = `${width}px`
@@ -712,7 +744,7 @@
     ctx?.setTransform(dpr, 0, 0, dpr, 0, 0)
 
     fitScale = (Math.min(width, height) / 2) * 0.86
-    scale = fitScale
+    scale = fitScale * zoom
     stars = makeStars()
 
     // Resizing the canvas clears it, and the render loop is throttled (or
@@ -733,23 +765,34 @@
   }
 
   $effect(() => {
-    if (!host || !canvas) return
-    resize()
+    // Only host/canvas binding may (re)start the loop. Everything else the
+    // setup touches — draw() reads `cities` and `hovered`, resize() reads
+    // `ambient` — must be untracked, or every hover and every data poll would
+    // re-run this effect: rotation snapped back to the capital, zoom reset,
+    // and the starfield regenerated (which looked like TV static).
+    const h = host
+    const c = canvas
+    if (!h || !c) return
+    return untrack(() => {
+      resize()
 
-    const observer = new ResizeObserver(() => resize())
-    observer.observe(host)
+      const observer = new ResizeObserver(() => resize())
+      observer.observe(h)
+      // Svelte registers onwheel passively, which makes preventDefault a no-op
+      // and lets the page scroll under the globe while zooming.
+      c.addEventListener('wheel', wheel, { passive: false })
 
-    // Start over the capital rather than mid-Pacific. Untracked, because this
-    // effect owns the render loop: it must not restart every time a drop
-    // changes the settlement list.
-    const home = untrack(() => capitalPoint)
-    if (home) rotation = [-home[0], -home[1]]
+      // Start over the capital rather than mid-Pacific.
+      const home = capitalPoint
+      if (home) rotation = [-home[0], -home[1]]
 
-    raf = requestAnimationFrame(frame)
-    return () => {
-      observer.disconnect()
-      cancelAnimationFrame(raf)
-    }
+      raf = requestAnimationFrame(frame)
+      return () => {
+        observer.disconnect()
+        c.removeEventListener('wheel', wheel)
+        cancelAnimationFrame(raf)
+      }
+    })
   })
 
   // The websocket is already open in the feed store; the globe just listens.
@@ -766,7 +809,6 @@
     onpointerup={pointerUp}
     onpointercancel={pointerUp}
     onpointerleave={() => (hovered = null)}
-    onwheel={wheel}
     ondblclick={reset}
     aria-label="A globe of every country you have sold in"
   ></canvas>
