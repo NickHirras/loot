@@ -22,33 +22,37 @@ import (
 const bossesTTL = 5 * time.Second
 
 type bossCache struct {
-	mu     sync.Mutex
-	at     time.Time
-	value  bosses.Board
-	loaded bool
+	mu      sync.Mutex
+	entries map[string]bossEntry
 }
 
-func (c *bossCache) cached() (bosses.Board, bool) {
+type bossEntry struct {
+	at    time.Time
+	value bosses.Board
+}
+
+func (c *bossCache) cached(scope string) (bosses.Board, bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if c.loaded && time.Since(c.at) < bossesTTL {
-		return c.value, true
+	if e, ok := c.entries[scope]; ok && time.Since(e.at) < bossesTTL {
+		return e.value, true
 	}
 	return bosses.Board{}, false
 }
 
-func (c *bossCache) put(b bosses.Board) {
+func (c *bossCache) put(scope string, b bosses.Board) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.value = b
-	c.at = time.Now()
-	c.loaded = true
+	if c.entries == nil {
+		c.entries = map[string]bossEntry{}
+	}
+	c.entries[scope] = bossEntry{at: time.Now(), value: b}
 }
 
 func (c *bossCache) invalidate() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.loaded = false
+	c.entries = nil
 }
 
 // InvalidateBosses forgets the memoized board. `loot serve` hands it to the
@@ -62,7 +66,8 @@ func (s *Server) handleBosses(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, bosses.Board{Alive: []core.Boss{}, Recent: []core.Boss{}})
 		return
 	}
-	if board, ok := s.bosses.cached(); ok {
+	scope := scopeOf(r)
+	if board, ok := s.bosses.cached(scope); ok {
 		writeJSON(w, http.StatusOK, board)
 		return
 	}
@@ -72,8 +77,26 @@ func (s *Server) handleBosses(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, "bosses", err)
 		return
 	}
-	s.bosses.put(board)
+	// A boss row records the raw (source, app) the crash arrived with, so the
+	// scope is applied here rather than in SQL. See internal/server/scope.go.
+	board = bosses.Board{
+		Alive:  s.bossesInScope(scope, board.Alive),
+		Recent: s.bossesInScope(scope, board.Recent),
+	}
+	s.bosses.put(scope, board)
 	writeJSON(w, http.StatusOK, board)
+}
+
+// bossesInScope keeps the fights that belong to one product. An empty scope
+// keeps everything.
+func (s *Server) bossesInScope(scope string, list []core.Boss) []core.Boss {
+	out := make([]core.Boss, 0, len(list))
+	for _, b := range list {
+		if s.inScope(scope, b.Source, b.App) {
+			out = append(out, b)
+		}
+	}
+	return out
 }
 
 // handleBossSlay ends a fight because you said so.

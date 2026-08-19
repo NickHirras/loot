@@ -111,6 +111,23 @@ func runServe(args []string) error {
 	defer st.Close()
 	log.Info("store ready", "path", cfg.ActiveDBPath())
 
+	// The app scope. Demo mode brings its own mapping so its three fictional
+	// apps are already products, which is what fills the scope selector on a
+	// screenshot; a real Loot uses whatever `apps:` says, and an empty mapping
+	// simply makes every app its own product.
+	products := cfg.Apps
+	if cfg.Demo.Enabled && len(products) == 0 {
+		products = demo.Products()
+	}
+	// Remap at every startup, so editing `apps:` is the whole of the work:
+	// there is no migration to run and no stale scope to discover a week
+	// later. It walks the distinct (source, app) pairs, not the rows.
+	if n, err := st.RemapProducts(ctx, products); err != nil {
+		return err
+	} else if n > 0 {
+		log.Info("products remapped", "events", n, "products", len(products))
+	}
+
 	// Events stored before there was a base amount, but already in the display
 	// currency, need no rates to catch up.
 	if n, err := st.BackfillAmountBase(ctx, cfg.DisplayCurrency); err != nil {
@@ -158,6 +175,7 @@ func runServe(args []string) error {
 	b := bus.New(256)
 	pipe := pipeline.New(st, engine, b, log)
 	pipe.DisplayCurrency = cfg.DisplayCurrency
+	pipe.Products = products
 	pipe.FX = converter
 	pipe.ChestEnabled = cfg.ChestEnabled()
 	pipe.ChestAutoOpenAfterHours = cfg.ChestAutoOpenAfterHours()
@@ -383,11 +401,21 @@ func runServe(args []string) error {
 	}
 
 	sched := pipeline.NewScheduler(pipe, st, sources, log)
+	// Quests are generated against the history a first run has actually
+	// fetched, never against the empty database that exists a second after
+	// boot — otherwise the backfill that lands next completes them instantly.
+	// Demo mode seeds its own history before this point, and its sources never
+	// poll, so the channel is already closed by the time anyone waits on it.
+	questSvc.ReadyWhen = sched.FirstRoundDone()
 	go sched.Run(ctx)
 	go questSvc.Run(ctx)
 	go detector.RunLoop(ctx)
 	go codexSvc.Run(ctx)
 	go bossSvc.Run(ctx)
+
+	// The server resolves products for the rows that have no product column of
+	// their own (bosses, mysteries) and lists the scope selector's options.
+	cfg.Apps = products
 
 	srv := server.New(cfg, st, b, pipe, sources, web.DistFS(), log)
 	srv.Quests = questSvc

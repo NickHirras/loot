@@ -398,6 +398,21 @@ Each has its own guide with setup steps, config (YAML + env), what it emits, and
 
 `loot check` validates all of them.
 
+## Apps and the scope filter
+
+Every store names your app differently — App Store Connect by title, RevenueCat by app id, Google Play by package name. An `apps:` block in your config maps them onto one **product** so the whole dashboard can be scoped to it:
+
+```yaml
+apps:
+  - name: Nistis
+    match:
+      appstore: ["Nistis: Fasting Timer"]
+      revenuecat: ["app5525946104"]
+      googleplay: ["com.example.nistis"]
+```
+
+The header's **All apps ▾** selector (and `?app=<product>` on every read endpoint) narrows the feed, Vault, Hearth, quests, mysteries, Codex records and bosses to one product. Money, units, installs and settlements are strictly per product; Loot's realm-wide news (achievements, global quests) still shows in every scope; XP/level/era, trophies and the daily chest stay global. `loot apps` lists what each source has called your apps and what is still unmapped; `loot apps remap` reapplies a changed mapping to history. See [docs/apps.md](docs/apps.md).
+
 ## The daily chest
 
 A ledger source does not report a sale when it happens; it reports yesterday, all at once, as hundreds of rows. Loot handles that with two kinds of event:
@@ -537,7 +552,7 @@ Events with no country at all are counted apart, as **unknown lands**: Flathub r
 
 The **Quests** tab gives you goals worth chasing and puzzles worth poking at — see [docs/quests.md](docs/quests.md) for the full design and API.
 
-- **Quests** are generated from your own history each week and month ("Beat last week's revenue · $1,240", "Settle 2 new countries this month", "Earn 10,900 XP this week"), plus custom ones you create. Completing one mints a rare (weekly) or epic (monthly) drop. An unmet quest quietly ends as "ended · 62%" — never red, never a broken streak.
+- **Quests** are generated from your own history each week and month (after the sources' first poll, and only for metrics with at least a week of data) ("Beat last week's revenue · $1,240", "Settle 2 new countries this month", "Earn 10,900 XP this week"), plus custom ones you create. Completing one mints a rare (weekly) or epic (monthly) drop. An unmet quest quietly ends as "ended · 62%" — never red, never a broken streak.
 - **Mysteries** are anomalies Loot noticed in your data and turned into open questions: "Google Play installs tripled on Fri Aug 14 — why?", refund spikes, a cluster of new countries, or a source that has gone quiet (usually broken credentials — Loot allows for each store's normal reporting lag, asks once, and dismisses the question itself when data resumes). Each card has a 28-day sparkline; write a one-line explanation and **Solve** it for a drop, or dismiss it. Solved mysteries become a notebook of your own explanations.
 
 ## Boss fights

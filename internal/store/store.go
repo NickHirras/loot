@@ -34,6 +34,9 @@ type Store struct {
 	// q is where reads and writes go: the pool for a normal store, a
 	// *sql.Tx for the store handed to WithTx.
 	q querier
+	// scope narrows reads to one product; the zero value is "every app".
+	// See scope.go — it is a lens on reads and never affects a write.
+	scope scope
 }
 
 // Open opens (creating if needed) the SQLite database at path and applies all
@@ -133,13 +136,21 @@ func (s *Store) InsertEvent(ctx context.Context, ev core.Event) (exists bool, er
 		day = core.DayOf(ev.OccurredAt)
 	}
 
+	// A source that has not been through Normalize (a test, a hand-built
+	// event) still gets a product, because an event with an app but no product
+	// would be invisible in every scope — including its own.
+	product := ev.Product
+	if product == "" {
+		product = ev.App
+	}
+
 	res, err := s.q.ExecContext(ctx, `
-        INSERT INTO events (id, source, kind, app, occurred_at, observed_at, day, country,
+        INSERT INTO events (id, source, kind, app, product, occurred_at, observed_at, day, country,
                             amount, currency, amount_base, quantity, dedupe_key,
                             is_ledger, silent, chest, payload)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(dedupe_key) DO NOTHING`,
-		ev.ID, ev.Source, ev.Kind, ev.App,
+		ev.ID, ev.Source, ev.Kind, ev.App, product,
 		ev.OccurredAt.UTC().UnixMilli(), ev.ObservedAt.UTC().UnixMilli(), day,
 		strings.ToUpper(ev.Country), ev.Amount, ev.Currency, ev.AmountBase, ev.Quantity,
 		ev.DedupeKey, ev.IsLedger, ev.Silent, ev.Chest, payload,
@@ -190,7 +201,7 @@ func (s *Store) WithTx(ctx context.Context, fn func(tx *Store) error) error {
 	if err != nil {
 		return fmt.Errorf("begin transaction: %w", err)
 	}
-	if err := fn(&Store{db: s.db, q: tx}); err != nil {
+	if err := fn(&Store{db: s.db, q: tx, scope: s.scope}); err != nil {
 		tx.Rollback()
 		return err
 	}
@@ -296,9 +307,12 @@ func (s *Store) EventCount(ctx context.Context, source string) (int, error) {
 // DropView is a drop joined with the event fields the feed needs to render.
 type DropView struct {
 	core.Drop
-	Source     string          `json:"source"`
-	Kind       string          `json:"kind"`
-	App        string          `json:"app"`
+	Source string `json:"source"`
+	Kind   string `json:"kind"`
+	App    string `json:"app"`
+	// Product is the canonical app this drop belongs to, or "" for a
+	// realm-wide one. The UI filters live drops on it.
+	Product    string          `json:"product"`
 	Country    string          `json:"country"`
 	Amount     float64         `json:"amount"`
 	AmountBase float64         `json:"amount_base"`
@@ -318,6 +332,7 @@ func (v DropView) Event() core.Event {
 		Source:     v.Source,
 		Kind:       v.Kind,
 		App:        v.App,
+		Product:    v.Product,
 		OccurredAt: v.OccurredAt,
 		Day:        v.Day,
 		Country:    v.Country,
@@ -331,7 +346,7 @@ func (v DropView) Event() core.Event {
 const dropSelect = `
 SELECT d.id, d.event_id, d.rarity, d.title, d.subtitle, d.xp, d.created_at,
        d.chest_date, d.revealed_at,
-       e.source, e.kind, e.app, e.country, e.amount, e.amount_base, e.currency,
+       e.source, e.kind, e.app, e.product, e.country, e.amount, e.amount_base, e.currency,
        e.quantity, e.day, e.occurred_at
 FROM drops d
 JOIN events e ON e.id = d.event_id`
@@ -375,6 +390,12 @@ func (s *Store) ListDrops(ctx context.Context, q DropQuery) ([]DropView, error) 
 	}
 	if !q.IncludeUnrevealed {
 		where = append(where, `NOT `+unrevealed)
+	}
+	// Loose: another product's drops are hidden, Loot's own realm-wide ones
+	// are not. See scope.go.
+	if frag, fragArgs := s.scopeLoose("e"); frag != "" {
+		where = append(where, strings.TrimPrefix(frag, " AND "))
+		args = append(args, fragArgs...)
 	}
 
 	query := dropSelect
@@ -422,7 +443,7 @@ func scanDrops(rows *sql.Rows, capacity int) ([]DropView, error) {
 		)
 		if err := rows.Scan(&v.ID, &v.EventID, &rarity, &v.Title, &v.Subtitle, &v.XP, &createdAt,
 			&v.ChestDate, &revealedAt,
-			&v.Source, &v.Kind, &v.App, &v.Country, &v.Amount, &v.AmountBase, &v.Currency,
+			&v.Source, &v.Kind, &v.App, &v.Product, &v.Country, &v.Amount, &v.AmountBase, &v.Currency,
 			&v.Quantity, &v.Day, &occurredAt); err != nil {
 			return nil, fmt.Errorf("scan drop: %w", err)
 		}
@@ -648,21 +669,46 @@ func (s *Store) Stats(ctx context.Context) (Stats, error) {
 		st.ByRarity[string(r)] = 0
 	}
 
+	// Every count here is *loose*: another product's news is hidden, Loot's own
+	// realm-wide news is not. A scoped header therefore reads as "this app,
+	// plus the things that are about all of it" — which is what the trophies
+	// and the global quests genuinely are.
+	//
+	// The drop counts need the events join once there is a scope to apply;
+	// without one the cheaper drops-only query is kept.
+	scoped, scopeArgs := s.scopeLoose("e")
+	dropsFrom := `FROM drops d`
+	if scoped != "" {
+		dropsFrom = `FROM drops d JOIN events e ON e.id = d.event_id`
+	}
+
 	if err := s.q.QueryRowContext(ctx,
-		`SELECT COUNT(*), COALESCE(SUM(xp), 0) FROM drops d WHERE NOT `+unrevealed).
-		Scan(&st.TotalDrops, &st.TotalXP); err != nil {
+		`SELECT COUNT(*) `+dropsFrom+` WHERE NOT `+unrevealed+scoped, scopeArgs...).
+		Scan(&st.TotalDrops); err != nil {
 		return st, fmt.Errorf("stats totals: %w", err)
 	}
-	if err := s.q.QueryRowContext(ctx, `SELECT COUNT(*) FROM events`).Scan(&st.TotalEvents); err != nil {
+	// XP is the one figure here that is never scoped, for the same reason the
+	// Hearth's era is not: it is the account's standing, earned across
+	// everything you ship. A level that halved when you looked at one of your
+	// apps would be telling you something untrue about yourself — and the two
+	// numbers have to agree, because the header and the era bar are on screen
+	// together.
+	if err := s.q.QueryRowContext(ctx,
+		`SELECT COALESCE(SUM(xp), 0) FROM drops d WHERE NOT `+unrevealed).
+		Scan(&st.TotalXP); err != nil {
+		return st, fmt.Errorf("stats xp: %w", err)
+	}
+	if err := s.q.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM events e WHERE 1 = 1`+scoped, scopeArgs...).Scan(&st.TotalEvents); err != nil {
 		return st, fmt.Errorf("stats events: %w", err)
 	}
 	if err := s.q.QueryRowContext(ctx,
-		`SELECT COUNT(*) FROM drops d WHERE `+unrevealed).Scan(&st.UnrevealedCount); err != nil {
+		`SELECT COUNT(*) `+dropsFrom+` WHERE `+unrevealed+scoped, scopeArgs...).Scan(&st.UnrevealedCount); err != nil {
 		return st, fmt.Errorf("stats unrevealed: %w", err)
 	}
 
 	rarityRows, err := s.q.QueryContext(ctx,
-		`SELECT rarity, COUNT(*) FROM drops d WHERE NOT `+unrevealed+` GROUP BY rarity`)
+		`SELECT d.rarity, COUNT(*) `+dropsFrom+` WHERE NOT `+unrevealed+scoped+` GROUP BY d.rarity`, scopeArgs...)
 	if err != nil {
 		return st, fmt.Errorf("stats rarity: %w", err)
 	}
@@ -681,7 +727,7 @@ func (s *Store) Stats(ctx context.Context) (Stats, error) {
 
 	sourceRows, err := s.q.QueryContext(ctx, `
         SELECT e.source, COUNT(*) FROM drops d JOIN events e ON e.id = d.event_id
-        WHERE NOT `+unrevealed+` GROUP BY e.source`)
+        WHERE NOT `+unrevealed+scoped+` GROUP BY e.source`, scopeArgs...)
 	if err != nil {
 		return st, fmt.Errorf("stats source: %w", err)
 	}
@@ -699,7 +745,7 @@ func (s *Store) Stats(ctx context.Context) (Stats, error) {
 	}
 
 	countryRows, err := s.q.QueryContext(ctx,
-		`SELECT DISTINCT country FROM events WHERE country <> '' ORDER BY country`)
+		`SELECT DISTINCT e.country FROM events e WHERE e.country <> ''`+scoped+` ORDER BY e.country`, scopeArgs...)
 	if err != nil {
 		return st, fmt.Errorf("stats countries: %w", err)
 	}

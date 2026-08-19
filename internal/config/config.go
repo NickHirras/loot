@@ -49,6 +49,10 @@ type Config struct {
 	// means "the biggest settlement", which needs no configuring and is right
 	// for most people.
 	HomeCountry string `yaml:"home_country"`
+	// Apps is the app scope: the canonical products you ship, and the raw app
+	// names each source calls them. Every view can be narrowed to one of them.
+	// Unmapped apps still appear, under whatever name their source reported.
+	Apps Products `yaml:"apps"`
 
 	FX      FX      `yaml:"fx"`
 	Chest   Chest   `yaml:"chest"`

@@ -85,6 +85,10 @@ func newGenerator(st *store.Store) *quests.Generator {
 		Logger:          quiet(),
 		DisplayCurrency: "USD",
 		Now:             func() time.Time { return wednesday },
+		// These tests seed a day or two of history on purpose — they are about
+		// targets, idempotence and the cap, not about how much history is
+		// enough. The minimum has its own tests below.
+		MinHistoryDays: -1,
 	}
 }
 
@@ -190,6 +194,7 @@ func newService(t *testing.T, st *store.Store, rec *recorder, b *spy) *quests.Se
 	svc := quests.NewService(st, rec, b, "USD", quiet())
 	svc.Now = func() time.Time { return wednesday }
 	svc.Generator.Now = svc.Now
+	svc.Generator.MinHistoryDays = -1
 	return svc
 }
 

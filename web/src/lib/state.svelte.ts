@@ -3,6 +3,7 @@ import { bossesState } from './bosses.svelte'
 import { codexState } from './codex.svelte'
 import { questsState } from './quests.svelte'
 import { prefersReducedMotion } from './route.svelte'
+import { scope } from './scope.svelte'
 import { sounds } from './sound'
 import type { ChestSummary, Drop, Rarity, SourceInfo, Stats, WSMessage } from './types'
 import { RARITIES, RARITY_RANK } from './types'
@@ -104,6 +105,7 @@ class LootState {
    */
   #listeners = new Set<(drop: Drop) => void>()
 
+  #unscope: (() => void) | null = null
   #socket: WebSocket | null = null
   #retry = 0
   #reconnectTimer: ReturnType<typeof setTimeout> | null = null
@@ -191,6 +193,9 @@ class LootState {
   /** Loads the initial page and opens the live stream. */
   async start(): Promise<void> {
     this.#stopped = false
+    // The feed is the one view that is always mounted, so it subscribes to
+    // scope changes for its whole life rather than per page.
+    this.#unscope = scope.onChange(() => void this.rescope())
     await this.refresh()
     this.loading = false
     this.connect()
@@ -202,6 +207,8 @@ class LootState {
 
   stop(): void {
     this.#stopped = true
+    this.#unscope?.()
+    this.#unscope = null
     if (this.#reconnectTimer) clearTimeout(this.#reconnectTimer)
     if (this.#statsTimer) clearInterval(this.#statsTimer)
     if (this.#cascadeTimer) clearInterval(this.#cascadeTimer)
@@ -219,6 +226,7 @@ class LootState {
       ])
       this.#mergeHead(page.drops, page.next_before)
       this.stats = stats
+      scope.setProducts(stats.apps)
       this.sources = sources
       this.#setChests(chests)
       this.error = ''
@@ -231,6 +239,7 @@ class LootState {
     try {
       const [stats, sources] = await Promise.all([fetchStats(), fetchSources()])
       this.stats = stats
+      scope.setProducts(stats.apps)
       this.sources = sources
     } catch {
       // A failed background refresh is not worth surfacing; the websocket
@@ -275,6 +284,24 @@ class LootState {
     // `nextBefore` is left as it is on purpose: it already points past
     // everything still loaded, which a fresh head page cannot improve on, and
     // an empty one means the whole hoard is in hand.
+  }
+
+  /**
+   * Re-reads everything for a new app scope.
+   *
+   * The feed is *replaced* rather than merged: the drops on screen belong to
+   * the scope that has just been left, and prepending a scoped page on top of
+   * them would leave another app's cards sitting below the fold forever. The
+   * pagination cursor goes with them, because it points into the old scope's
+   * ordering.
+   */
+  async rescope(): Promise<void> {
+    this.drops = []
+    this.nextBefore = ''
+    this.#paged = false
+    this.loading = true
+    await this.refresh()
+    this.loading = false
   }
 
   /** Fetches the next page of older drops for infinite scroll. */
@@ -343,6 +370,7 @@ class LootState {
           source: (ev.source as string) ?? '',
           kind: (ev.kind as string) ?? '',
           app: (ev.app as string) ?? '',
+          product: (ev.product as string) ?? '',
           country: (ev.country as string) ?? '',
           amount: (ev.amount as number) ?? 0,
           amount_base: (ev.amount_base as number) ?? 0,
@@ -355,8 +383,21 @@ class LootState {
 
         // A drop from the chest being opened here is the cascade's clock: it
         // goes into the reveal queue instead of straight into the feed.
+        //
+        // A cascade is deliberately never scope-filtered: a chest is one daily
+        // ritual over everything you ship (there is no per-app chest), and
+        // dropping cards out of the middle of a reveal that the POST response
+        // still lists would strand the cascade waiting for them.
         if (msg.chest && this.#wantsArrival(drop)) {
           this.#enqueue(drop)
+          return
+        }
+        // Scope means focus. A live drop for another app does not render and
+        // does not play; it becomes a "+1 elsewhere" on the scope selector, so
+        // you know something happened without being pulled away from what you
+        // were looking at. The header's counts are refetched anyway.
+        if (!scope.includes(drop.product)) {
+          scope.noteElsewhere()
           return
         }
         this.receive(drop)

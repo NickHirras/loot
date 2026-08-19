@@ -74,13 +74,15 @@ END`
 // row, no country) is therefore entirely unknown, a Play day covered by its
 // country file is entirely placed, and a Play day whose country file has not
 // arrived yet is unknown until it does.
-const hearthUnknownInstalls = `
+func hearthUnknownInstalls(scope string) string {
+	return `
 SELECT COALESCE(SUM(MAX(day_total - placed, 0)), 0) FROM (
     SELECT ` + installValue + ` AS day_total,
            COALESCE(SUM(CASE WHEN e.country <> '' AND e.quantity > 0 THEN e.quantity ELSE 0 END), 0) AS placed
     FROM events e
-    WHERE e.kind = 'install'
+    WHERE e.kind = 'install'` + scope + `
     GROUP BY e.source, e.app, e.day)`
+}
 
 // maxHearthRecent is how many recent country-bearing drops the ticker gets.
 const maxHearthRecent = 30
@@ -208,6 +210,10 @@ func (s *Store) Hearth(ctx context.Context, homeCountry, displayCurrency string)
 
 	out.Capital = pickCapital(homeCountry, countries, events)
 
+	// XP and the era are deliberately *not* scoped. They are the account's
+	// standing — how far you have come, across everything you ship — and an
+	// era that went backwards when you narrowed the view to one app would be
+	// telling you something untrue about yourself.
 	if err := s.q.QueryRowContext(ctx,
 		`SELECT COALESCE(SUM(xp), 0) FROM drops d WHERE NOT `+unrevealed).Scan(&out.TotalXP); err != nil {
 		return out, fmt.Errorf("hearth xp: %w", err)
@@ -245,6 +251,11 @@ func pickCapital(homeCountry string, countries []HearthCountry, events map[strin
 func (s *Store) hearthCountries(ctx context.Context) ([]HearthCountry, map[string]int, HearthUnknown, error) {
 	var unknown HearthUnknown
 
+	// Settlements are arrivals and money, so the scope is strict: a scoped
+	// Hearth is this app's map of the world, not this app's plus everyone
+	// else's citizens.
+	strict, strictArgs := s.scopeStrict("e")
+
 	rows, err := s.q.QueryContext(ctx, `
         SELECT e.country,
                COALESCE(SUM(`+hearthPopulation+`), 0),
@@ -252,7 +263,8 @@ func (s *Store) hearthCountries(ctx context.Context) ([]HearthCountry, map[strin
                COALESCE(SUM(CASE WHEN `+ledgerRows+` THEN e.amount_base ELSE 0 END), 0),
                MIN(e.day), MAX(e.day), COUNT(*)
         FROM events e
-        GROUP BY e.country`)
+        WHERE 1 = 1`+strict+`
+        GROUP BY e.country`, strictArgs...)
 	if err != nil {
 		return nil, nil, unknown, fmt.Errorf("hearth countries: %w", err)
 	}
@@ -296,7 +308,7 @@ func (s *Store) hearthCountries(ctx context.Context) ([]HearthCountry, map[strin
 	rows.Close()
 
 	var unplaced int
-	if err := s.q.QueryRowContext(ctx, hearthUnknownInstalls).Scan(&unplaced); err != nil {
+	if err := s.q.QueryRowContext(ctx, hearthUnknownInstalls(strict), strictArgs...).Scan(&unplaced); err != nil {
 		return nil, nil, unknown, fmt.Errorf("hearth unknown installs: %w", err)
 	}
 	unknown.Population += unplaced
@@ -308,11 +320,12 @@ func (s *Store) hearthCountries(ctx context.Context) ([]HearthCountry, map[strin
 // still waiting in an unopened chest are excluded, exactly as they are from
 // the feed and from XP.
 func (s *Store) hearthDropCounts(ctx context.Context) (map[string]int, error) {
+	loose, looseArgs := s.scopeLoose("e")
 	rows, err := s.q.QueryContext(ctx, `
         SELECT e.country, COUNT(*)
         FROM drops d JOIN events e ON e.id = d.event_id
-        WHERE NOT `+unrevealed+` AND e.country <> ''
-        GROUP BY e.country`)
+        WHERE NOT `+unrevealed+` AND e.country <> ''`+loose+`
+        GROUP BY e.country`, looseArgs...)
 	if err != nil {
 		return nil, fmt.Errorf("hearth drop counts: %w", err)
 	}
@@ -338,12 +351,13 @@ func (s *Store) hearthDropCounts(ctx context.Context) (map[string]int, error) {
 // hearthRecent returns the newest visible drops that carry a country — the
 // arrivals ticker, and what the globe replays as arcs on a cold load.
 func (s *Store) hearthRecent(ctx context.Context) ([]HearthDrop, error) {
+	loose, looseArgs := s.scopeLoose("e")
 	rows, err := s.q.QueryContext(ctx, `
         SELECT d.id, d.rarity, d.title, d.subtitle, d.created_at, e.country, e.kind
         FROM drops d JOIN events e ON e.id = d.event_id
-        WHERE NOT `+unrevealed+` AND e.country <> ''
+        WHERE NOT `+unrevealed+` AND e.country <> ''`+loose+`
         ORDER BY d.id DESC
-        LIMIT ?`, maxHearthRecent)
+        LIMIT ?`, append(looseArgs, maxHearthRecent)...)
 	if err != nil {
 		return nil, fmt.Errorf("hearth recent: %w", err)
 	}

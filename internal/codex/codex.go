@@ -214,7 +214,11 @@ func (s *Service) Evaluate(ctx context.Context) (Result, error) {
 	// database: this is the backfill pass.
 	res.Backfilled = total == 0
 
-	snap, err := s.snapshot(ctx)
+	// Evaluation is always realm-wide. A trophy is something you did, not
+	// something one app did, so "your ten thousandth unit" counts every unit
+	// you have ever sold — and unlocking it twice because two products each
+	// crossed a threshold would cheapen both.
+	snap, err := s.snapshot(ctx, "")
 	if err != nil {
 		return res, err
 	}
@@ -309,9 +313,9 @@ func (s *Service) Evaluate(ctx context.Context) (Result, error) {
 }
 
 // snapshot reads the history once and reshapes it into the cumulative series
-// the catalog measures against.
-func (s *Service) snapshot(ctx context.Context) (*Snapshot, error) {
-	agg, err := s.Store.CodexAggregates(ctx)
+// the catalog measures against. An empty product reads everything.
+func (s *Service) snapshot(ctx context.Context, product string) (*Snapshot, error) {
+	agg, err := s.Store.Scoped(product).CodexAggregates(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -367,9 +371,20 @@ func (s *Service) publish() {
 // List answers GET /api/codex: the trophy wall, the records and the lifetime
 // totals, all from one pass over the history.
 func (s *Service) List(ctx context.Context) (Board, error) {
+	return s.ListScoped(ctx, "")
+}
+
+// ListScoped is List narrowed to one product.
+//
+// The records and the lifetime totals are the app's — its best revenue day,
+// its units, its countries. The achievements are *not*: a trophy is yours, and
+// a wall that emptied itself when you picked one of your apps would be telling
+// you that you had won less than you have. So the wall is the same in every
+// scope, and the numbers beside it change.
+func (s *Service) ListScoped(ctx context.Context, product string) (Board, error) {
 	board := Board{DisplayCurrency: s.DisplayCurrency, Achievements: []core.Achievement{}}
 
-	snap, err := s.snapshot(ctx)
+	snap, err := s.snapshot(ctx, product)
 	if err != nil {
 		return board, err
 	}
@@ -404,11 +419,16 @@ func (s *Service) List(ctx context.Context) (Board, error) {
 
 // Recap answers GET /api/recap for one period.
 func (s *Service) Recap(ctx context.Context, month, season string) (Recap, error) {
+	return s.RecapScoped(ctx, month, season, "")
+}
+
+// RecapScoped is Recap for one product: the month as that app had it.
+func (s *Service) RecapScoped(ctx context.Context, month, season, product string) (Recap, error) {
 	p, err := ResolvePeriod(s.now(), month, season)
 	if err != nil {
 		return Recap{}, err
 	}
-	return BuildRecap(ctx, s.Store, p, s.DisplayCurrency)
+	return BuildRecap(ctx, s.Store.Scoped(product), p, s.DisplayCurrency)
 }
 
 // Months lists the periods the recap picker offers: the last twelve months

@@ -8,6 +8,7 @@
   import QuestsPage from './lib/QuestsPage.svelte'
   import VaultPage from './lib/VaultPage.svelte'
   import { router } from './lib/route.svelte'
+  import { scope } from './lib/scope.svelte'
   import { loot } from './lib/state.svelte'
 
   $effect(() => {
@@ -15,7 +16,17 @@
     return () => loot.stop()
   })
 
-  $effect(() => router.start())
+  $effect(() => {
+    const stopRouter = router.start()
+    // A scoped link, or the back button, changes the hash without going
+    // through the selector; adopting it here is what makes both work.
+    const syncScope = () => scope.syncFromHash()
+    addEventListener('hashchange', syncScope)
+    return () => {
+      stopRouter()
+      removeEventListener('hashchange', syncScope)
+    }
+  })
 
   // Browsers will not start an AudioContext without a gesture, so the banner
   // stays until the user clicks (or explicitly mutes).

@@ -17,6 +17,7 @@ Usage:
   loot serve [flags]        Run the API, websocket stream, sources and dashboard (default)
   loot tail  [flags]        Stream drops into your terminal
   loot check [flags]        Verify every configured source and exit
+  loot apps  [remap]        Show which apps map to which product, or recompute them
   loot chest [open [date]]  List the daily chests waiting, or open one
   loot fx    [recompute]    Show exchange rates, or re-convert stored amounts
   loot demo  reset          Delete the demo database (data/demo.db); see "loot serve --demo"
@@ -43,6 +44,8 @@ func main() {
 		err = runTail(args)
 	case "check":
 		err = runCheck(args)
+	case "apps":
+		err = runApps(args)
 	case "chest":
 		err = runChest(args)
 	case "fx":

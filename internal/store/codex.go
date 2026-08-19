@@ -298,6 +298,15 @@ func (s *Store) CodexAggregates(ctx context.Context) (CodexAggregates, error) {
 	var agg CodexAggregates
 	var err error
 
+	// Scoped, the Codex answers "what has this app ever done?". Money, units,
+	// installs and countries are strict — they belong to one product — while
+	// the drop and XP series are loose, so a realm-wide trophy still counts
+	// towards "most drops in a day" inside a scope. Achievements themselves
+	// are stored rows and never scoped at all: a trophy is yours, not the
+	// app's. See scope.go.
+	strict, strictArgs := s.scopeStrict("e")
+	loose, looseArgs := s.scopeLoose("e")
+
 	if agg.LedgerDays, err = s.codexLedgerDays(ctx); err != nil {
 		return agg, err
 	}
@@ -308,17 +317,20 @@ func (s *Store) CodexAggregates(ctx context.Context) (CodexAggregates, error) {
 		return agg, err
 	}
 	if agg.CountryFirstDay, err = s.codexFirstDays(ctx,
-		`SELECT country, MIN(day) FROM events WHERE country <> '' GROUP BY country`); err != nil {
+		`SELECT e.country, MIN(e.day) FROM events e WHERE e.country <> ''`+strict+
+			` GROUP BY e.country`, strictArgs...); err != nil {
 		return agg, err
 	}
 	if agg.CurrencyFirstDay, err = s.codexFirstDays(ctx,
-		`SELECT UPPER(currency), MIN(day) FROM events
-         WHERE currency <> '' AND amount <> 0 GROUP BY UPPER(currency)`); err != nil {
+		`SELECT UPPER(e.currency), MIN(e.day) FROM events e
+         WHERE e.currency <> '' AND e.amount <> 0`+strict+` GROUP BY UPPER(e.currency)`,
+		strictArgs...); err != nil {
 		return agg, err
 	}
 	if agg.LedgerSourceFirstDay, err = s.codexFirstDays(ctx,
 		`SELECT e.source, MIN(e.day) FROM events e
-         WHERE `+ledgerRows+` AND e.amount_base <> 0 GROUP BY e.source`); err != nil {
+         WHERE `+ledgerRows+` AND e.amount_base <> 0`+strict+` GROUP BY e.source`,
+		strictArgs...); err != nil {
 		return agg, err
 	}
 	if agg.ChestDays, err = s.codexDayValues(ctx, `
@@ -332,18 +344,21 @@ func (s *Store) CodexAggregates(ctx context.Context) (CodexAggregates, error) {
 		agg.ChestsOpened += int(c.Value)
 	}
 	if agg.QuestDays, err = s.codexDayValues(ctx, `
-        SELECT day, COUNT(*) FROM events
-        WHERE source = 'loot' AND kind = 'quest_complete' GROUP BY day ORDER BY day`); err != nil {
+        SELECT e.day, COUNT(*) FROM events e
+        WHERE e.source = 'loot' AND e.kind = 'quest_complete'`+loose+`
+        GROUP BY e.day ORDER BY e.day`, looseArgs...); err != nil {
 		return agg, err
 	}
 	if agg.MysteryDays, err = s.codexDayValues(ctx, `
-        SELECT day, COUNT(*) FROM events
-        WHERE source = 'loot' AND kind = 'mystery_solved' GROUP BY day ORDER BY day`); err != nil {
+        SELECT e.day, COUNT(*) FROM events e
+        WHERE e.source = 'loot' AND e.kind = 'mystery_solved'`+loose+`
+        GROUP BY e.day ORDER BY e.day`, looseArgs...); err != nil {
 		return agg, err
 	}
 	if agg.StarDays, err = s.codexDayValues(ctx, `
-        SELECT day, COALESCE(SUM(CASE WHEN quantity > 0 THEN quantity ELSE 1 END), 0)
-        FROM events WHERE kind = 'star' GROUP BY day ORDER BY day`); err != nil {
+        SELECT e.day, COALESCE(SUM(CASE WHEN e.quantity > 0 THEN e.quantity ELSE 1 END), 0)
+        FROM events e WHERE e.kind = 'star'`+strict+` GROUP BY e.day ORDER BY e.day`,
+		strictArgs...); err != nil {
 		return agg, err
 	}
 	// Star *events* only exist for stars Loot watched arrive. The daily
@@ -353,25 +368,27 @@ func (s *Store) CodexAggregates(ctx context.Context) (CodexAggregates, error) {
 	// over the repos that reported it.
 	if agg.StarTotalDays, err = s.codexDayValues(ctx, `
         SELECT day, COALESCE(SUM(v), 0) FROM (
-            SELECT day AS day, MAX(quantity) AS v FROM events
-            WHERE kind = 'stars_total' GROUP BY app, day)
-        GROUP BY day ORDER BY day`); err != nil {
+            SELECT e.day AS day, MAX(e.quantity) AS v FROM events e
+            WHERE e.kind = 'stars_total'`+strict+` GROUP BY e.app, e.day)
+        GROUP BY day ORDER BY day`, strictArgs...); err != nil {
 		return agg, err
 	}
 	// A snapshot is a level, not a flow: a day's subscribers is the sum over
 	// the apps that reported that day, and the achievement takes the highest
 	// level ever reached — a number that, once reached, was reached.
 	if agg.SubscriberDays, err = s.codexDayValues(ctx, `
-        SELECT day, COALESCE(SUM(quantity), 0) FROM events
-        WHERE kind = 'subscription_snapshot' GROUP BY day ORDER BY day`); err != nil {
+        SELECT e.day, COALESCE(SUM(e.quantity), 0) FROM events e
+        WHERE e.kind = 'subscription_snapshot'`+strict+` GROUP BY e.day ORDER BY e.day`,
+		strictArgs...); err != nil {
 		return agg, err
 	}
 
 	firsts := []struct {
 		into  *string
 		query string
+		args  []any
 	}{
-		{&agg.FirstEventDay, `SELECT MIN(day) FROM events`},
+		{&agg.FirstEventDay, `SELECT MIN(e.day) FROM events e WHERE 1 = 1` + strict, strictArgs},
 		// A drop still sealed in an unopened chest has not happened yet — the
 		// same rule the feed and the XP counter use. Without it, an unlock
 		// drop sitting in today's chest would hand out "your first legendary
@@ -379,18 +396,18 @@ func (s *Store) CodexAggregates(ctx context.Context) (CodexAggregates, error) {
 		// Webhook test pings and Loot's own bookkeeping drops don't count as
 		// "something to report" either.
 		{&agg.FirstDropDay, `SELECT MIN(e.day) FROM drops d JOIN events e ON e.id = d.event_id
-             WHERE NOT ` + unrevealed + ` AND e.kind <> 'test' AND e.source <> 'loot'`},
+             WHERE NOT ` + unrevealed + ` AND e.kind <> 'test' AND e.source <> 'loot'` + loose, looseArgs},
 		{&agg.FirstSaleDay, `SELECT MIN(e.day) FROM events e
-             WHERE ` + ledgerRows + ` AND e.kind IN ('sale', 'iap', 'subscription') AND e.quantity > 0`},
-		{&agg.FirstSubscriberDay, `SELECT MIN(day) FROM events
-             WHERE (source = 'revenuecat' AND kind = 'purchase')
-                OR kind = 'subscription' OR kind = 'subscription_snapshot'`},
+             WHERE ` + ledgerRows + ` AND e.kind IN ('sale', 'iap', 'subscription') AND e.quantity > 0` + strict, strictArgs},
+		{&agg.FirstSubscriberDay, `SELECT MIN(e.day) FROM events e
+             WHERE ((e.source = 'revenuecat' AND e.kind = 'purchase')
+                OR e.kind = 'subscription' OR e.kind = 'subscription_snapshot')` + strict, strictArgs},
 		{&agg.FirstLegendaryDay, `SELECT MIN(e.day) FROM drops d JOIN events e ON e.id = d.event_id
-             WHERE NOT ` + unrevealed + ` AND d.rarity = 'legendary'`},
+             WHERE NOT ` + unrevealed + ` AND d.rarity = 'legendary'` + loose, looseArgs},
 	}
 	for _, f := range firsts {
 		var day sql.NullString
-		if err := s.q.QueryRowContext(ctx, f.query).Scan(&day); err != nil {
+		if err := s.q.QueryRowContext(ctx, f.query, f.args...).Scan(&day); err != nil {
 			return agg, fmt.Errorf("codex first day: %w", err)
 		}
 		*f.into = day.String
@@ -406,15 +423,16 @@ func (s *Store) CodexAggregates(ctx context.Context) (CodexAggregates, error) {
 }
 
 func (s *Store) codexLedgerDays(ctx context.Context) ([]SourceDay, error) {
+	strict, strictArgs := s.scopeStrict("e")
 	rows, err := s.q.QueryContext(ctx, `
         SELECT e.source, e.day,
                COALESCE(SUM(e.amount_base), 0),
                COALESCE(SUM(CASE WHEN `+isPaidUnit+` THEN e.quantity ELSE 0 END), 0),
                COALESCE(SUM(CASE WHEN `+isRefund+` THEN ABS(e.quantity) ELSE 0 END), 0)
         FROM events e
-        WHERE `+ledgerRows+`
+        WHERE `+ledgerRows+strict+`
         GROUP BY e.source, e.day
-        ORDER BY e.day ASC`)
+        ORDER BY e.day ASC`, strictArgs...)
 	if err != nil {
 		return nil, fmt.Errorf("codex ledger days: %w", err)
 	}
@@ -435,24 +453,26 @@ func (s *Store) codexLedgerDays(ctx context.Context) ([]SourceDay, error) {
 func (s *Store) codexInstallDays(ctx context.Context) ([]DayValue, error) {
 	// The install rule, once more: a (source, app, day) that has any row
 	// without a country *is* the day; otherwise the country rows are the day.
+	strict, strictArgs := s.scopeStrict("e")
 	return s.codexDayValues(ctx, `
         SELECT day, COALESCE(SUM(v), 0) FROM (
             SELECT e.day AS day, `+installValue+` AS v FROM events e
-            WHERE e.kind = 'install'
+            WHERE e.kind = 'install'`+strict+`
             GROUP BY e.source, e.app, e.day)
-        GROUP BY day ORDER BY day`)
+        GROUP BY day ORDER BY day`, strictArgs...)
 }
 
 func (s *Store) codexDropDays(ctx context.Context) ([]DropDay, error) {
+	loose, looseArgs := s.scopeLoose("e")
 	rows, err := s.q.QueryContext(ctx, `
         SELECT e.day, d.rarity, COUNT(*), COALESCE(SUM(d.xp), 0),
                COALESCE(SUM(CASE WHEN d.rarity = 'epic'
                                   AND e.kind IN ('sales_day', 'installs_day')
                             THEN 1 ELSE 0 END), 0)
         FROM drops d JOIN events e ON e.id = d.event_id
-        WHERE NOT `+unrevealed+`
+        WHERE NOT `+unrevealed+loose+`
         GROUP BY e.day, d.rarity
-        ORDER BY e.day ASC`)
+        ORDER BY e.day ASC`, looseArgs...)
 	if err != nil {
 		return nil, fmt.Errorf("codex drop days: %w", err)
 	}
@@ -510,8 +530,8 @@ func (s *Store) codexDayValues(ctx context.Context, query string, args ...any) (
 }
 
 // codexFirstDays runs a query returning (key, first day) pairs.
-func (s *Store) codexFirstDays(ctx context.Context, query string) (map[string]string, error) {
-	rows, err := s.q.QueryContext(ctx, query)
+func (s *Store) codexFirstDays(ctx context.Context, query string, args ...any) (map[string]string, error) {
+	rows, err := s.q.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("codex first days: %w", err)
 	}
@@ -574,11 +594,12 @@ func (s *Store) codexBestDrop(ctx context.Context) (*BestDrop, error) {
 		b      BestDrop
 		rarity string
 	)
+	loose, looseArgs := s.scopeLoose("e")
 	err := s.q.QueryRowContext(ctx, `
         SELECT d.id, d.title, d.subtitle, d.rarity, d.xp, e.day, e.source
         FROM drops d JOIN events e ON e.id = d.event_id
-        WHERE NOT `+unrevealed+`
-        ORDER BY d.xp DESC, d.id ASC LIMIT 1`).
+        WHERE NOT `+unrevealed+loose+`
+        ORDER BY d.xp DESC, d.id ASC LIMIT 1`, looseArgs...).
 		Scan(&b.ID, &b.Title, &b.Subtitle, &rarity, &b.XP, &b.Day, &b.Source)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
@@ -653,6 +674,11 @@ func (s *Store) RecapWindow(ctx context.Context, from, to string) (RecapAggregat
 		NewCountries: []RecapCountry{},
 	}
 
+	// Same split as the Codex proper: money strict, drops loose. Chests stay
+	// global — a chest is a daily ritual over everything, not a per-app one.
+	strict, strictArgs := s.scopeStrict("e")
+	loose, looseArgs := s.scopeLoose("e")
+
 	var (
 		revenue sql.NullFloat64
 		units   sql.NullInt64
@@ -663,7 +689,8 @@ func (s *Store) RecapWindow(ctx context.Context, from, to string) (RecapAggregat
                COALESCE(SUM(CASE WHEN `+isPaidUnit+` THEN e.quantity ELSE 0 END), 0),
                COALESCE(SUM(CASE WHEN `+isRefund+` THEN ABS(e.quantity) ELSE 0 END), 0)
         FROM events e
-        WHERE `+ledgerRows+` AND e.day BETWEEN ? AND ?`, from, to).
+        WHERE `+ledgerRows+` AND e.day BETWEEN ? AND ?`+strict,
+		append([]any{from, to}, strictArgs...)...).
 		Scan(&revenue, &units, &refunds); err != nil {
 		return out, fmt.Errorf("recap totals: %w", err)
 	}
@@ -675,8 +702,9 @@ func (s *Store) RecapWindow(ctx context.Context, from, to string) (RecapAggregat
 	if err := s.q.QueryRowContext(ctx, `
         SELECT COALESCE(SUM(v), 0) FROM (
             SELECT `+installValue+` AS v FROM events e
-            WHERE e.kind = 'install' AND e.day BETWEEN ? AND ?
-            GROUP BY e.source, e.app, e.day)`, from, to).Scan(&installs); err != nil {
+            WHERE e.kind = 'install' AND e.day BETWEEN ? AND ?`+strict+`
+            GROUP BY e.source, e.app, e.day)`,
+		append([]any{from, to}, strictArgs...)...).Scan(&installs); err != nil {
 		return out, fmt.Errorf("recap installs: %w", err)
 	}
 	out.Installs = int(installs.Float64)
@@ -684,8 +712,8 @@ func (s *Store) RecapWindow(ctx context.Context, from, to string) (RecapAggregat
 	rarityRows, err := s.q.QueryContext(ctx, `
         SELECT d.rarity, COUNT(*), COALESCE(SUM(d.xp), 0)
         FROM drops d JOIN events e ON e.id = d.event_id
-        WHERE NOT `+unrevealed+` AND e.day BETWEEN ? AND ?
-        GROUP BY d.rarity`, from, to)
+        WHERE NOT `+unrevealed+` AND e.day BETWEEN ? AND ?`+loose+`
+        GROUP BY d.rarity`, append([]any{from, to}, looseArgs...)...)
 	if err != nil {
 		return out, fmt.Errorf("recap rarities: %w", err)
 	}
@@ -722,8 +750,8 @@ func (s *Store) RecapWindow(ctx context.Context, from, to string) (RecapAggregat
 	}
 	daily, err := s.codexDayValues(ctx, `
         SELECT e.day, COALESCE(SUM(e.amount_base), 0) FROM events e
-        WHERE `+ledgerRows+` AND e.day BETWEEN ? AND ?
-        GROUP BY e.day ORDER BY e.day`, from, to)
+        WHERE `+ledgerRows+` AND e.day BETWEEN ? AND ?`+strict+`
+        GROUP BY e.day ORDER BY e.day`, append([]any{from, to}, strictArgs...)...)
 	if err != nil {
 		return out, err
 	}
@@ -743,10 +771,10 @@ func (s *Store) RecapWindow(ctx context.Context, from, to string) (RecapAggregat
 	// this window — a returning customer is not a new settlement.
 	countryRows, err := s.q.QueryContext(ctx, `
         SELECT country, first_day FROM (
-            SELECT country, MIN(day) AS first_day FROM events
-            WHERE country <> '' GROUP BY country)
+            SELECT e.country AS country, MIN(e.day) AS first_day FROM events e
+            WHERE e.country <> ''`+strict+` GROUP BY e.country)
         WHERE first_day BETWEEN ? AND ?
-        ORDER BY first_day ASC, country ASC`, from, to)
+        ORDER BY first_day ASC, country ASC`, append(append([]any{}, strictArgs...), from, to)...)
 	if err != nil {
 		return out, fmt.Errorf("recap new countries: %w", err)
 	}
@@ -788,24 +816,26 @@ func (s *Store) RecapWindow(ctx context.Context, from, to string) (RecapAggregat
 	counts := []struct {
 		into  *int
 		query string
+		args  []any
 	}{
 		{&out.ChestsOpened, `SELECT COUNT(DISTINCT chest_date) FROM drops
              WHERE revealed_at IS NOT NULL AND chest_date <> ''
-               AND strftime('%Y-%m-%d', revealed_at / 1000, 'unixepoch') BETWEEN ? AND ?`},
-		{&out.QuestsCompleted, `SELECT COUNT(*) FROM events
-             WHERE source = 'loot' AND kind = 'quest_complete' AND day BETWEEN ? AND ?`},
-		{&out.MysteriesSolved, `SELECT COUNT(*) FROM events
-             WHERE source = 'loot' AND kind = 'mystery_solved' AND day BETWEEN ? AND ?`},
+               AND strftime('%Y-%m-%d', revealed_at / 1000, 'unixepoch') BETWEEN ? AND ?`, nil},
+		{&out.QuestsCompleted, `SELECT COUNT(*) FROM events e
+             WHERE e.source = 'loot' AND e.kind = 'quest_complete' AND e.day BETWEEN ? AND ?` + loose, looseArgs},
+		{&out.MysteriesSolved, `SELECT COUNT(*) FROM events e
+             WHERE e.source = 'loot' AND e.kind = 'mystery_solved' AND e.day BETWEEN ? AND ?` + loose, looseArgs},
 	}
 	for _, c := range counts {
-		if err := s.q.QueryRowContext(ctx, c.query, from, to).Scan(c.into); err != nil {
+		if err := s.q.QueryRowContext(ctx, c.query, append([]any{from, to}, c.args...)...).Scan(c.into); err != nil {
 			return out, fmt.Errorf("recap count: %w", err)
 		}
 	}
 
 	if err := s.q.QueryRowContext(ctx, `
         SELECT COALESCE(SUM(d.xp), 0) FROM drops d JOIN events e ON e.id = d.event_id
-        WHERE NOT `+unrevealed+` AND e.day < ?`, from).Scan(&out.XPBefore); err != nil {
+        WHERE NOT `+unrevealed+` AND e.day < ?`+loose,
+		append([]any{from}, looseArgs...)...).Scan(&out.XPBefore); err != nil {
 		return out, fmt.Errorf("recap xp before: %w", err)
 	}
 	return out, nil
@@ -816,15 +846,16 @@ func (s *Store) RecapWindow(ctx context.Context, from, to string) (RecapAggregat
 // an answer.
 func (s *Store) recapTop(ctx context.Context, column, from, to string) (RecapSlice, error) {
 	var r RecapSlice
+	strict, strictArgs := s.scopeStrict("e")
 	err := s.q.QueryRowContext(ctx, `
         SELECT `+column+`,
                COALESCE(SUM(e.amount_base), 0),
                COALESCE(SUM(CASE WHEN `+isPaidUnit+` THEN e.quantity ELSE 0 END), 0)
         FROM events e
-        WHERE `+ledgerRows+` AND e.day BETWEEN ? AND ? AND `+column+` <> ''
+        WHERE `+ledgerRows+` AND e.day BETWEEN ? AND ? AND `+column+` <> ''`+strict+`
         GROUP BY `+column+`
         ORDER BY SUM(e.amount_base) DESC, SUM(e.quantity) DESC
-        LIMIT 1`, from, to).Scan(&r.Key, &r.RevenueBase, &r.Units)
+        LIMIT 1`, append([]any{from, to}, strictArgs...)...).Scan(&r.Key, &r.RevenueBase, &r.Units)
 	if errors.Is(err, sql.ErrNoRows) {
 		return RecapSlice{}, nil
 	}

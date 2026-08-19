@@ -1,5 +1,6 @@
 import { untrack } from 'svelte'
 import { fetchHearth } from './api'
+import { scope } from './scope.svelte'
 import { loot } from './state.svelte'
 import type { Drop, Hearth, HearthCountry, HearthDrop } from './types'
 
@@ -82,6 +83,8 @@ class HearthState {
       void this.load()
       this.#timer = setInterval(() => void this.load(), REFRESH_MS)
       this.#unsubscribe = loot.onDrop((drop) => this.#applyDrop(drop))
+      // A scope change is not "stale soon", it is "wrong now".
+      const unscope = scope.onChange(() => void this.load())
 
       return () => {
         this.#active = false
@@ -90,6 +93,7 @@ class HearthState {
         this.#unsubscribe?.()
         this.#timer = this.#staleTimer = null
         this.#unsubscribe = null
+        unscope()
       }
     })
   }
@@ -132,6 +136,10 @@ class HearthState {
   #applyDrop(drop: Drop): void {
     const data = this.data
     if (!data || !drop.country) return
+    // A scoped globe must not light up a country because another app sold
+    // there. `loot` already filters live drops, but the Hearth also replays
+    // chest cascades, which are never scoped.
+    if (!scope.includes(drop.product)) return
 
     const arrival: HearthDrop = {
       id: drop.id,

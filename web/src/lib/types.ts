@@ -35,6 +35,11 @@ export interface Drop {
   source: string
   kind: string
   app: string
+  /**
+   * The canonical app this drop belongs to, or "" for a realm-wide one (an
+   * achievement, a global quest). The scope filter reads this.
+   */
+  product?: string
   country: string
   amount: number
   /** `amount` converted into the dashboard's display currency at ingest. */
@@ -73,10 +78,40 @@ export interface Stats {
   /** How many bosses are still standing; drives the red Quests tab badge. */
   bosses_alive: number
   display_currency: string
+  /** Every product this Loot can be scoped to, configured ones first. */
+  apps: string[]
+  /** The product this response was scoped to; "" for all apps. */
+  app: string
   dev: boolean
   /** True when this Loot is running on synthetic demo data. */
   demo: boolean
   listeners: number
+}
+
+/** One product, as GET /api/apps reports it. */
+export interface AppProduct {
+  name: string
+  /** Source id -> the raw app names that source used for this product. */
+  sources: Record<string, string[]>
+  /** False for a product Loot inferred because no `apps:` entry claimed it. */
+  configured: boolean
+  events: number
+  first_seen: string
+}
+
+/** One (source, app) pair no configured product claimed. */
+export interface UnmappedApp {
+  source: string
+  app: string
+  product: string
+  events: number
+  first_seen: string
+}
+
+/** The whole of GET /api/apps. */
+export interface AppsResponse {
+  products: AppProduct[]
+  unmapped: UnmappedApp[]
 }
 
 export interface SourceInfo {

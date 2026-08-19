@@ -15,31 +15,40 @@ import (
 // websocket drops on top anyway, so the cache is never what the eye sees.
 const hearthTTL = 5 * time.Second
 
-// hearthCache memoizes the Hearth aggregate for hearthTTL.
+// hearthCache memoizes the Hearth aggregate for hearthTTL, per scope.
+//
+// Keyed by product because "all apps" and "just Nistis" are different globes
+// and one would otherwise serve the other for five seconds — which, on a page
+// where changing the scope is a click, is exactly the five seconds somebody is
+// looking at it. The map is bounded by how many apps you ship.
 type hearthCache struct {
-	mu     sync.Mutex
-	at     time.Time
-	value  store.Hearth
-	loaded bool
+	mu      sync.Mutex
+	entries map[string]hearthEntry
 }
 
-// cached returns the memoized aggregate if it is still fresh.
-func (c *hearthCache) cached() (store.Hearth, bool) {
+type hearthEntry struct {
+	at    time.Time
+	value store.Hearth
+}
+
+// cached returns the memoized aggregate for one scope if it is still fresh.
+func (c *hearthCache) cached(scope string) (store.Hearth, bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if c.loaded && time.Since(c.at) < hearthTTL {
-		return c.value, true
+	if e, ok := c.entries[scope]; ok && time.Since(e.at) < hearthTTL {
+		return e.value, true
 	}
 	return store.Hearth{}, false
 }
 
 // put stores a freshly computed aggregate.
-func (c *hearthCache) put(h store.Hearth) {
+func (c *hearthCache) put(scope string, h store.Hearth) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.value = h
-	c.at = time.Now()
-	c.loaded = true
+	if c.entries == nil {
+		c.entries = map[string]hearthEntry{}
+	}
+	c.entries[scope] = hearthEntry{at: time.Now(), value: h}
 }
 
 // handleHearth serves the globe: settlements, era, capital and the recent
@@ -55,17 +64,20 @@ func (c *hearthCache) put(h store.Hearth) {
 // deliberate: it is one read of an indexed table, and it is a far better
 // trade than serializing every reader behind the first one.
 func (s *Server) handleHearth(w http.ResponseWriter, r *http.Request) {
-	if hearth, ok := s.hearth.cached(); ok {
+	scope := scopeOf(r)
+	if hearth, ok := s.hearth.cached(scope); ok {
 		writeJSON(w, http.StatusOK, hearth)
 		return
 	}
 
-	hearth, err := s.Store.Hearth(r.Context(), s.Cfg.HomeCountry, s.displayCurrency())
+	// Settlements, population and the arrivals ticker narrow to the product;
+	// the era and the XP behind it never do. See internal/store/hearth.go.
+	hearth, err := s.scoped(r).Hearth(r.Context(), s.Cfg.HomeCountry, s.displayCurrency())
 	if err != nil {
 		s.fail(w, "hearth", err)
 		return
 	}
-	s.hearth.put(hearth)
+	s.hearth.put(scope, hearth)
 
 	writeJSON(w, http.StatusOK, hearth)
 }

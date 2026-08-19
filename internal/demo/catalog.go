@@ -1,6 +1,39 @@
 package demo
 
-import "github.com/nickhirras/loot/internal/core"
+import (
+	"github.com/nickhirras/loot/internal/config"
+	"github.com/nickhirras/loot/internal/core"
+)
+
+// Products is the demo world's `apps:` mapping: the same three fictional apps,
+// stated the way a real config would state them.
+//
+// It exists so a demo opens with a populated scope selector rather than with
+// one that says "All apps" and nothing else — the scope filter is only worth
+// looking at when there is more than one thing to scope to, and a demo whose
+// selector is empty demonstrates the opposite of the feature.
+//
+// The raw names are exactly what the seeder writes: the display name for the
+// stores that report by title, the Flatpak id for Flathub, which is precisely
+// the mismatch the mapping exists to paper over.
+func Products() config.Products {
+	out := make(config.Products, 0, len(apps))
+	for _, a := range apps {
+		match := map[string][]string{
+			"appstore":   {a.Name},
+			"googleplay": {a.Name},
+			"revenuecat": {a.Name},
+			"playvitals": {a.Name},
+			"crash":      {a.Name},
+			"sentry":     {a.Name},
+		}
+		if a.Flatpak != "" {
+			match["flathub"] = []string{a.Flatpak}
+		}
+		out = append(out, config.Product{Name: a.Name, Match: match})
+	}
+	return out
+}
 
 // The cast: three fictional apps, the storefronts they sell in, and the
 // products they sell. Everything the seeder and the live emitter invent is

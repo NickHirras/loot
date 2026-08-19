@@ -19,38 +19,44 @@ import (
 // same aggregate to be computed thirty times.
 const codexTTL = 5 * time.Second
 
-// codexCache memoizes the Codex board for codexTTL.
+// codexCache memoizes the Codex board for codexTTL, per scope: the records and
+// totals differ per product even though the trophies do not.
 type codexCache struct {
-	mu     sync.Mutex
-	at     time.Time
-	value  codex.Board
-	loaded bool
+	mu      sync.Mutex
+	entries map[string]codexEntry
 }
 
-func (c *codexCache) cached() (codex.Board, bool) {
+type codexEntry struct {
+	at    time.Time
+	value codex.Board
+}
+
+func (c *codexCache) cached(scope string) (codex.Board, bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if c.loaded && time.Since(c.at) < codexTTL {
-		return c.value, true
+	if e, ok := c.entries[scope]; ok && time.Since(e.at) < codexTTL {
+		return e.value, true
 	}
 	return codex.Board{}, false
 }
 
-func (c *codexCache) put(b codex.Board) {
+func (c *codexCache) put(scope string, b codex.Board) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.value = b
-	c.at = time.Now()
-	c.loaded = true
+	if c.entries == nil {
+		c.entries = map[string]codexEntry{}
+	}
+	c.entries[scope] = codexEntry{at: time.Now(), value: b}
 }
 
-// invalidate drops the memo. An unlock is precisely the moment a stale wall is
-// most obvious — the drop is on screen, the page has been nudged to refetch,
-// and a five-second-old answer would show the trophy still locked.
+// invalidate drops every memo. An unlock is precisely the moment a stale wall
+// is most obvious — the drop is on screen, the page has been nudged to
+// refetch, and a five-second-old answer would show the trophy still locked.
+// Every scope shows the same trophies, so every scope is stale at once.
 func (c *codexCache) invalidate() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.loaded = false
+	c.entries = nil
 }
 
 // InvalidateCodex forgets the memoized trophy wall. `loot serve` hands it to
@@ -73,17 +79,20 @@ func (s *Server) handleCodex(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-	if board, ok := s.codex.cached(); ok {
+	scope := scopeOf(r)
+	if board, ok := s.codex.cached(scope); ok {
 		writeJSON(w, http.StatusOK, board)
 		return
 	}
 
-	board, err := s.Codex.List(r.Context())
+	// Records and lifetime totals narrow to the product; the trophies do not.
+	// See codex.Service.ListScoped.
+	board, err := s.Codex.ListScoped(r.Context(), scope)
 	if err != nil {
 		s.fail(w, "codex", err)
 		return
 	}
-	s.codex.put(board)
+	s.codex.put(scope, board)
 	writeJSON(w, http.StatusOK, board)
 }
 
@@ -99,7 +108,7 @@ func (s *Server) handleRecap(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	q := r.URL.Query()
-	recap, err := s.Codex.Recap(r.Context(), q.Get("month"), q.Get("season"))
+	recap, err := s.Codex.RecapScoped(r.Context(), q.Get("month"), q.Get("season"), scopeOf(r))
 	if err != nil {
 		// A bad month is the caller's mistake and worth saying so precisely;
 		// anything else is ours.

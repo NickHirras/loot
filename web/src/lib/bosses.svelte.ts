@@ -1,5 +1,6 @@
 import { untrack } from 'svelte'
 import { fetchBosses, slayBoss } from './api'
+import { scope } from './scope.svelte'
 import type { Boss, BossBoard } from './types'
 
 /** How often the page re-reads the board while it is open. */
@@ -65,11 +66,14 @@ class BossesState {
       this.#active = true
       void this.load()
       this.#timer = setInterval(() => void this.load(), REFRESH_MS)
+      // A scope change is not "stale soon", it is "wrong now".
+      const unscope = scope.onChange(() => void this.load())
       return () => {
         this.#active = false
         if (this.#timer) clearInterval(this.#timer)
         if (this.#staleTimer) clearTimeout(this.#staleTimer)
         this.#timer = this.#staleTimer = null
+        unscope()
       }
     })
   }

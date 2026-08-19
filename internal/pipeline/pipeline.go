@@ -50,6 +50,11 @@ type Pipeline struct {
 
 	// DisplayCurrency is what Event.AmountBase is denominated in.
 	DisplayCurrency string
+	// Products resolves each event's raw app name into the canonical product
+	// it belongs to, which is what every scoped view filters on. Optional:
+	// without it an app is its own product, which is exactly what an unmapped
+	// app resolves to anyway.
+	Products store.Resolver
 	// FX converts amounts into DisplayCurrency at ingest. Optional: without
 	// it, only amounts already in the display currency get a base amount.
 	FX Converter
@@ -209,6 +214,21 @@ func (p *Pipeline) Normalize(ev *core.Event) {
 	}
 	if ev.Day == "" {
 		ev.Day = core.DayOf(ev.OccurredAt)
+	}
+	// The product is resolved at ingest so a scoped query is one indexed
+	// column rather than a mapping applied per row at read time. It is
+	// recomputed for the whole table by store.RemapProducts whenever the
+	// mapping changes, so this is a cache and never the source of truth.
+	//
+	// An event with no app at all stays product-less on purpose: Loot's own
+	// achievements are about the whole realm and appear in every scope.
+	switch {
+	case ev.App == "":
+		ev.Product = ""
+	case p.Products != nil:
+		ev.Product = p.Products.Resolve(ev.Source, ev.App)
+	case ev.Product == "":
+		ev.Product = ev.App
 	}
 	if ev.Amount != 0 && ev.AmountBase == 0 {
 		if ev.Currency == "" {
@@ -451,12 +471,25 @@ func (p *Pipeline) IngestSilently(ctx context.Context, ev core.Event) error {
 	return err
 }
 
+// DefaultFirstRoundCap is how long FirstRoundDone waits for a slow or stuck
+// source before declaring the first round over anyway. A source that is still
+// downloading six months of App Store reports must not hold up the rest of
+// Loot forever.
+const DefaultFirstRoundCap = 10 * time.Minute
+
 // Scheduler drives polling sources on their own intervals.
 type Scheduler struct {
 	Pipeline *Pipeline
 	Store    *store.Store
 	Sources  []core.Source
 	Logger   *slog.Logger
+	// FirstRoundCap overrides DefaultFirstRoundCap. Tests set it small.
+	FirstRoundCap time.Duration
+
+	// firstRound is closed once every polling source has finished its first
+	// Poll (or the cap has expired). See FirstRoundDone.
+	firstRound chan struct{}
+	firstOnce  sync.Once
 }
 
 // NewScheduler returns a scheduler over the polling-capable sources in list.
@@ -465,7 +498,36 @@ func NewScheduler(p *Pipeline, st *store.Store, sources []core.Source, log *slog
 	if log == nil {
 		log = slog.Default()
 	}
-	return &Scheduler{Pipeline: p, Store: st, Sources: sources, Logger: log}
+	return &Scheduler{
+		Pipeline:   p,
+		Store:      st,
+		Sources:    sources,
+		Logger:     log,
+		firstRound: make(chan struct{}),
+	}
+}
+
+// FirstRoundDone is closed once every polling source has completed its first
+// Poll — that is, once the database holds whatever history a first run was
+// going to backfill.
+//
+// It exists because of one specific, embarrassing bug: quests were generated
+// at startup, before the sources had said anything, so the generator saw an
+// empty database, and the App Store backfill that landed forty seconds later
+// completed "Settle 2 new countries" instantly — with an epic drop, a sound
+// and XP for countries that were settled months ago. A quest has to be set
+// against what you already have, and at startup Loot does not yet know what
+// that is.
+//
+// A webhook-only source has no first poll and is not waited for: it will speak
+// when something happens, which may be next week. A polling source that hangs
+// is waited for no longer than FirstRoundCap.
+func (s *Scheduler) FirstRoundDone() <-chan struct{} { return s.firstRound }
+
+// closeFirstRound is idempotent: the cap and the last source race, and either
+// may win.
+func (s *Scheduler) closeFirstRound() {
+	s.firstOnce.Do(func() { close(s.firstRound) })
 }
 
 // Run polls every polling source until ctx is cancelled. It blocks.
@@ -473,36 +535,72 @@ func (s *Scheduler) Run(ctx context.Context) {
 	done := make(chan struct{})
 	started := 0
 
+	var first sync.WaitGroup
 	for _, src := range s.Sources {
 		interval := src.PollInterval()
 		if interval <= 0 {
 			continue
 		}
 		started++
+		first.Add(1)
 		go func(src core.Source, interval time.Duration) {
 			defer func() { done <- struct{}{} }()
-			s.runSource(ctx, src, interval)
+			s.runSource(ctx, src, interval, &first)
 		}(src, interval)
 	}
 
 	if started == 0 {
+		// Nothing polls, so the first round is over before it began: a
+		// webhook-only Loot (or demo mode) must not wait ten minutes for a
+		// quest board.
+		s.closeFirstRound()
 		<-ctx.Done()
 		return
 	}
+
+	go func() {
+		first.Wait()
+		s.Logger.Debug("first poll round complete", "sources", started)
+		s.closeFirstRound()
+	}()
+	limit := s.FirstRoundCap
+	if limit <= 0 {
+		limit = DefaultFirstRoundCap
+	}
+	go func() {
+		select {
+		case <-ctx.Done():
+		case <-s.firstRound:
+		case <-time.After(limit):
+			s.Logger.Warn("first poll round timed out; carrying on", "after", limit.String())
+			s.closeFirstRound()
+		}
+	}()
+
 	for i := 0; i < started; i++ {
 		<-done
 	}
 }
 
-func (s *Scheduler) runSource(ctx context.Context, src core.Source, interval time.Duration) {
+// runSource polls src forever. first is released after the very first poll,
+// whether it succeeded or not: a source that is broken is not a source Loot
+// should wait on, it is one that has already told us all it is going to.
+func (s *Scheduler) runSource(ctx context.Context, src core.Source, interval time.Duration, first *sync.WaitGroup) {
 	log := s.Logger.With("source", src.Name())
 	log.Info("polling source started", "interval", interval.String())
 
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
+	firstDone := false
 	for {
 		s.PollOnce(ctx, src)
+		if !firstDone {
+			firstDone = true
+			if first != nil {
+				first.Done()
+			}
+		}
 		select {
 		case <-ctx.Done():
 			log.Info("polling source stopped")

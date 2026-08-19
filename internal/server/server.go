@@ -72,6 +72,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/drops", s.handleDrops)
 	mux.HandleFunc("GET /api/stats", s.handleStats)
 	mux.HandleFunc("GET /api/sources", s.handleSources)
+	mux.HandleFunc("GET /api/apps", s.handleApps)
 	mux.HandleFunc("GET /api/vault/summary", s.handleVaultSummary)
 	mux.HandleFunc("GET /api/hearth", s.handleHearth)
 	mux.HandleFunc("GET /api/chest", s.handleChest)
@@ -119,7 +120,11 @@ func (s *Server) handleDrops(w http.ResponseWriter, r *http.Request) {
 
 	// Drops waiting in an unopened chest are deliberately absent: the feed is
 	// the "already happened" list, and a chest has not happened yet.
-	drops, err := s.Store.ListDrops(r.Context(), store.DropQuery{Limit: limit, Before: before})
+	//
+	// `?app=` narrows the feed to one product *plus* Loot's own realm-wide
+	// drops — an achievement is about the whole hoard, and hiding it because
+	// you were looking at one app would be hiding your own news from you.
+	drops, err := s.scoped(r).ListDrops(r.Context(), store.DropQuery{Limit: limit, Before: before})
 	if err != nil {
 		s.fail(w, "list drops", err)
 		return
@@ -133,28 +138,40 @@ func (s *Server) handleDrops(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {
-	st, err := s.Store.Stats(r.Context())
+	scope := scopeOf(r)
+	scoped := s.scoped(r)
+
+	st, err := scoped.Stats(r.Context())
 	if err != nil {
 		s.fail(w, "stats", err)
 		return
 	}
 	// Two counts the header needs on every page: what is still unexplained,
 	// and how much is running. Both are one indexed COUNT.
-	openMysteries, err := s.Store.CountOpenMysteries(r.Context())
+	openMysteries, err := s.countOpenMysteries(r.Context(), scope)
 	if err != nil {
 		s.fail(w, "stats", err)
 		return
 	}
 	// Every active row, closed windows included: the badge should agree with
 	// the board beside it, and the board lists a quest until expiry retires it.
-	activeQuests, err := s.Store.CountActiveQuests(r.Context(), "", "")
+	activeQuests, err := scoped.CountActiveQuests(r.Context(), "", "")
 	if err != nil {
 		s.fail(w, "stats", err)
 		return
 	}
 	// And one the Quests tab needs so its badge can turn red before the board
 	// itself has been fetched: how many monsters are still standing.
-	aliveBosses, err := s.Store.CountAliveBosses(r.Context())
+	aliveBosses, err := s.countAliveBosses(r.Context(), scope)
+	if err != nil {
+		s.fail(w, "stats", err)
+		return
+	}
+
+	// The selector's own options travel with every stats read, so the header
+	// can draw the scope picker from the response it already makes rather
+	// than from a second request on every page load.
+	pairs, err := s.Store.ProductPairs(r.Context())
 	if err != nil {
 		s.fail(w, "stats", err)
 		return
@@ -174,7 +191,11 @@ func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {
 		"active_quests":    activeQuests,
 		"bosses_alive":     aliveBosses,
 		"display_currency": s.displayCurrency(),
-		"dev":              s.Cfg.Dev.Enabled,
+		// apps is every product this Loot could be scoped to, and app the one
+		// it currently is. Both are always present, empty scope included.
+		"apps": s.knownProducts(pairs),
+		"app":  scope,
+		"dev":  s.Cfg.Dev.Enabled,
 		// demo tells the dashboard to wear its "synthetic data" pill, so
 		// nobody mistakes a demo for their own numbers.
 		"demo":      s.Cfg.Demo.Enabled,

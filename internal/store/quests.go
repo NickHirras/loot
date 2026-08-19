@@ -38,14 +38,21 @@ END`
 
 // questFilters renders the optional app/source narrowing of a quest onto an
 // events alias, returning the SQL fragment and its arguments.
+//
+// A quest's App matches either the canonical product or the raw app name a
+// source reported. Both, because a quest set from the scope selector names a
+// *product* ("Nistis"), while one set before there were products — or against
+// an app nobody has mapped — names whatever App Store Connect called it. An
+// unmapped app resolves to its own name, so for those two the columns agree
+// and matching on both costs nothing.
 func questFilters(app, source string) (string, []any) {
 	var (
 		sb   strings.Builder
 		args []any
 	)
 	if app != "" {
-		sb.WriteString(" AND e.app = ?")
-		args = append(args, app)
+		sb.WriteString(" AND (e.product = ? OR e.app = ?)")
+		args = append(args, app, app)
 	}
 	if source != "" {
 		sb.WriteString(" AND e.source = ?")
@@ -129,28 +136,48 @@ func (s *Store) QuestProgress(ctx context.Context, q core.Quest) (float64, error
 	return round2(value.Float64), nil
 }
 
-// MetricsWithData reports which metrics this database has any history for, so
-// the generator never invents a revenue quest for somebody who has only ever
-// had installs. The answers are cheap existence checks, not counts.
-func (s *Store) MetricsWithData(ctx context.Context) (map[core.Metric]bool, error) {
+// MetricDays reports how many distinct business days this database has data on
+// for each metric.
+//
+// It is a count of *days* rather than of rows because that is the question the
+// generator actually has: "beat last week by 5%" needs a week to have
+// happened. Three hundred App Store rows that all belong to one imported day
+// are one day of history, and a target extrapolated from them is a target
+// invented out of nothing.
+func (s *Store) MetricDays(ctx context.Context) (map[core.Metric]int, error) {
 	checks := map[core.Metric]string{
-		core.MetricRevenue:     `SELECT EXISTS (SELECT 1 FROM events e WHERE ` + ledgerRows + ` AND e.amount_base <> 0)`,
-		core.MetricUnits:       `SELECT EXISTS (SELECT 1 FROM events e WHERE ` + ledgerRows + ` AND ` + isPaidUnit + ` AND e.quantity > 0)`,
-		core.MetricInstalls:    `SELECT EXISTS (SELECT 1 FROM events WHERE kind = 'install')`,
-		core.MetricSubscribers: `SELECT EXISTS (SELECT 1 FROM events WHERE kind = 'subscription_snapshot')`,
-		core.MetricDrops:       `SELECT EXISTS (SELECT 1 FROM drops)`,
-		core.MetricSettlements: `SELECT EXISTS (SELECT 1 FROM events WHERE kind = 'settlement')`,
-		core.MetricStars:       `SELECT EXISTS (SELECT 1 FROM events WHERE kind = 'star')`,
-		core.MetricXP:          `SELECT EXISTS (SELECT 1 FROM drops WHERE xp > 0)`,
+		core.MetricRevenue:     `SELECT COUNT(DISTINCT e.day) FROM events e WHERE ` + ledgerRows + ` AND e.amount_base <> 0`,
+		core.MetricUnits:       `SELECT COUNT(DISTINCT e.day) FROM events e WHERE ` + ledgerRows + ` AND ` + isPaidUnit + ` AND e.quantity > 0`,
+		core.MetricInstalls:    `SELECT COUNT(DISTINCT day) FROM events WHERE kind = 'install'`,
+		core.MetricSubscribers: `SELECT COUNT(DISTINCT day) FROM events WHERE kind = 'subscription_snapshot'`,
+		core.MetricDrops:       `SELECT COUNT(DISTINCT e.day) FROM drops d JOIN events e ON e.id = d.event_id`,
+		core.MetricSettlements: `SELECT COUNT(DISTINCT day) FROM events WHERE kind = 'settlement'`,
+		core.MetricStars:       `SELECT COUNT(DISTINCT day) FROM events WHERE kind = 'star'`,
+		core.MetricXP:          `SELECT COUNT(DISTINCT e.day) FROM drops d JOIN events e ON e.id = d.event_id WHERE d.xp > 0`,
 	}
 
-	out := make(map[core.Metric]bool, len(checks))
+	out := make(map[core.Metric]int, len(checks))
 	for _, metric := range core.Metrics {
-		var found int
-		if err := s.q.QueryRowContext(ctx, checks[metric]).Scan(&found); err != nil {
-			return nil, fmt.Errorf("metrics with data %s: %w", metric, err)
+		var days int
+		if err := s.q.QueryRowContext(ctx, checks[metric]).Scan(&days); err != nil {
+			return nil, fmt.Errorf("metric days %s: %w", metric, err)
 		}
-		out[metric] = found == 1
+		out[metric] = days
+	}
+	return out, nil
+}
+
+// MetricsWithData reports which metrics this database has any history for, so
+// the generator never invents a revenue quest for somebody who has only ever
+// had installs.
+func (s *Store) MetricsWithData(ctx context.Context) (map[core.Metric]bool, error) {
+	days, err := s.MetricDays(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[core.Metric]bool, len(days))
+	for metric, n := range days {
+		out[metric] = n > 0
 	}
 	return out, nil
 }
@@ -207,12 +234,20 @@ type QuestQuery struct {
 func (s *Store) ListQuests(ctx context.Context, q QuestQuery) ([]core.Quest, error) {
 	query := `SELECT ` + questColumns + ` FROM quests`
 	var args []any
+	where := ` WHERE 1 = 1`
 	if len(q.Statuses) > 0 {
-		query += ` WHERE status IN (` + placeholders(len(q.Statuses)) + `)`
+		where += ` AND status IN (` + placeholders(len(q.Statuses)) + `)`
 		for _, st := range q.Statuses {
 			args = append(args, st)
 		}
 	}
+	// A scoped board shows this product's quests plus the realm-wide ones the
+	// generator writes, exactly as a scoped feed shows global drops.
+	if frag, fragArgs := s.scopeQuests("quests"); frag != "" {
+		where += frag
+		args = append(args, fragArgs...)
+	}
+	query += where
 	if q.Newest {
 		query += ` ORDER BY COALESCE(completed_at, created_at) DESC, id DESC`
 	} else {
@@ -276,6 +311,10 @@ func (s *Store) CountActiveQuests(ctx context.Context, kind, today string) (int,
 	if today != "" {
 		query += ` AND window_end >= ?`
 		args = append(args, today)
+	}
+	if frag, fragArgs := s.scopeQuests("quests"); frag != "" {
+		query += frag
+		args = append(args, fragArgs...)
 	}
 	var n int
 	if err := s.q.QueryRowContext(ctx, query, args...).Scan(&n); err != nil {

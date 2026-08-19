@@ -1,5 +1,6 @@
 import { untrack } from 'svelte'
 import { fetchVaultSummary } from './api'
+import { scope } from './scope.svelte'
 import type { VaultRange, VaultSummary } from './types'
 import { VAULT_RANGES } from './types'
 
@@ -57,11 +58,15 @@ class VaultState {
       this.#active = true
       void this.load()
       this.#timer = setInterval(() => void this.load(), REFRESH_MS)
+      // A scope change is not "stale soon", it is "wrong now": reload at once
+      // rather than through the debounce.
+      const unscope = scope.onChange(() => void this.load())
       return () => {
         this.#active = false
         if (this.#timer) clearInterval(this.#timer)
         if (this.#staleTimer) clearTimeout(this.#staleTimer)
         this.#timer = this.#staleTimer = null
+        unscope()
       }
     })
   }

@@ -224,4 +224,31 @@ CREATE UNIQUE INDEX bosses_key_idx    ON bosses(key);
 CREATE INDEX        bosses_status_idx ON bosses(status, spawned_day);
 `,
 	},
+	{
+		// The app scope: which product an event belongs to.
+		//
+		// `app` stays exactly what the source said — it is evidence, and
+		// rewriting it would lose the only record of what App Store Connect
+		// actually called the row. `product` is the *reading* of it: App
+		// resolved through the configured `apps:` mapping, recomputed at
+		// startup by RemapProducts whenever that mapping changes. An empty
+		// product means "the whole realm" (Loot's own achievements), never
+		// "unknown app" — an unmapped app resolves to its own raw name.
+		//
+		// Both indexes lead with product because every scoped query starts
+		// there; (product, day) serves the vault and the codex, and
+		// (product, source, day) the per-source breakdowns.
+		Name: "0006_products",
+		SQL: `
+ALTER TABLE events ADD COLUMN product TEXT NOT NULL DEFAULT '';
+
+-- Existing rows start as their own raw app name, which is what an unmapped
+-- app resolves to anyway; RemapProducts corrects the mapped ones at startup
+-- and logs how many it changed.
+UPDATE events SET product = app WHERE product = '' AND app <> '';
+
+CREATE INDEX events_product_day_idx        ON events(product, day);
+CREATE INDEX events_product_source_day_idx ON events(product, source, day);
+`,
+	},
 }

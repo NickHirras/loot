@@ -164,6 +164,12 @@ func (s *Store) VaultSummary(ctx context.Context, from, to, displayCurrency, tod
 func (s *Store) vaultTotals(ctx context.Context, from, to string) (VaultTotals, error) {
 	var t VaultTotals
 
+	// The vault is money, so its scope is strict throughout: there are no
+	// product-less ledger rows, and adding another product's revenue to a
+	// scoped headline would be the one bug in Loot nobody would forgive.
+	strict, strictArgs := s.scopeStrict("e")
+	loose, looseArgs := s.scopeLoose("e")
+
 	var (
 		revenue sql.NullFloat64
 		units   sql.NullInt64
@@ -174,7 +180,8 @@ func (s *Store) vaultTotals(ctx context.Context, from, to string) (VaultTotals, 
                COALESCE(SUM(CASE WHEN `+isPaidUnit+` THEN e.quantity ELSE 0 END), 0),
                COALESCE(SUM(CASE WHEN `+isRefund+` THEN ABS(e.quantity) ELSE 0 END), 0)
         FROM events e
-        WHERE `+ledgerRows+` AND e.day BETWEEN ? AND ?`, from, to).Scan(&revenue, &units, &refunds)
+        WHERE `+ledgerRows+` AND e.day BETWEEN ? AND ?`+strict,
+		append([]any{from, to}, strictArgs...)...).Scan(&revenue, &units, &refunds)
 	if err != nil {
 		return t, fmt.Errorf("vault totals: %w", err)
 	}
@@ -183,15 +190,17 @@ func (s *Store) vaultTotals(ctx context.Context, from, to string) (VaultTotals, 
 	t.Refunds = int(refunds.Int64)
 
 	err = s.q.QueryRowContext(ctx, `
-        SELECT COUNT(*), COUNT(DISTINCT CASE WHEN country <> '' THEN country END)
-        FROM events WHERE day BETWEEN ? AND ?`, from, to).Scan(&t.Events, &t.Countries)
+        SELECT COUNT(*), COUNT(DISTINCT CASE WHEN e.country <> '' THEN e.country END)
+        FROM events e WHERE e.day BETWEEN ? AND ?`+strict,
+		append([]any{from, to}, strictArgs...)...).Scan(&t.Events, &t.Countries)
 	if err != nil {
 		return t, fmt.Errorf("vault event totals: %w", err)
 	}
 
 	err = s.q.QueryRowContext(ctx, `
         SELECT COUNT(*) FROM drops d JOIN events e ON e.id = d.event_id
-        WHERE NOT `+unrevealed+` AND e.day BETWEEN ? AND ?`, from, to).Scan(&t.Drops)
+        WHERE NOT `+unrevealed+` AND e.day BETWEEN ? AND ?`+loose,
+		append([]any{from, to}, looseArgs...)...).Scan(&t.Drops)
 	if err != nil {
 		return t, fmt.Errorf("vault drop totals: %w", err)
 	}
@@ -212,13 +221,14 @@ func (s *Store) vaultSeries(ctx context.Context, from, to string, days int) ([]V
 		series = append(series, VaultPoint{Day: day, BySource: map[string]float64{}})
 	}
 
+	strict, strictArgs := s.scopeStrict("e")
 	rows, err := s.q.QueryContext(ctx, `
         SELECT e.day, e.source,
                COALESCE(SUM(e.amount_base), 0),
                COALESCE(SUM(CASE WHEN `+isPaidUnit+` THEN e.quantity ELSE 0 END), 0)
         FROM events e
-        WHERE `+ledgerRows+` AND e.day BETWEEN ? AND ?
-        GROUP BY e.day, e.source`, from, to)
+        WHERE `+ledgerRows+` AND e.day BETWEEN ? AND ?`+strict+`
+        GROUP BY e.day, e.source`, append([]any{from, to}, strictArgs...)...)
 	if err != nil {
 		return nil, fmt.Errorf("vault series: %w", err)
 	}
@@ -248,6 +258,7 @@ func (s *Store) vaultSeries(ctx context.Context, from, to string, days int) ([]V
 }
 
 func (s *Store) vaultBreakdowns(ctx context.Context, from, to string, totalRevenue float64) ([]SourceSlice, []AppSlice, []CountrySlice, error) {
+	strict, strictArgs := s.scopeStrict("e")
 	group := func(column string) ([]struct {
 		Key string
 		Slice
@@ -257,9 +268,10 @@ func (s *Store) vaultBreakdowns(ctx context.Context, from, to string, totalReven
                    COALESCE(SUM(e.amount_base), 0),
                    COALESCE(SUM(CASE WHEN `+isPaidUnit+` THEN e.quantity ELSE 0 END), 0)
             FROM events e
-            WHERE `+ledgerRows+` AND e.day BETWEEN ? AND ?
+            WHERE `+ledgerRows+` AND e.day BETWEEN ? AND ?`+strict+`
             GROUP BY `+column+`
-            ORDER BY SUM(e.amount_base) DESC, SUM(e.quantity) DESC`, from, to)
+            ORDER BY SUM(e.amount_base) DESC, SUM(e.quantity) DESC`,
+			append([]any{from, to}, strictArgs...)...)
 		if err != nil {
 			return nil, fmt.Errorf("vault breakdown %s: %w", column, err)
 		}
@@ -342,15 +354,18 @@ func (s *Store) vaultSubscriptions(ctx context.Context, today string) (VaultSubs
 		floor = core.DayOf(t.AddDate(0, 0, -(subscriptionRecencyDays - 1)))
 	}
 
+	strict, strictArgs := s.scopeStrict("e")
+	snapScope, snapArgs := s.scopeStrict("snap")
 	rows, err := s.q.QueryContext(ctx, `
         SELECT e.quantity, e.day
         FROM events e
         JOIN (
-            SELECT source, app, MAX(day) AS day
-            FROM events WHERE kind = 'subscription_snapshot' AND day >= ?
-            GROUP BY source, app
+            SELECT snap.source, snap.app, MAX(snap.day) AS day
+            FROM events snap WHERE snap.kind = 'subscription_snapshot' AND snap.day >= ?`+snapScope+`
+            GROUP BY snap.source, snap.app
         ) latest ON latest.source = e.source AND latest.app = e.app AND latest.day = e.day
-        WHERE e.kind = 'subscription_snapshot'`, floor)
+        WHERE e.kind = 'subscription_snapshot'`+strict,
+		append(append([]any{floor}, snapArgs...), strictArgs...)...)
 	if err != nil {
 		return VaultSubscriptions{}, fmt.Errorf("vault subscriptions: %w", err)
 	}
@@ -387,10 +402,12 @@ func (s *Store) vaultSubscriptions(ctx context.Context, today string) (VaultSubs
 func (s *Store) vaultRealtime(ctx context.Context, today string) (VaultRealtime, error) {
 	var rt VaultRealtime
 	var amount sql.NullFloat64
+	strict, strictArgs := s.scopeStrict("e")
 	err := s.q.QueryRowContext(ctx, `
-        SELECT COUNT(*), COALESCE(SUM(amount_base), 0)
-        FROM events
-        WHERE source = 'revenuecat' AND kind IN ('purchase', 'renewal') AND day = ?`, today).
+        SELECT COUNT(*), COALESCE(SUM(e.amount_base), 0)
+        FROM events e
+        WHERE e.source = 'revenuecat' AND e.kind IN ('purchase', 'renewal') AND e.day = ?`+strict,
+		append([]any{today}, strictArgs...)...).
 		Scan(&rt.RevenueCatPurchasesToday, &amount)
 	if err != nil {
 		return rt, fmt.Errorf("vault realtime: %w", err)

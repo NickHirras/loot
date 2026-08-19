@@ -66,10 +66,15 @@ func DayOf(t time.Time) string { return t.UTC().Format(DayLayout) }
 // Event is a single normalized fact observed from a store or service. Sources
 // produce events; the pipeline dedupes, persists and classifies them.
 type Event struct {
-	ID         string    `json:"id"`
-	Source     string    `json:"source"`
-	Kind       string    `json:"kind"`
-	App        string    `json:"app"`
+	ID     string `json:"id"`
+	Source string `json:"source"`
+	Kind   string `json:"kind"`
+	App    string `json:"app"`
+	// Product is the canonical app this event belongs to: App resolved through
+	// the configured `apps:` mapping (see config.Products). It is what every
+	// scoped view filters on, and it is "" for Loot's own global events — an
+	// achievement belongs to the whole realm, not to one app.
+	Product    string    `json:"product"`
 	OccurredAt time.Time `json:"occurred_at"`
 	ObservedAt time.Time `json:"observed_at"`
 	// Day is the business day this event belongs to (YYYY-MM-DD). Ledger

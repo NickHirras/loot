@@ -27,7 +27,9 @@ func (s *Server) handleQuests(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, quests.Board{Active: []core.Quest{}, Recent: []core.Quest{}})
 		return
 	}
-	board, err := s.Quests.List(r.Context())
+	// A scoped board shows this product's quests and the realm-wide ones; see
+	// quests.Service.ListScoped.
+	board, err := s.Quests.ListScoped(r.Context(), scopeOf(r))
 	if err != nil {
 		s.fail(w, "quests", err)
 		return
@@ -89,10 +91,19 @@ func (s *Server) handleQuestCreate(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// A custom quest keeps its own app: whatever the form said, or — when the
+	// form said nothing and the page was scoped — the product being looked at,
+	// which is what "set a goal for this app" means when you are already
+	// looking at one app.
+	app := strings.TrimSpace(req.App)
+	if app == "" {
+		app = scopeOf(r)
+	}
+
 	quest, err := s.Quests.Create(r.Context(), quests.CustomRequest{
 		Metric: core.Metric(strings.ToLower(strings.TrimSpace(req.Metric))),
 		Target: req.Target,
-		App:    req.App,
+		App:    app,
 		Source: req.Source,
 		Window: req.Window.Name,
 		Start:  req.Window.Start,
@@ -136,7 +147,24 @@ func (s *Server) handleMysteries(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, "mysteries", err)
 		return
 	}
+	// A mystery row records the raw (source, app) the flagged day belonged to,
+	// so the scope is applied here rather than in SQL.
+	if scope := scopeOf(r); scope != "" {
+		book.Open = s.mysteriesInScope(scope, book.Open)
+		book.Resolved = s.mysteriesInScope(scope, book.Resolved)
+	}
 	writeJSON(w, http.StatusOK, book)
+}
+
+// mysteriesInScope keeps the flagged days that belong to one product.
+func (s *Server) mysteriesInScope(scope string, list []core.Mystery) []core.Mystery {
+	out := make([]core.Mystery, 0, len(list))
+	for _, m := range list {
+		if s.inScope(scope, m.Source, m.App) {
+			out = append(out, m)
+		}
+	}
+	return out
 }
 
 // solveRequest is the body of POST /api/mysteries/{id}/solve.

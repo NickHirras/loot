@@ -30,6 +30,17 @@ import (
 // DefaultMaxActive is how many generated quests may run at the same time.
 const DefaultMaxActive = 6
 
+// MinHistoryDays is how many days a metric must have data on before the
+// generator will write a quest about it.
+//
+// "Beat last week by 5%" is only a meaningful target if there was a last week.
+// A Loot that has been running for two days — or one whose App Store backfill
+// landed as a single day's worth of rows — has a number, not a baseline, and a
+// target extrapolated from it is either trivially met or wildly out of reach.
+// Seven days is the shortest window that contains one of each weekday, which
+// is the shape almost every app's numbers actually have.
+const MinHistoryDays = 7
+
 // growth factors: last window plus a nudge, not a leap.
 const (
 	growthStandard = 1.05
@@ -57,6 +68,9 @@ type Generator struct {
 	DisplayCurrency string
 	// MaxActive caps how many auto quests may be running at once.
 	MaxActive int
+	// MinHistoryDays overrides MinHistoryDays for tests. 0 uses the constant;
+	// a negative value switches the check off entirely.
+	MinHistoryDays int
 	// Now is the clock, in local time.
 	Now func() time.Time
 }
@@ -114,9 +128,17 @@ func (g *Generator) Run(ctx context.Context) ([]core.Quest, error) {
 	prevWeekStart, prevWeekEnd := WeekWindow(now.AddDate(0, 0, -7))
 	prevMonthStart, prevMonthEnd := MonthWindow(now.AddDate(0, 0, -now.Day()))
 
-	available, err := g.Store.MetricsWithData(ctx)
+	history, err := g.Store.MetricDays(ctx)
 	if err != nil {
 		return nil, err
+	}
+	minDays := g.MinHistoryDays
+	if minDays == 0 {
+		minDays = MinHistoryDays
+	}
+	available := make(map[core.Metric]bool, len(history))
+	for metric, days := range history {
+		available[metric] = days > 0 && (minDays < 0 || days >= minDays)
 	}
 
 	// Priority order: the week first (it is the window somebody can still do
@@ -178,6 +200,9 @@ func (g *Generator) Run(ctx context.Context) ([]core.Quest, error) {
 			break
 		}
 		if !available[c.metric] {
+			// Either nothing has ever happened for this metric, or not enough
+			// days of it have. Both mean "no basis for a target"; see
+			// MinHistoryDays.
 			continue
 		}
 

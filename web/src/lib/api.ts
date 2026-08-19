@@ -1,5 +1,7 @@
 import type {
   Achievement,
+  AppProduct,
+  AppsResponse,
   Boss,
   BossBoard,
   Casebook,
@@ -19,9 +21,43 @@ import type {
   RecapResponse,
   SourceInfo,
   Stats,
+  UnmappedApp,
   VaultRange,
   VaultSummary,
 } from './types'
+
+/**
+ * The app scope, as a plain module variable rather than as reactive state.
+ *
+ * Every read endpoint takes `?app=<product>`, so rather than thread a scope
+ * argument through two dozen call sites, the scope lives here and every
+ * request picks it up. It is deliberately *not* `$state`: `scope.svelte.ts`
+ * owns the reactive copy the UI renders and pushes it down here, which keeps
+ * api.ts free of Svelte imports and — more usefully — keeps a fetch from
+ * becoming a reactive dependency of whatever effect happened to trigger it.
+ */
+let currentScope = ''
+
+/** Sets the product every subsequent request is scoped to. "" is all apps. */
+export function setScope(product: string): void {
+  currentScope = product
+}
+
+/** The product requests are currently scoped to. */
+export function getScope(): string {
+  return currentScope
+}
+
+/** Adds `app=` to a parameter set when a scope is active. */
+function withScope(params: URLSearchParams): URLSearchParams {
+  if (currentScope) params.set('app', currentScope)
+  return params
+}
+
+/** Renders a scoped query string, including the leading "?", or "". */
+function scopeQuery(): string {
+  return currentScope ? `?app=${encodeURIComponent(currentScope)}` : ''
+}
 
 async function getJSON<T>(path: string): Promise<T> {
   const res = await fetch(path, { headers: { Accept: 'application/json' } })
@@ -55,14 +91,14 @@ async function errorText(res: Response, path: string): Promise<string> {
 }
 
 export async function fetchDrops(limit = 100, before?: string): Promise<{ drops: Drop[]; next_before: string }> {
-  const params = new URLSearchParams({ limit: String(limit) })
+  const params = withScope(new URLSearchParams({ limit: String(limit) }))
   if (before) params.set('before', before)
   const data = await getJSON<{ drops: Drop[] | null; next_before: string }>(`/api/drops?${params}`)
   return { drops: data.drops ?? [], next_before: data.next_before ?? '' }
 }
 
 export function fetchStats(): Promise<Stats> {
-  return getJSON<Stats>('/api/stats')
+  return getJSON<Stats>(`/api/stats${scopeQuery()}`)
 }
 
 export async function fetchSources(): Promise<SourceInfo[]> {
@@ -70,8 +106,20 @@ export async function fetchSources(): Promise<SourceInfo[]> {
   return data.sources ?? []
 }
 
+/**
+ * What apps this Loot knows about: the configured products, anything a source
+ * reported that no mapping claimed, and the evidence for both.
+ *
+ * Deliberately unscoped — it is the list you pick a scope *from*.
+ */
+export async function fetchApps(): Promise<AppsResponse> {
+  const data = await getJSON<{ products: AppProduct[] | null; unmapped: UnmappedApp[] | null }>('/api/apps')
+  return { products: data.products ?? [], unmapped: data.unmapped ?? [] }
+}
+
 export function fetchVaultSummary(range: VaultRange): Promise<VaultSummary> {
-  return getJSON<VaultSummary>(`/api/vault/summary?range=${encodeURIComponent(range)}`)
+  const params = withScope(new URLSearchParams({ range }))
+  return getJSON<VaultSummary>(`/api/vault/summary?${params}`)
 }
 
 export async function fetchChests(): Promise<ChestSummary[]> {
@@ -142,7 +190,7 @@ export async function fetchHearth(): Promise<Hearth> {
       tiers: HearthTier[] | null
       recent: HearthDrop[] | null
     }
-  >('/api/hearth')
+  >(`/api/hearth${scopeQuery()}`)
   return {
     ...data,
     countries: data.countries ?? [],
@@ -155,7 +203,7 @@ export async function fetchHearth(): Promise<Hearth> {
 
 /** The quest board: what is running, and what recently finished or ended. */
 export async function fetchQuests(): Promise<QuestBoard> {
-  const data = await getJSON<{ active: Quest[] | null; recent: Quest[] | null }>('/api/quests')
+  const data = await getJSON<{ active: Quest[] | null; recent: Quest[] | null }>(`/api/quests${scopeQuery()}`)
   return { active: data.active ?? [], recent: data.recent ?? [] }
 }
 
@@ -179,7 +227,7 @@ export async function deleteQuest(id: string): Promise<void> {
 
 /** The casebook: what is unexplained, and the notes on what was. */
 export async function fetchMysteries(): Promise<Casebook> {
-  const data = await getJSON<{ open: Mystery[] | null; resolved: Mystery[] | null }>('/api/mysteries')
+  const data = await getJSON<{ open: Mystery[] | null; resolved: Mystery[] | null }>(`/api/mysteries${scopeQuery()}`)
   return { open: data.open ?? [], resolved: data.resolved ?? [] }
 }
 
@@ -204,7 +252,9 @@ export async function dismissMystery(id: string): Promise<Mystery> {
  * lifetime totals, which the server computes on read.
  */
 export async function fetchCodex(): Promise<CodexBoard> {
-  const data = await getJSON<Omit<CodexBoard, 'achievements'> & { achievements: Achievement[] | null }>('/api/codex')
+  const data = await getJSON<Omit<CodexBoard, 'achievements'> & { achievements: Achievement[] | null }>(
+    `/api/codex${scopeQuery()}`,
+  )
   return { ...data, achievements: data.achievements ?? [] }
 }
 
@@ -214,7 +264,7 @@ export async function fetchCodex(): Promise<CodexBoard> {
  * sharing.
  */
 export async function fetchRecap(period = ''): Promise<RecapResponse> {
-  const params = new URLSearchParams()
+  const params = withScope(new URLSearchParams())
   if (/^\d{4}$/.test(period)) params.set('season', period)
   else if (period) params.set('month', period)
   const query = params.toString()
@@ -228,7 +278,7 @@ export async function fetchRecap(period = ''): Promise<RecapResponse> {
 
 /** The boss board: the fights in progress, and the last few that ended. */
 export async function fetchBosses(): Promise<BossBoard> {
-  const data = await getJSON<{ alive: Boss[] | null; recent: Boss[] | null }>('/api/bosses')
+  const data = await getJSON<{ alive: Boss[] | null; recent: Boss[] | null }>(`/api/bosses${scopeQuery()}`)
   return { alive: data.alive ?? [], recent: data.recent ?? [] }
 }
 

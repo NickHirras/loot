@@ -1,6 +1,8 @@
 <script lang="ts">
   import ChestIcon from './ChestIcon.svelte'
   import { TABS, router } from './route.svelte'
+  import ScopeSelect from './ScopeSelect.svelte'
+  import { scope } from './scope.svelte'
   import { loot } from './state.svelte'
   import { RARITIES } from './types'
 
@@ -28,6 +30,12 @@
     <div class="brand">
       <span class="gem" aria-hidden="true">◆</span>
       <h1>Loot</h1>
+      <!-- When scoped, the app being looked at is said once, quietly, beside
+           the name: enough that a screenshot is unambiguous, not so much that
+           the header becomes about it. -->
+      {#if scope.active}
+        <span class="scoped-to" title="Every panel is scoped to {scope.current}">{scope.current}</span>
+      {/if}
       <span class="conn" class:live={loot.connected} title={loot.connected ? 'Live' : 'Reconnecting…'}>
         <span class="dot"></span>{loot.connected ? 'live' : 'offline'}
       </span>
@@ -36,12 +44,14 @@
       {/if}
     </div>
 
+    <ScopeSelect />
+
     <nav class="tabs" aria-label="Sections">
       {#each TABS as tab (tab.id)}
         <a
           class="tab"
           class:current={router.tab === tab.id}
-          href={tab.hash}
+          href={scope.link(tab.hash)}
           aria-current={router.tab === tab.id ? 'page' : undefined}
         >
           {tab.label}
@@ -192,6 +202,18 @@
     50% {
       opacity: 0.45;
     }
+  }
+
+  .scoped-to {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--text-dim);
+    letter-spacing: 0.01em;
+  }
+
+  .scoped-to::before {
+    content: '/ ';
+    color: var(--text-faint);
   }
 
   .demo {

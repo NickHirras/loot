@@ -42,7 +42,9 @@ func (s *Server) handleVaultSummary(w http.ResponseWriter, r *http.Request) {
 	today := core.DayOf(now)
 	from := core.DayOf(now.AddDate(0, 0, -(days - 1)))
 
-	summary, err := s.Store.VaultSummary(r.Context(), from, today, s.displayCurrency(), today)
+	// Money is scoped strictly: `?app=` here means "this product's revenue",
+	// with nothing of anyone else's folded in. See internal/store/scope.go.
+	summary, err := s.scoped(r).VaultSummary(r.Context(), from, today, s.displayCurrency(), today)
 	if err != nil {
 		s.fail(w, "vault summary", err)
 		return
@@ -58,6 +60,12 @@ func (s *Server) displayCurrency() string {
 }
 
 // handleChest lists the chests waiting to be opened, oldest first.
+//
+// Chests are deliberately *not* scoped. A chest is a daily ritual over
+// everything you ship — one lid, one cascade, the whole day's news — and three
+// chests a day, one per app, would be three times the ceremony for the same
+// morning. `?app=` is accepted and ignored here, which keeps every client's
+// request builder uniform.
 func (s *Server) handleChest(w http.ResponseWriter, r *http.Request) {
 	chests, err := s.Store.ChestSummaries(r.Context())
 	if err != nil {

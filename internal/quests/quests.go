@@ -68,6 +68,20 @@ type Service struct {
 	// Now is the clock, in *local* time: windows are weeks and months as the
 	// person reading them lives them, not as UTC has them.
 	Now func() time.Time
+	// ReadyWhen delays the very first generation until it is closed. `loot
+	// serve` hands it the scheduler's FirstRoundDone, so quests are written
+	// against the history a first run has actually fetched rather than against
+	// the empty database that exists a second after boot.
+	//
+	// It matters more than it sounds. Generating first meant the App Store
+	// backfill that landed forty seconds later *completed* fresh quests
+	// instantly: "Settle 2 new countries" paid out an epic drop, a sound and
+	// XP for countries settled months ago. A quest you were handed already
+	// finished is not a quest, it is a bug with confetti on it.
+	//
+	// nil means "generate immediately", which is right for demo mode (whose
+	// history is seeded before the service starts) and for tests.
+	ReadyWhen <-chan struct{}
 
 	trigger chan struct{}
 	lastGen string
@@ -130,6 +144,13 @@ func (s *Service) Trigger() {
 // It checks progress every minute (and immediately whenever the pipeline
 // nudges it), and generates the day's quests once a day just after midnight.
 func (s *Service) Run(ctx context.Context) {
+	if s.ReadyWhen != nil {
+		select {
+		case <-ctx.Done():
+			return
+		case <-s.ReadyWhen:
+		}
+	}
 	if err := s.Startup(ctx); err != nil {
 		s.log().Error("quest startup failed", "error", err)
 	}
@@ -359,9 +380,22 @@ func (s *Service) publish() {
 // ended. Progress is read fresh for active quests so the page is never a
 // minute behind the feed beside it.
 func (s *Service) List(ctx context.Context) (Board, error) {
-	board := Board{Active: []core.Quest{}, Recent: []core.Quest{}}
+	return s.ListScoped(ctx, "")
+}
 
-	active, err := s.Store.ListQuests(ctx, store.QuestQuery{Statuses: []string{core.QuestActive}})
+// ListScoped is List narrowed to one product: that product's own quests plus
+// the realm-wide ones the generator writes, which belong to every scope
+// because they are about everything you ship. An empty product is List.
+//
+// Progress is *not* re-scoped: a quest measures whatever its own App says, and
+// a realm-wide quest measures the realm even when the board it appears on is
+// scoped. Narrowing its progress would change the goal depending on which tab
+// you were looking at, which is not a goal at all.
+func (s *Service) ListScoped(ctx context.Context, product string) (Board, error) {
+	board := Board{Active: []core.Quest{}, Recent: []core.Quest{}}
+	scoped := s.Store.Scoped(product)
+
+	active, err := scoped.ListQuests(ctx, store.QuestQuery{Statuses: []string{core.QuestActive}})
 	if err != nil {
 		return board, err
 	}
@@ -375,7 +409,7 @@ func (s *Service) List(ctx context.Context) (Board, error) {
 		board.Active = append(board.Active, q)
 	}
 
-	recent, err := s.Store.ListQuests(ctx, store.QuestQuery{
+	recent, err := scoped.ListQuests(ctx, store.QuestQuery{
 		Statuses: []string{core.QuestCompleted, core.QuestExpired},
 		Limit:    defaultRecentLimit,
 		Newest:   true,

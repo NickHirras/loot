@@ -1,5 +1,6 @@
 import { untrack } from 'svelte'
 import { fetchCodex, fetchRecap } from './api'
+import { scope } from './scope.svelte'
 import type { CodexBoard, Recap, RecapPeriod } from './types'
 
 /** How often the page re-reads the wall while it is open. */
@@ -69,11 +70,18 @@ class CodexState {
       void this.load()
       void this.loadRecap()
       this.#timer = setInterval(() => void this.load(), REFRESH_MS)
+      // Records and totals are per app even though the trophies are not, so a
+      // scope change reloads both halves at once.
+      const unscope = scope.onChange(() => {
+        void this.load()
+        void this.loadRecap()
+      })
       return () => {
         this.#active = false
         if (this.#timer) clearInterval(this.#timer)
         if (this.#staleTimer) clearTimeout(this.#staleTimer)
         this.#timer = this.#staleTimer = null
+        unscope()
       }
     })
   }
