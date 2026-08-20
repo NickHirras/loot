@@ -1,6 +1,6 @@
 import { defineConfig, type Plugin } from 'vite'
 import { svelte } from '@sveltejs/vite-plugin-svelte'
-import { writeFileSync } from 'node:fs'
+import { readFileSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 /**
@@ -17,10 +17,28 @@ function keepDist(): Plugin {
   }
 }
 
+/**
+ * The service worker lives in public/ so it is served from the origin root (a
+ * worker can only claim clients at or below its own path). Its cache names need
+ * to change on every build, though, or an old shell would outlive the deploy it
+ * belongs to — so the placeholder gets stamped here, after public/ is copied.
+ */
+function stampServiceWorker(): Plugin {
+  return {
+    name: 'loot-stamp-sw',
+    apply: 'build',
+    closeBundle() {
+      const sw = resolve(__dirname, 'dist/sw.js')
+      const stamp = new Date().toISOString().replace(/[-:.TZ]/g, '').slice(0, 14)
+      writeFileSync(sw, readFileSync(sw, 'utf8').replace(/__LOOT_BUILD__/g, stamp))
+    },
+  }
+}
+
 const backend = process.env.LOOT_BACKEND ?? 'http://localhost:8080'
 
 export default defineConfig({
-  plugins: [svelte(), keepDist()],
+  plugins: [svelte(), keepDist(), stampServiceWorker()],
   build: {
     outDir: 'dist',
     emptyOutDir: true,

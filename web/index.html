@@ -5,11 +5,22 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="dark" />
     <meta name="description" content="Loot — a gamified dashboard for indie app developers' cross-store metrics." />
+    <!-- The app is dark-only (color-scheme above), so one theme-color says it all. -->
+    <meta name="theme-color" content="#090b10" />
     <title>Loot</title>
-    <link
-      rel="icon"
-      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ctext y='26' font-size='26'%3E%F0%9F%92%8E%3C/text%3E%3C/svg%3E"
-    />
+
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="alternate icon" href="/favicon-32.png" type="image/png" sizes="32x32" />
+    <link rel="mask-icon" href="/mask-icon.svg" color="#ffc23d" />
+
+    <!-- Installable: manifest for Chromium/Firefox, the apple-* meta for iOS,
+         which still ignores most of the manifest when adding to the home screen. -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+    <meta name="apple-mobile-web-app-title" content="Loot" />
   </head>
   <body>
     <div id="app"></div>

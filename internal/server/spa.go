@@ -3,10 +3,18 @@ package server
 import (
 	"errors"
 	"io/fs"
+	"mime"
 	"net/http"
 	"path"
 	"strings"
 )
+
+// Go's built-in table has no entry for .webmanifest, and the distroless image
+// the release container is built on has no /etc/mime.types to fall back to, so
+// the PWA manifest would go out sniffed as text/plain. Name it explicitly.
+func init() {
+	_ = mime.AddExtensionType(".webmanifest", "application/manifest+json")
+}
 
 // notBuiltPage is shown when the binary was built without a compiled frontend,
 // which is the normal state of a fresh clone before `make web`.

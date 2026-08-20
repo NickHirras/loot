@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0d1018"/>
+      <stop offset="1" stop-color="#090b10"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#ffc23d" stop-opacity="0.34"/>
+      <stop offset="0.45" stop-color="#ffc23d" stop-opacity="0.13"/>
+      <stop offset="1" stop-color="#ffc23d" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="table" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#fff6d8"/>
+      <stop offset="0.5" stop-color="#ffe19a"/>
+      <stop offset="1" stop-color="#ffc84a"/>
+    </linearGradient>
+    <radialGradient id="spark" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#fffbee"/>
+      <stop offset="1" stop-color="#ffc23d"/>
+    </radialGradient>
+  </defs>
+  <rect width="512" height="512" fill="url(#bg)"/>
+  <circle cx="256.0" cy="256.0" r="256.0" fill="url(#glow)"/>
+  <g transform="translate(256.0,256.0) scale(1.15874)">
+    
+    <polygon points="0,-190 0,-72 -68,-6" fill="#ffeab0"/>
+    <polygon points="0,-190 -68,-6 -180,0" fill="#ffd97c"/>
+    <polygon points="0,-190 0,-72 68,-6" fill="#ffd463"/>
+    <polygon points="0,-190 68,-6 180,0" fill="#f6b933"/>
+    <polygon points="-180,0 -68,-6 0,190" fill="#e9a52c"/>
+    <polygon points="-68,-6 0,60 0,190" fill="#d68f1e"/>
+    <polygon points="180,0 68,-6 0,190" fill="#c67a13"/>
+    <polygon points="68,-6 0,60 0,190" fill="#ab660f"/>
+    <polygon points="0,-72 68,-6 0,60 -68,-6" fill="url(#table)"/>
+    <polygon points="0,-190 180,0 0,190 -180,0" fill="none" stroke="#ffe6a0"
+             stroke-opacity="0.5" stroke-width="4" stroke-linejoin="round"/>
+  </g>
+</svg>
