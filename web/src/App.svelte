@@ -98,10 +98,19 @@
     border-bottom: 1px solid color-mix(in oklab, var(--legendary) 35%, transparent);
     border-radius: 0;
     padding: 0.5rem 1rem;
+    /* Installed on a phone this banner is the topmost thing on screen, so it
+       is the one that has to clear the notch. */
+    padding-top: max(0.5rem, env(safe-area-inset-top, 0px));
     font-size: 0.8rem;
     color: #1a1405;
     background: linear-gradient(90deg, var(--legendary), #ffd97a);
     font-weight: 600;
+  }
+
+  /* …and while it is there, the header behind it must not pad for the notch
+     a second time. */
+  :global(#app:has(> .unlock) > header) {
+    padding-top: 0;
   }
 
   .unlock:hover {
@@ -131,6 +140,7 @@
     max-width: 780px;
     margin: 0 auto;
     padding: 1.2rem 1.1rem 2.5rem;
+    padding-bottom: calc(2.5rem + env(safe-area-inset-bottom, 0px));
     border-top: 1px solid var(--border-soft);
     color: var(--text-faint);
     font-size: 0.72rem;

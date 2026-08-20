@@ -115,7 +115,13 @@
       <div class="layout">
         <div class="globe-card">
           <Globe countries={settlements} fleet={data.fleet ?? []} capital={data.capital} {code} />
-          <p class="hint">Drag to turn · scroll to zoom · double click to recentre</p>
+          <!-- Two spellings of the same sentence: a phone has no wheel and no
+               hover, and telling someone to scroll on a canvas that will not
+               is worse than saying nothing. -->
+          <p class="hint">
+            <span class="pointer-hint">Drag to turn · scroll to zoom · double click to recentre</span>
+            <span class="touch-hint">Drag to turn · tap a marker · double tap to recentre</span>
+          </p>
         </div>
 
         <aside class="panel">
@@ -228,8 +234,8 @@
   }
 
   .overlay.top {
-    top: 1.4rem;
-    left: 1.6rem;
+    top: max(1.4rem, env(safe-area-inset-top, 0px));
+    left: max(1.6rem, env(safe-area-inset-left, 0px));
     max-width: 340px;
   }
 
@@ -262,8 +268,8 @@
   }
 
   .overlay.corner {
-    top: 1.2rem;
-    right: 1.4rem;
+    top: max(1.2rem, env(safe-area-inset-top, 0px));
+    right: max(1.4rem, env(safe-area-inset-right, 0px));
     display: flex;
     gap: 0.35rem;
     pointer-events: auto;
@@ -287,7 +293,7 @@
   .overlay.ticker {
     left: 0;
     right: 0;
-    bottom: 1.2rem;
+    bottom: max(1.2rem, env(safe-area-inset-bottom, 0px));
     display: flex;
     justify-content: center;
     flex-wrap: wrap;
@@ -398,6 +404,10 @@
     border-radius: var(--radius);
     background: radial-gradient(120% 100% at 50% 30%, #0c1220 0%, #070a12 70%);
     overflow: hidden;
+  }
+
+  .touch-hint {
+    display: none;
   }
 
   .globe-card .hint {
@@ -616,9 +626,50 @@
     color: var(--cursed);
   }
 
+  /*
+   * Ambient mode on a phone: the era line ran the full width of a 375px screen
+   * and straight under the two corner buttons. Keep it clear of them, and make
+   * the whole caption a size that suits the screen it is on.
+   */
+  @media (max-width: 560px) {
+    .overlay.top {
+      max-width: calc(100% - 8.5rem);
+    }
+
+    .era-mini .era-name {
+      font-size: 1.2rem;
+    }
+
+    .era-mini .era-xp {
+      font-size: 0.8rem;
+    }
+
+    .bar.wide {
+      width: 100%;
+    }
+
+    .overlay.ticker {
+      padding: 0 1rem;
+      gap: 0.3rem 0.8rem;
+      font-size: 0.7rem;
+    }
+
+    .tick {
+      max-width: 100%;
+    }
+  }
+
   @media (max-width: 900px) {
     .layout {
       grid-template-columns: 1fr;
+    }
+
+    .pointer-hint {
+      display: none;
+    }
+
+    .touch-hint {
+      display: inline;
     }
 
     .globe-card {

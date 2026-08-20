@@ -90,6 +90,18 @@ a:focus-visible {
   outline-offset: 2px;
 }
 
+/*
+ * Touch targets. Below the width where the header stacks — the same 900px the
+ * Hearth and the globe use — every button is at least a fingertip tall. A
+ * control that is only 26px high is fine with a mouse and a coin toss with a
+ * thumb, and this app is read on a phone more than anywhere else.
+ */
+@media (max-width: 900px) {
+  button {
+    min-height: 44px;
+  }
+}
+
 /* Rarity helpers, used by cards, chips and the dev panel. */
 .rarity-common {
   --r: var(--common);

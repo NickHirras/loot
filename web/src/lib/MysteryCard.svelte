@@ -228,4 +228,18 @@
     opacity: 0.55;
     cursor: default;
   }
+
+  /* A 12rem input plus two buttons is one item too many for a phone row, and
+     what wrapped was the Dismiss button, alone and off to the left. Give the
+     question its own line and let the two answers share the next. */
+  @media (max-width: 560px) {
+    input {
+      flex: 1 1 100%;
+    }
+
+    .solve,
+    .dismiss {
+      flex: 1 1 0;
+    }
+  }
 </style>

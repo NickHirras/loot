@@ -94,6 +94,8 @@
 
   let dragging = false
   let dragFrom: { x: number; y: number; rotation: [number, number] } | null = null
+  /** Where the pointer went down, so a tap can be told from a drag. */
+  let downFrom: { x: number; y: number } | null = null
   let interactingUntil = 0
   /** Yaw/pitch velocity in degrees per ms, left over from a flick. */
   let velocity: [number, number] = [0, 0]
@@ -795,6 +797,7 @@
     dragging = true
     interactingUntil = performance.now() + INTERACTION_PAUSE_MS
     dragFrom = { x: event.clientX, y: event.clientY, rotation: [...rotation] as [number, number] }
+    downFrom = { x: event.clientX, y: event.clientY }
     lastMove = { x: event.clientX, y: event.clientY, t: performance.now() }
     velocity = [0, 0]
     turn = null
@@ -834,6 +837,12 @@
     if (!lastMove || performance.now() - lastMove.t > 80) velocity = [0, 0]
     lastMove = null
     interactingUntil = performance.now() + INTERACTION_PAUSE_MS
+    // A touch never hovers, so a tap that did not turn the world is read as
+    // "what is that?" instead — otherwise the tooltips, and everything they
+    // say about a country, simply do not exist on a phone.
+    const still = downFrom && Math.hypot(event.clientX - downFrom.x, event.clientY - downFrom.y) < 6
+    downFrom = null
+    if (still) trackHover(event)
     ;(event.currentTarget as HTMLCanvasElement).releasePointerCapture?.(event.pointerId)
   }
 
@@ -974,6 +983,18 @@
   $effect(() => loot.onDrop(receive))
 
   const hoveredName = $derived(hovered ? countryName(hovered.country.country) : '')
+
+  /**
+   * Keeps a tooltip inside the globe rather than half off its edge. It is a
+   * function, not a `$derived`, because `width` is deliberately plain state
+   * (see above) — reading it as each tooltip renders is exactly right, and a
+   * resize while one is open is not a case worth a reactive dependency.
+   */
+  const TIP_HALF = 96
+  function tipX(x: number): number {
+    if (width <= TIP_HALF * 2) return width / 2
+    return Math.max(TIP_HALF, Math.min(width - TIP_HALF, x))
+  }
 </script>
 
 <div class="globe" bind:this={host} class:ambient>
@@ -991,7 +1012,7 @@
   {#if hovered}
     <div
       class="tip"
-      style="left: {hovered.x}px; top: {hovered.y}px"
+      style="left: {tipX(hovered.x)}px; top: {hovered.y}px"
       class:below={hovered.y < 140}
     >
       <div class="tip-head">
@@ -1011,7 +1032,7 @@
   {#if hoveredShip}
     <div
       class="tip"
-      style="left: {hoveredShip.x}px; top: {hoveredShip.y}px"
+      style="left: {tipX(hoveredShip.x)}px; top: {hoveredShip.y}px"
       class:below={hoveredShip.y < 160}
     >
       <div class="tip-head">
@@ -1066,6 +1087,7 @@
     z-index: 5;
     transform: translate(-50%, calc(-100% - 14px));
     min-width: 168px;
+    max-width: min(192px, 100%);
     padding: 0.5rem 0.6rem;
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);

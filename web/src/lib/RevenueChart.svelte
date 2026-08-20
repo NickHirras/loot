@@ -28,10 +28,17 @@
 
   let width = $state(680)
   const height = REVENUE_H + GAP + UNITS_H + PAD.top + PAD.bottom
-  const plotW = $derived(Math.max(80, width - PAD.left - PAD.right))
+  /**
+   * The gutter the y labels live in. On a phone the chart is barely 300px
+   * wide and a fixed 54px gutter is a fifth of it, so it narrows to the least
+   * that still fits a compact amount like "$1.2M".
+   */
+  const padL = $derived(width < 420 ? 44 : PAD.left)
+  const padR = $derived(width < 420 ? 10 : PAD.right)
+  const plotW = $derived(Math.max(80, width - padL - padR))
 
   const n = $derived(series.length)
-  const x = $derived(scaleLinear().domain([0, Math.max(1, n - 1)]).range([PAD.left, PAD.left + plotW]))
+  const x = $derived(scaleLinear().domain([0, Math.max(1, n - 1)]).range([padL, padL + plotW]))
 
   const revenueTop = PAD.top
   const revenueBottom = PAD.top + REVENUE_H
@@ -105,7 +112,7 @@
 
   function track(event: PointerEvent) {
     const rect = (event.currentTarget as SVGRectElement).getBoundingClientRect()
-    const px = event.clientX - rect.left + PAD.left
+    const px = event.clientX - rect.left + padL
     const i = Math.round(x.invert(px))
     hover = Math.max(0, Math.min(n - 1, i))
   }
@@ -121,7 +128,7 @@
   })
 
   /** Keeps the tooltip inside the chart instead of off its right edge. */
-  const tooltipLeft = $derived(hover === null ? 0 : Math.min(Math.max(x(hover), PAD.left + 6), width - 150))
+  const tooltipLeft = $derived(hover === null ? 0 : Math.min(Math.max(x(hover), padL + 6), Math.max(0, width - 150)))
 </script>
 
 <figure class="chart" bind:clientWidth={width}>
@@ -137,8 +144,8 @@
     <svg viewBox="0 0 {width} {height}" {height} width="100%" role="img" aria-label="Revenue and units per day">
       <!-- y gridlines and ticks -->
       {#each yTicks as tick (tick)}
-        <line class="grid" x1={PAD.left} x2={PAD.left + plotW} y1={y(tick)} y2={y(tick)} />
-        <text class="tick" x={PAD.left - 8} y={y(tick)} text-anchor="end" dominant-baseline="middle">
+        <line class="grid" x1={padL} x2={padL + plotW} y1={y(tick)} y2={y(tick)} />
+        <text class="tick" x={padL - 8} y={y(tick)} text-anchor="end" dominant-baseline="middle">
           {currencyCompact(tick, code)}
         </text>
       {/each}
@@ -157,7 +164,7 @@
           <path class="seam" d={band.edge} />
         {/if}
       {/each}
-      <line class="axis" x1={PAD.left} x2={PAD.left + plotW} y1={revenueBottom} y2={revenueBottom} />
+      <line class="axis" x1={padL} x2={padL + plotW} y1={revenueBottom} y2={revenueBottom} />
 
       <!-- units bars -->
       {#each series as p, i (p.day)}
@@ -172,14 +179,24 @@
           />
         {/if}
       {/each}
-      <line class="axis" x1={PAD.left} x2={PAD.left + plotW} y1={unitsBottom} y2={unitsBottom} />
-      <text class="panel-label" x={PAD.left - 8} y={unitsTop + UNITS_H / 2} text-anchor="end" dominant-baseline="middle"
+      <line class="axis" x1={padL} x2={padL + plotW} y1={unitsBottom} y2={unitsBottom} />
+      <text class="panel-label" x={padL - 8} y={unitsTop + UNITS_H / 2} text-anchor="end" dominant-baseline="middle"
         >units</text
       >
 
       <!-- x ticks -->
-      {#each xTicks as tick (tick.i)}
-        <text class="tick" x={x(tick.i)} y={height - 4} text-anchor="middle">{dayLabel(tick.day)}</text>
+      <!-- The first and last labels hug their end of the axis: centred on a
+           tick that sits on the plot's edge, they paint outside the chart —
+           which on a phone is outside the page. -->
+      {#each xTicks as tick, i (tick.i)}
+        <text
+          class="tick"
+          x={x(tick.i)}
+          y={height - 4}
+          text-anchor={i === 0 ? 'start' : i === xTicks.length - 1 ? 'end' : 'middle'}
+        >
+          {dayLabel(tick.day)}
+        </text>
       {/each}
 
       <!-- crosshair -->
@@ -190,7 +207,7 @@
 
       <rect
         class="capture"
-        x={PAD.left}
+        x={padL}
         y={revenueTop}
         width={plotW}
         height={unitsBottom - revenueTop}

@@ -95,11 +95,25 @@
     position: fixed;
     right: 1rem;
     bottom: 1rem;
+    bottom: max(1rem, env(safe-area-inset-bottom, 0px));
+    left: auto;
     z-index: 20;
     display: flex;
     flex-direction: column;
     align-items: flex-end;
     gap: 0.5rem;
+  }
+
+  /* A 260px panel plus a 1rem margin does not fit a 375px phone with anything
+     to spare, so on a narrow screen it spans what is left of the width. */
+  @media (max-width: 420px) {
+    .dev {
+      left: 1rem;
+    }
+
+    .panel {
+      width: 100%;
+    }
   }
 
   .toggle {

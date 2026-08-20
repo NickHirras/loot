@@ -251,6 +251,8 @@
     align-items: center;
     justify-content: center;
     padding: 1rem;
+    padding-top: max(1rem, env(safe-area-inset-top, 0px));
+    padding-bottom: max(1rem, env(safe-area-inset-bottom, 0px));
     background: color-mix(in oklab, #04060b 78%, transparent);
     backdrop-filter: blur(6px);
     animation: fade 0.18s ease-out both;
@@ -475,6 +477,9 @@
     align-items: center;
     justify-content: space-between;
     gap: 0.6rem;
+    /* The close button floats over this row's right end; Skip has to start
+       before it, or the two share the same pixels and the wrong one wins. */
+    padding-right: 1.6rem;
   }
 
   .counter {
@@ -752,6 +757,56 @@
     from {
       opacity: 0;
       transform: translateX(-8px);
+    }
+  }
+
+  /*
+   * On a phone the sheet is the whole screen, so it gives its margins back to
+   * the content, and the waiting-chest row — which wants three columns and has
+   * room for two — puts the Open button beside a stacked date and count.
+   */
+  @media (max-width: 560px) {
+    .scrim {
+      padding: 0.6rem;
+      padding-top: max(0.6rem, env(safe-area-inset-top, 0px));
+      padding-bottom: max(0.6rem, env(safe-area-inset-bottom, 0px));
+    }
+
+    .sheet {
+      padding: 1rem 0.9rem 1.1rem;
+    }
+
+    .close {
+      min-width: 44px;
+    }
+
+    .head,
+    .progress {
+      /* The close button owns the top-right corner, and at 44px square it
+         claims more of it than it does on a desktop. */
+      padding-right: 2.8rem;
+    }
+
+    .head {
+      gap: 0.7rem;
+    }
+
+    .chest-row {
+      grid-template-columns: minmax(0, 1fr) auto;
+      grid-template-areas:
+        'when open'
+        'counts open'
+        'dots dots';
+      gap: 0.15rem 0.6rem;
+    }
+
+    /* The long-form date already says it; the ISO spelling is for wider screens. */
+    .iso {
+      display: none;
+    }
+
+    .final-xp {
+      font-size: 2.2rem;
     }
   }
 

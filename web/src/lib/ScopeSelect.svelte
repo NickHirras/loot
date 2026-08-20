@@ -183,6 +183,8 @@
     left: 0;
     z-index: 20;
     min-width: 13rem;
+    /* Never wider than the window, whichever edge it is anchored to. */
+    max-width: calc(100vw - 1.2rem);
     max-height: 60vh;
     overflow-y: auto;
     list-style: none;
@@ -219,9 +221,34 @@
     background: color-mix(in oklab, var(--accent) 16%, transparent);
   }
 
+  .opt-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
   .opt-meta {
     font-size: 0.66rem;
     color: var(--text-faint);
+    white-space: nowrap;
+  }
+
+  /*
+   * On a narrow screen the selector lives at the right end of the header row,
+   * so a menu hung from its left edge runs off the side of the page — and
+   * took the whole document's horizontal scroll with it. Hang it from the
+   * right edge instead, where there is room.
+   */
+  @media (max-width: 900px) {
+    .menu {
+      left: auto;
+      right: 0;
+      /* Hung from the right edge of a button that is itself near the right of
+         a 360px screen, the menu has only so much room before it runs off the
+         *other* side. The names ellipsize; the panel stays on the page. */
+      min-width: 0;
+      max-width: min(13rem, calc(100vw - 1.6rem));
+    }
   }
 
   .divider {

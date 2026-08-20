@@ -234,7 +234,7 @@
 
   .tiles {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(160px, 100%), 1fr));
     gap: 0.6rem;
     margin-bottom: 0.9rem;
   }
@@ -268,7 +268,7 @@
 
   .breakdowns {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr));
     gap: 0.6rem;
   }
 

@@ -292,7 +292,7 @@
 
   .form {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(150px, 100%), 1fr));
     gap: 0.6rem;
     padding: 0.85rem 0.9rem 0.9rem;
     margin-bottom: 1rem;
@@ -402,12 +402,12 @@
 
   .grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr));
     gap: 0.6rem;
   }
 
   .wide-grid {
-    grid-template-columns: repeat(auto-fit, minmax(330px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(330px, 100%), 1fr));
   }
 
   .empty {
