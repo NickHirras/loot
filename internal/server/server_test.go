@@ -686,7 +686,7 @@ func TestHearthEndpoint(t *testing.T) {
 	// Two ledger days from two countries, one of them twice as large.
 	h.post(t, "/api/dev/fake", `{"kind":"sales_day","amount":80,"currency":"EUR","quantity":200,"country":"DE"}`)
 	h.post(t, "/api/dev/fake", `{"kind":"sales_day","amount":40,"currency":"EUR","quantity":100,"country":"JP"}`)
-	// A realtime purchase with no country at all: unknown lands.
+	// A realtime purchase with no country at all: nobody the map can place.
 	h.post(t, "/api/dev/fake", `{"rarity":"uncommon"}`)
 
 	resp, body := h.get(t, "/api/hearth")
@@ -742,6 +742,60 @@ func TestHearthEndpoint(t *testing.T) {
 	_, opened := h.post(t, "/api/chest/open", `{}`)
 	if n, _ := opened["count"].(float64); n != 4 {
 		t.Fatalf("chest held %v drops, want the two settlements and the two sales days", opened["count"])
+	}
+}
+
+// The fleet: people a source counted but never placed, one vessel per source,
+// and the old scalar bucket still there and still equal to their sum.
+func TestHearthFleetEndpoint(t *testing.T) {
+	h := newHarness(t, true)
+
+	// A country to measure against, and a ledger day that arrived with no
+	// country at all — which is every Flathub day, and any store report whose
+	// per-country file has not landed yet.
+	h.post(t, "/api/dev/fake", `{"kind":"sales_day","amount":80,"currency":"EUR","quantity":200,"country":"DE"}`)
+	h.post(t, "/api/dev/fake", `{"kind":"sales_day","amount":20,"currency":"EUR","quantity":50}`)
+
+	_, body := h.get(t, "/api/hearth")
+
+	fleet, ok := body["fleet"].([]any)
+	if !ok {
+		t.Fatalf("fleet missing or not a list: %#v", body["fleet"])
+	}
+	if len(fleet) != 1 {
+		t.Fatalf("fleet = %#v, want one vessel", fleet)
+	}
+	vessel, _ := fleet[0].(map[string]any)
+	if vessel["source"] != "dev" {
+		t.Errorf("vessel source = %v, want dev", vessel["source"])
+	}
+	if vessel["population"].(float64) != 50 {
+		t.Errorf("vessel population = %v, want 50", vessel["population"])
+	}
+	// 20 EUR at 0.8 to the dollar, with the sales_day rollup ignored.
+	if vessel["revenue_base"].(float64) != 25 {
+		t.Errorf("vessel revenue = %v, want 25", vessel["revenue_base"])
+	}
+	if vessel["first_seen"] == "" || vessel["last_seen"] == "" {
+		t.Errorf("vessel has no dates: %v", vessel)
+	}
+	// 50 of the biggest settlement's 200: a quarter, which is a city afloat.
+	if tier, _ := vessel["tier"].(map[string]any); tier["name"] != "city" {
+		t.Errorf("vessel tier = %v, want city", vessel["tier"])
+	}
+
+	unknown, _ := body["unknown"].(map[string]any)
+	if unknown["population"].(float64) != 50 || unknown["revenue_base"].(float64) != 25 {
+		t.Errorf("unknown = %v, want the fleet's 50 people and 25 dollars", unknown)
+	}
+
+	// And none of it is a country: the map still has one settlement.
+	countries, _ := body["countries"].([]any)
+	if len(countries) != 1 {
+		t.Fatalf("countries = %v, want DE alone", countries)
+	}
+	if body["population"].(float64) != 200 {
+		t.Errorf("population = %v, want 200: the fleet is counted apart", body["population"])
 	}
 }
 

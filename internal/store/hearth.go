@@ -49,8 +49,8 @@ CASE
 END`
 
 // hearthPopulationNoInstalls is hearthPopulation with the install branch taken
-// out. It exists for the unknown-lands bucket, whose install population cannot
-// be a plain sum — see hearthUnknownInstalls.
+// out. It exists for the fleet, whose install population cannot be a plain
+// sum — see hearthUnknownInstalls.
 const hearthPopulationNoInstalls = `
 CASE
     WHEN e.is_ledger = 1 AND e.kind IN ('sale', 'iap', 'subscription', 'download') AND e.quantity > 0 THEN e.quantity
@@ -59,7 +59,8 @@ CASE
 END`
 
 // hearthUnknownInstalls is how many of a day's installs could not be placed on
-// the map, summed over every (source, app, day).
+// the map, summed over every (source, app, day) and grouped by source — one
+// row per source, which is one vessel of the fleet.
 //
 // Google Play reports its installs *twice*: once as an overview row with no
 // country, and once per country. Adding both up gave every Play install a
@@ -69,19 +70,21 @@ END`
 //
 // The day's real total is installValue — the same rule quests and the mystery
 // detector use: an overview row, where there is one, *is* the day, otherwise
-// the country rows are it. Unknown lands then get the remainder the country
-// rows could not account for, never less than nothing. A Flathub day (one
-// row, no country) is therefore entirely unknown, a Play day covered by its
-// country file is entirely placed, and a Play day whose country file has not
-// arrived yet is unknown until it does.
+// the country rows are it. The source's vessel then gets the remainder the
+// country rows could not account for, never less than nothing. A Flathub day
+// (one row, no country) is therefore entirely at sea, a Play day covered by
+// its country file is entirely placed, and a Play day whose country file has
+// not arrived yet is at sea until it does.
 func hearthUnknownInstalls(scope string) string {
 	return `
-SELECT COALESCE(SUM(MAX(day_total - placed, 0)), 0) FROM (
-    SELECT ` + installValue + ` AS day_total,
+SELECT source, COALESCE(SUM(MAX(day_total - placed, 0)), 0) FROM (
+    SELECT e.source AS source,
+           ` + installValue + ` AS day_total,
            COALESCE(SUM(CASE WHEN e.country <> '' AND e.quantity > 0 THEN e.quantity ELSE 0 END), 0) AS placed
     FROM events e
     WHERE e.kind = 'install'` + scope + `
-    GROUP BY e.source, e.app, e.day)`
+    GROUP BY e.source, e.app, e.day)
+GROUP BY source`
 }
 
 // maxHearthRecent is how many recent country-bearing drops the ticker gets.
@@ -106,12 +109,36 @@ type HearthCountry struct {
 	Share float64 `json:"share"`
 }
 
-// HearthUnknown is the bucket for events that carry no country at all —
-// Flathub reports installs per app but not per country, so its citizens live
-// in "unknown lands" rather than being silently dropped.
+// HearthUnknown is the whole fleet added up: every event that carries no
+// country at all. Flathub reports installs per app but not per country, so its
+// citizens are neither invented into a country nor silently dropped.
+//
+// It is kept alongside Fleet because it is the honest one-number answer to
+// "how many people can you not place?", and because clients older than the
+// fleet still read it.
 type HearthUnknown struct {
 	Population  int     `json:"population"`
 	RevenueBase float64 `json:"revenue_base"`
+}
+
+// HearthVessel is one ship of the fleet: everybody a single source counted but
+// never located. They are not a country and are never counted as one — no
+// settlement, no continent, no share of the map. They are simply somewhere at
+// sea, and the globe draws them there.
+type HearthVessel struct {
+	// Source is the source id ("flathub"), which is what picks the vessel's
+	// name and its anchorage in the UI.
+	Source      string  `json:"source"`
+	Population  int     `json:"population"`
+	RevenueBase float64 `json:"revenue_base"`
+	// FirstSeen and LastSeen are business days (YYYY-MM-DD): when the first
+	// and most recent countryless event from this source landed.
+	FirstSeen string `json:"first_seen"`
+	LastSeen  string `json:"last_seen"`
+	// Tier is how big the vessel reads, measured against the largest
+	// settlement exactly as a country's tier is — a fleet bigger than every
+	// country is a metropolis afloat.
+	Tier core.Tier `json:"tier"`
 }
 
 // HearthDrop is one row of the Hearth's arrivals ticker.
@@ -135,12 +162,15 @@ type Hearth struct {
 	TotalXP         int              `json:"total_xp"`
 	// Population and RevenueBase are the totals across every country,
 	// excluding the unknown bucket (which is reported separately).
-	Population  int             `json:"population"`
-	RevenueBase float64         `json:"revenue_base"`
-	Unknown     HearthUnknown   `json:"unknown"`
-	Countries   []HearthCountry `json:"countries"`
-	Tiers       []core.Tier     `json:"tiers"`
-	Recent      []HearthDrop    `json:"recent"`
+	Population  int           `json:"population"`
+	RevenueBase float64       `json:"revenue_base"`
+	Unknown     HearthUnknown `json:"unknown"`
+	// Fleet is the countryless population, one vessel per source. Unknown is
+	// its sum.
+	Fleet     []HearthVessel  `json:"fleet"`
+	Countries []HearthCountry `json:"countries"`
+	Tiers     []core.Tier     `json:"tiers"`
+	Recent    []HearthDrop    `json:"recent"`
 }
 
 // Hearth aggregates every country Loot has seen into settlements, places the
@@ -151,6 +181,7 @@ type Hearth struct {
 func (s *Store) Hearth(ctx context.Context, homeCountry, displayCurrency string) (Hearth, error) {
 	out := Hearth{
 		DisplayCurrency: displayCurrency,
+		Fleet:           []HearthVessel{},
 		Countries:       []HearthCountry{},
 		Tiers:           core.Tiers,
 		Recent:          []HearthDrop{},
@@ -159,11 +190,15 @@ func (s *Store) Hearth(ctx context.Context, homeCountry, displayCurrency string)
 		out.Tiers = []core.Tier{}
 	}
 
-	countries, events, unknown, err := s.hearthCountries(ctx)
+	countries, events, err := s.hearthCountries(ctx)
 	if err != nil {
 		return out, err
 	}
-	out.Unknown = unknown
+
+	fleet, err := s.hearthFleet(ctx)
+	if err != nil {
+		return out, err
+	}
 
 	drops, err := s.hearthDropCounts(ctx)
 	if err != nil {
@@ -188,6 +223,34 @@ func (s *Store) Hearth(ctx context.Context, homeCountry, displayCurrency string)
 		countries[i].Tier = core.TierForShare(countries[i].Share)
 		out.Population += countries[i].Population
 		out.RevenueBase = round2(out.RevenueBase + countries[i].RevenueBase)
+	}
+
+	// A vessel is measured against the same yardstick as a settlement, so a
+	// fleet carrying more people than your biggest country reads as big as one
+	// — which, on the globe, is the whole point. A map with no countries on it
+	// at all (a Flathub-only app) falls back to the largest vessel, so the
+	// fleet is at least relative to itself rather than uniformly tiny.
+	fleetMax := 0
+	for _, v := range fleet {
+		if v.Population > fleetMax {
+			fleetMax = v.Population
+		}
+	}
+	against := maxPop
+	if against == 0 {
+		against = fleetMax
+	}
+	for i := range fleet {
+		share := 0.0
+		if against > 0 {
+			share = float64(fleet[i].Population) / float64(against)
+		}
+		fleet[i].Tier = core.TierForShare(share)
+		out.Unknown.Population += fleet[i].Population
+		out.Unknown.RevenueBase = round2(out.Unknown.RevenueBase + fleet[i].RevenueBase)
+	}
+	if fleet != nil {
+		out.Fleet = fleet
 	}
 
 	sort.Slice(countries, func(i, j int) bool {
@@ -245,12 +308,10 @@ func pickCapital(homeCountry string, countries []HearthCountry, events map[strin
 	return best
 }
 
-// hearthCountries returns one row per country that has ever produced an event,
-// the per-country event counts (used to break capital ties), and the bucket
-// for events that carry no country.
-func (s *Store) hearthCountries(ctx context.Context) ([]HearthCountry, map[string]int, HearthUnknown, error) {
-	var unknown HearthUnknown
-
+// hearthCountries returns one row per country that has ever produced an event
+// and the per-country event counts (used to break capital ties). Events with
+// no country belong to the fleet, not to the map, and are skipped here.
+func (s *Store) hearthCountries(ctx context.Context) ([]HearthCountry, map[string]int, error) {
 	// Settlements are arrivals and money, so the scope is strict: a scoped
 	// Hearth is this app's map of the world, not this app's plus everyone
 	// else's citizens.
@@ -259,14 +320,13 @@ func (s *Store) hearthCountries(ctx context.Context) ([]HearthCountry, map[strin
 	rows, err := s.q.QueryContext(ctx, `
         SELECT e.country,
                COALESCE(SUM(`+hearthPopulation+`), 0),
-               COALESCE(SUM(`+hearthPopulationNoInstalls+`), 0),
                COALESCE(SUM(CASE WHEN `+ledgerRows+` THEN e.amount_base ELSE 0 END), 0),
                MIN(e.day), MAX(e.day), COUNT(*)
         FROM events e
-        WHERE 1 = 1`+strict+`
+        WHERE e.country <> ''`+strict+`
         GROUP BY e.country`, strictArgs...)
 	if err != nil {
-		return nil, nil, unknown, fmt.Errorf("hearth countries: %w", err)
+		return nil, nil, fmt.Errorf("hearth countries: %w", err)
 	}
 	defer rows.Close()
 
@@ -276,21 +336,14 @@ func (s *Store) hearthCountries(ctx context.Context) ([]HearthCountry, map[strin
 	)
 	for rows.Next() {
 		var (
-			c                             HearthCountry
-			first, last                   sql.NullString
-			eventCount, popCol, popNoInst int
-			revenue                       float64
-			country                       string
+			c                  HearthCountry
+			first, last        sql.NullString
+			eventCount, popCol int
+			revenue            float64
+			country            string
 		)
-		if err := rows.Scan(&country, &popCol, &popNoInst, &revenue, &first, &last, &eventCount); err != nil {
-			return nil, nil, unknown, fmt.Errorf("scan hearth country: %w", err)
-		}
-		if country == "" {
-			// Installs are added back below, after the double counting a
-			// plain sum would cause has been resolved.
-			unknown.Population = popNoInst
-			unknown.RevenueBase = round2(revenue)
-			continue
+		if err := rows.Scan(&country, &popCol, &revenue, &first, &last, &eventCount); err != nil {
+			return nil, nil, fmt.Errorf("scan hearth country: %w", err)
 		}
 		c.Country = country
 		c.Population = popCol
@@ -301,19 +354,140 @@ func (s *Store) hearthCountries(ctx context.Context) ([]HearthCountry, map[strin
 		out = append(out, c)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, nil, unknown, fmt.Errorf("iterate hearth countries: %w", err)
+		return nil, nil, fmt.Errorf("iterate hearth countries: %w", err)
+	}
+	return out, events, nil
+}
+
+// hearthFleet returns one vessel per source that has people it cannot place,
+// biggest first. Tiers are left to the caller, which is the only place that
+// knows how big the largest settlement is.
+//
+// The rules are the country rules, exactly: the same population formula, the
+// same ledger-only revenue, refunds netting out of money but never evicting
+// anybody, and the same installValue de-duplication — a Play install that a
+// country row already placed must not board a ship as well.
+//
+// A vessel with no population but some money is still a vessel: an App Store
+// refund that arrived without a country is a real (negative) number, and
+// dropping it here would make the fleet stop adding up to Unknown.
+func (s *Store) hearthFleet(ctx context.Context) ([]HearthVessel, error) {
+	strict, strictArgs := s.scopeStrict("e")
+
+	rows, err := s.q.QueryContext(ctx, `
+        SELECT e.source,
+               COALESCE(SUM(`+hearthPopulationNoInstalls+`), 0),
+               COALESCE(SUM(CASE WHEN `+ledgerRows+` THEN e.amount_base ELSE 0 END), 0),
+               MIN(e.day), MAX(e.day)
+        FROM events e
+        WHERE e.country = ''`+strict+`
+        GROUP BY e.source`, strictArgs...)
+	if err != nil {
+		return nil, fmt.Errorf("hearth fleet: %w", err)
+	}
+	defer rows.Close()
+
+	var (
+		fleet []HearthVessel
+		index = map[string]int{}
+	)
+	for rows.Next() {
+		var (
+			v           HearthVessel
+			first, last sql.NullString
+		)
+		// Installs are added below, after the double counting a plain sum
+		// would cause has been resolved.
+		if err := rows.Scan(&v.Source, &v.Population, &v.RevenueBase, &first, &last); err != nil {
+			return nil, fmt.Errorf("scan hearth vessel: %w", err)
+		}
+		v.RevenueBase = round2(v.RevenueBase)
+		v.FirstSeen = first.String
+		v.LastSeen = last.String
+		index[v.Source] = len(fleet)
+		fleet = append(fleet, v)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate hearth fleet: %w", err)
 	}
 	// Close the cursor before the next query: SQLite is opened with a single
 	// connection, so an open result set would block it.
 	rows.Close()
 
-	var unplaced int
-	if err := s.q.QueryRowContext(ctx, hearthUnknownInstalls(strict), strictArgs...).Scan(&unplaced); err != nil {
-		return nil, nil, unknown, fmt.Errorf("hearth unknown installs: %w", err)
+	unplaced, err := s.q.QueryContext(ctx, hearthUnknownInstalls(strict), strictArgs...)
+	if err != nil {
+		return nil, fmt.Errorf("hearth unknown installs: %w", err)
 	}
-	unknown.Population += unplaced
+	defer unplaced.Close()
 
-	return out, events, unknown, nil
+	for unplaced.Next() {
+		var (
+			source string
+			people int
+		)
+		if err := unplaced.Scan(&source, &people); err != nil {
+			return nil, fmt.Errorf("scan hearth unknown installs: %w", err)
+		}
+		if people == 0 {
+			continue
+		}
+		if i, ok := index[source]; ok {
+			fleet[i].Population += people
+			continue
+		}
+		// A source whose only countryless rows are the installs themselves
+		// never appeared in the query above — its remainder is a day the
+		// country file has not covered yet, so it gets a vessel of its own.
+		index[source] = len(fleet)
+		fleet = append(fleet, HearthVessel{Source: source, Population: people})
+	}
+	if err := unplaced.Err(); err != nil {
+		return nil, fmt.Errorf("iterate hearth unknown installs: %w", err)
+	}
+	unplaced.Close()
+
+	out := fleet[:0]
+	for _, v := range fleet {
+		if v.Population <= 0 && v.RevenueBase == 0 {
+			continue
+		}
+		if v.FirstSeen == "" || v.LastSeen == "" {
+			first, last, err := s.hearthSourceDays(ctx, v.Source)
+			if err != nil {
+				return nil, err
+			}
+			v.FirstSeen, v.LastSeen = first, last
+		}
+		out = append(out, v)
+	}
+
+	sort.Slice(out, func(i, j int) bool {
+		a, b := out[i], out[j]
+		if a.Population != b.Population {
+			return a.Population > b.Population
+		}
+		if a.RevenueBase != b.RevenueBase {
+			return a.RevenueBase > b.RevenueBase
+		}
+		return a.Source < b.Source
+	})
+	return out, nil
+}
+
+// hearthSourceDays is the first and last countryless day one source reported,
+// for the rare vessel built entirely out of an install remainder whose own
+// rows all carry a country.
+func (s *Store) hearthSourceDays(ctx context.Context, source string) (string, string, error) {
+	strict, strictArgs := s.scopeStrict("e")
+	var first, last sql.NullString
+	err := s.q.QueryRowContext(ctx, `
+        SELECT MIN(e.day), MAX(e.day) FROM events e
+        WHERE e.source = ? AND e.kind = 'install'`+strict,
+		append([]any{source}, strictArgs...)...).Scan(&first, &last)
+	if err != nil {
+		return "", "", fmt.Errorf("hearth vessel days: %w", err)
+	}
+	return first.String, last.String, nil
 }
 
 // hearthDropCounts counts the visible drops each country has produced. Drops

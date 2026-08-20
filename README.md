@@ -170,6 +170,22 @@ Building it yourself is `docker build -t loot .`, or `make docker`.
 
 The image is a distroless static binary (~14 MB). Mount a volume at `/data` to keep `loot.db` across restarts. Every config field has a `LOOT_*` environment override, so no config file is required.
 
+### Install it as an app
+
+The dashboard is a PWA, so it can live outside the browser. Open it and use your browser's install
+control — the ⊕ or "Install" button in Chrome/Edge's address bar, **File → Add to Dock** in Safari on
+macOS, or **Share → Add to Home Screen** on iOS and Android. You get a standalone window with the Loot
+gem as its icon, no tab bar, and the app's own dark background behind the status bar.
+
+Loot's service worker caches the shell only — HTML, JavaScript, CSS and icons. It never caches
+`/api`, `/ws` or `/hooks`, so a number on screen is always a number the server just sent; open the app
+with no connection and you get an honest "offline" screen rather than yesterday's revenue. Updates
+need no action: each navigation fetches fresh HTML when you're online, so one reload after a deploy
+is enough.
+
+Installing over plain HTTP works on `localhost` only. On a real hostname, put Loot behind TLS
+(see [Security note](#security-note)) or the browser won't offer to install it.
+
 ### Tail it in your terminal
 
 ```bash
@@ -271,7 +287,7 @@ Loot polls `https://flathub.org/api/v2/stats/{app_id}` once an hour and, for eac
 ./bin/loot serve --since 2026-01-01
 ```
 
-The Flathub API also returns `installs_per_country`, but those figures are cumulative and carry no dates, so they cannot be turned into events without double counting. Flathub installs therefore count toward the Hearth's "unknown lands", not toward any settlement.
+The Flathub API also returns `installs_per_country`, but those figures are cumulative and carry no dates, so they cannot be turned into events without double counting. Flathub installs therefore sail with the Hearth's [fleet](#the-capital-and-the-fleet), not with any settlement.
 
 ### App Store Connect (polling, hourly)
 
@@ -533,7 +549,7 @@ The whole account sits on an era ladder, unlocked by total XP. Each rung costs r
 
 Both tables live in [`internal/core/hearth.go`](internal/core/hearth.go), which is the only place to tune them.
 
-### The capital, and unknown lands
+### The capital, and the fleet
 
 Every arc flies to your **capital**. By default that is your biggest settlement, which needs no configuring; set `home_country` if you would rather it were where *you* are:
 
@@ -543,13 +559,15 @@ home_country: "NZ"   # ISO 3166-1 alpha-2, or "" for the biggest settlement
 
 `LOOT_HOME_COUNTRY` overrides it. A country you have never sold in is still a valid capital — it is where you are, not where your customers are.
 
-Events with no country at all are counted apart, as **unknown lands**: Flathub reports how many people installed but never says from where, and those people should not be invented into a country or silently dropped.
+Events with no country at all are counted apart, as **the fleet**. Flathub reports how many people installed but never says from where, and every store's per-country file lags its overview file by a poll or two — those people should not be invented into a country or silently dropped, so each source that has them gets a ship, anchored in open ocean, sized on the same tier ladder as a settlement: *The Flathub Freighter*, *Snapcraft Platform Nine* (a rig, off Ubuntu's homeland), *The Cupertino Clipper*, *The Play Trawler*.
+
+Be clear about what the ships are: **a visualization, not a location**. These people have no position at all — the anchorage says only which source could not place them. A vessel is never a country: it does not count toward your settlements, your continents, the Cartographer and Settler trophies, or any quest that counts countries, and it is drawn cold and hull-shaped precisely so it cannot be mistaken for a city. `GET /api/hearth` returns them as `fleet`, one entry per source, with the scalar `unknown` bucket kept beside it as their sum. The tables live in [`web/src/lib/sea.ts`](web/src/lib/sea.ts).
 
 ### Ambient mode
 
 <http://localhost:8080/#/ambient> (or the **⤢ Ambient** button, or `#/hearth?ambient=1`) is the Hearth with everything else taken away: full-bleed globe on a starfield, the era and its progress in one corner, a ticker of recent arrivals along the bottom, and a cursor that gets out of the way after three seconds. <kbd>Esc</kbd> leaves. It is meant to be left running on a spare monitor or an iPad all day, so the globe idles at 30fps, pauses its own rotation for five seconds after you touch it, and honours `prefers-reduced-motion` by not spinning at all.
 
-`GET /api/hearth` is the aggregate behind all of it — settlements, capital, era, tier ladder and the last 30 country-bearing drops. It is cached for five seconds server-side; the page refetches once a minute and merges live websocket drops in between, so a new country appears the instant its first customer does.
+`GET /api/hearth` is the aggregate behind all of it — settlements, the fleet, capital, era, tier ladder and the last 30 country-bearing drops. It is cached for five seconds server-side; the page refetches once a minute and merges live websocket drops in between, so a new country appears the instant its first customer does.
 
 ## Quests & mysteries
 

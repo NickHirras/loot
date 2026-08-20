@@ -399,10 +399,27 @@ export interface HearthCountry {
   share: number
 }
 
-/** Events with no country at all — Flathub reports installs but not where. */
+/** The whole fleet added up — every event with no country at all. */
 export interface HearthUnknown {
   population: number
   revenue_base: number
+}
+
+/**
+ * One vessel: everybody a single source counted but never located. Flathub
+ * reports installs but not where, so its people sail rather than settle. A
+ * vessel is never a country and is never counted as one.
+ */
+export interface HearthVessel {
+  /** The source id ("flathub"), which picks the ship's name and anchorage. */
+  source: string
+  population: number
+  revenue_base: number
+  /** Business days: the first and latest countryless event from this source. */
+  first_seen: string
+  last_seen: string
+  /** How big the vessel reads, against the largest settlement. */
+  tier: HearthTier
 }
 
 /** One row of the arrivals ticker. */
@@ -427,6 +444,8 @@ export interface Hearth {
   population: number
   revenue_base: number
   unknown: HearthUnknown
+  /** The countryless population, one vessel per source; `unknown` is its sum. */
+  fleet: HearthVessel[]
   countries: HearthCountry[]
   tiers: HearthTier[]
   recent: HearthDrop[]

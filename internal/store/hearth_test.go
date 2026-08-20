@@ -230,7 +230,7 @@ func TestHearthEmpty(t *testing.T) {
 	if err := json.Unmarshal(raw, &decoded); err != nil {
 		t.Fatalf("decode hearth: %v", err)
 	}
-	for _, key := range []string{"countries", "recent", "tiers"} {
+	for _, key := range []string{"countries", "fleet", "recent", "tiers"} {
 		if got := string(decoded[key]); strings.HasPrefix(got, "null") {
 			t.Errorf("%s serialized as null on a fresh install", key)
 		}
@@ -349,5 +349,219 @@ func TestHearthDropsAndRecent(t *testing.T) {
 		if d.Country == "" {
 			t.Errorf("a countryless drop reached the arrivals ticker: %+v", d)
 		}
+	}
+}
+
+// vessel is one source's ship, or a failure if that source never put to sea.
+func vessel(t *testing.T, h store.Hearth, source string) store.HearthVessel {
+	t.Helper()
+	for _, v := range h.Fleet {
+		if v.Source == source {
+			return v
+		}
+	}
+	t.Fatalf("no vessel for %s in %+v", source, h.Fleet)
+	return store.HearthVessel{}
+}
+
+// The fleet is the unknown bucket with the one fact it always had attached:
+// which source could not place these people. One vessel per source, counted by
+// exactly the rules a country is counted by.
+func TestHearthFleetGroupsBySource(t *testing.T) {
+	ctx := context.Background()
+	st := newStore(t)
+
+	events := []core.Event{
+		// A country to measure the fleet against: 600 people in the US.
+		hearthEvent("appstore", "sale", "2026-08-04", "US", 600, 3000, true, "us:1"),
+
+		// Flathub: installs per app per day, never a country.
+		hearthEvent("flathub", "install", "2026-08-04", "", 500, 0, false, "fh:1"),
+		hearthEvent("flathub", "install", "2026-08-06", "", 87, 0, false, "fh:2"),
+		// Its own rollup of the rows above must not board a second time.
+		hearthEvent("flathub", "installs_day", "2026-08-06", "", 87, 0, false, "fh:3"),
+
+		// Google Play reports the day twice; only the remainder the country
+		// file could not place is at sea.
+		hearthEvent("googleplay", "install", "2026-08-04", "", 100, 0, false, "gp:overview"),
+		hearthEvent("googleplay", "install", "2026-08-04", "US", 30, 0, false, "gp:us"),
+		hearthEvent("googleplay", "install", "2026-08-05", "", 50, 0, false, "gp:overview2"),
+
+		// A ledger sale that arrived without a country, and a refund of part
+		// of it: money nets out, nobody is thrown overboard.
+		hearthEvent("appstore", "sale", "2026-08-02", "", 12, 60, true, "as:1"),
+		hearthEvent("appstore", "refund", "2026-08-03", "", -3, -15, true, "as:2"),
+		hearthEvent("appstore", "sales_day", "2026-08-03", "", 12, 60, true, "as:3"),
+
+		// One RevenueCat purchase with no country: one person, one vessel.
+		hearthEvent("revenuecat", "purchase", "2026-08-07", "", 1, 4, false, "rc:1"),
+	}
+	for _, ev := range events {
+		if _, err := st.InsertEvent(ctx, ev); err != nil {
+			t.Fatalf("insert %s: %v", ev.DedupeKey, err)
+		}
+	}
+
+	h := hearthOf(t, st, "")
+
+	if len(h.Fleet) != 4 {
+		t.Fatalf("fleet = %+v, want four vessels", h.Fleet)
+	}
+	// Biggest first, exactly as the settlement list is ordered.
+	if got := []string{h.Fleet[0].Source, h.Fleet[1].Source, h.Fleet[2].Source, h.Fleet[3].Source}; got[0] != "flathub" ||
+		got[1] != "googleplay" || got[2] != "appstore" || got[3] != "revenuecat" {
+		t.Errorf("fleet order = %v, want flathub, googleplay, appstore, revenuecat", got)
+	}
+
+	fh := vessel(t, h, "flathub")
+	if fh.Population != 587 {
+		t.Errorf("flathub population = %d, want 587 (the installs_day rollup is a summary)", fh.Population)
+	}
+	if fh.FirstSeen != "2026-08-04" || fh.LastSeen != "2026-08-06" {
+		t.Errorf("flathub sailed %s..%s, want 2026-08-04..2026-08-06", fh.FirstSeen, fh.LastSeen)
+	}
+	if fh.Tier.Name != "metropolis" {
+		t.Errorf("flathub tier = %q, want metropolis: 587 of the biggest country's 600", fh.Tier.Name)
+	}
+
+	gp := vessel(t, h, "googleplay")
+	if gp.Population != 70+50 {
+		t.Errorf("googleplay population = %d, want 120: only what the country file could not place", gp.Population)
+	}
+	if gp.Tier.Name != "city" {
+		t.Errorf("googleplay tier = %q, want city", gp.Tier.Name)
+	}
+
+	as := vessel(t, h, "appstore")
+	if as.Population != 12 {
+		t.Errorf("appstore population = %d, want 12: a refund does not throw anybody overboard", as.Population)
+	}
+	if as.RevenueBase != 45 {
+		t.Errorf("appstore revenue = %v, want 45: 60 sold, 15 refunded, the rollup ignored", as.RevenueBase)
+	}
+
+	if rc := vessel(t, h, "revenuecat"); rc.Population != 1 || rc.Tier.Name != "outpost" {
+		t.Errorf("revenuecat vessel = %+v, want one person in an outpost", rc)
+	}
+
+	// The old scalar bucket is still the honest one-number answer, and it is
+	// exactly the fleet added up.
+	sumPop, sumRevenue := 0, 0.0
+	for _, v := range h.Fleet {
+		sumPop += v.Population
+		sumRevenue += v.RevenueBase
+	}
+	if h.Unknown.Population != sumPop || h.Unknown.RevenueBase != sumRevenue {
+		t.Errorf("unknown = %+v, want the fleet's %d people and %v", h.Unknown, sumPop, sumRevenue)
+	}
+	if h.Unknown.Population != 587+120+12+1 {
+		t.Errorf("unknown population = %d, want 720", h.Unknown.Population)
+	}
+
+	// None of this is a country. The map has one settlement and one only.
+	if len(h.Countries) != 1 || h.Countries[0].Country != "US" {
+		t.Errorf("countries = %+v, want the US and nothing else", h.Countries)
+	}
+	if got := settlement(t, h, "US").Population; got != 630 {
+		t.Errorf("US population = %d, want 630 (600 sales + 30 placed installs)", got)
+	}
+	if h.Population != 630 {
+		t.Errorf("total population = %d, want 630: the fleet is counted apart", h.Population)
+	}
+}
+
+// A vessel that never puts anybody aboard is not drawn. Kinds that are
+// summaries, snapshots or bad news carry nobody, whatever their quantity.
+func TestHearthFleetIgnoresNonArrivals(t *testing.T) {
+	ctx := context.Background()
+	st := newStore(t)
+
+	for _, ev := range []core.Event{
+		hearthEvent("googleplay", "installs_day", "2026-08-04", "", 900, 0, false, "x:1"),
+		hearthEvent("revenuecat", "cancellation", "2026-08-04", "", 5, 0, false, "x:2"),
+		hearthEvent("revenuecat", "expiration", "2026-08-04", "", 5, 0, false, "x:3"),
+		hearthEvent("appstore", "active_devices", "2026-08-04", "", 4000, 0, false, "x:4"),
+		hearthEvent("loot", "settlement", "2026-08-04", "", 1, 0, false, "x:5"),
+	} {
+		if _, err := st.InsertEvent(ctx, ev); err != nil {
+			t.Fatalf("insert %s: %v", ev.DedupeKey, err)
+		}
+	}
+
+	h := hearthOf(t, st, "")
+	if len(h.Fleet) != 0 {
+		t.Errorf("fleet = %+v, want nothing afloat", h.Fleet)
+	}
+	if h.Unknown.Population != 0 {
+		t.Errorf("unknown population = %d, want 0", h.Unknown.Population)
+	}
+}
+
+// With no country on the map at all — a Flathub-only app — the fleet is still
+// measured, against itself.
+func TestHearthFleetWithoutAnyCountry(t *testing.T) {
+	ctx := context.Background()
+	st := newStore(t)
+
+	for _, ev := range []core.Event{
+		hearthEvent("flathub", "install", "2026-08-04", "", 400, 0, false, "fh:1"),
+		hearthEvent("snapcraft", "install", "2026-08-04", "", 4, 0, false, "sc:1"),
+	} {
+		if _, err := st.InsertEvent(ctx, ev); err != nil {
+			t.Fatalf("insert %s: %v", ev.DedupeKey, err)
+		}
+	}
+
+	h := hearthOf(t, st, "")
+	if len(h.Countries) != 0 || h.Capital != "" {
+		t.Fatalf("a countryless database grew a map: %+v", h.Countries)
+	}
+	if got := vessel(t, h, "flathub").Tier.Name; got != "metropolis" {
+		t.Errorf("flathub tier = %q, want metropolis: it is the whole fleet", got)
+	}
+	if got := vessel(t, h, "snapcraft").Tier.Name; got != "village" {
+		t.Errorf("snapcraft tier = %q, want village: 4 of 400", got)
+	}
+}
+
+// A scoped globe is this app's fleet, not this app's plus everyone else's.
+func TestHearthFleetIsScopedToTheProduct(t *testing.T) {
+	ctx := context.Background()
+	st := newStore(t)
+
+	mk := func(product string, qty int, dedupe string) core.Event {
+		ev := hearthEvent("flathub", "install", "2026-08-04", "", qty, 0, false, dedupe)
+		ev.App = product
+		ev.Product = product
+		return ev
+	}
+	for _, ev := range []core.Event{mk("Lumen Notes", 300, "l:1"), mk("Orbit Weather", 20, "o:1")} {
+		if _, err := st.InsertEvent(ctx, ev); err != nil {
+			t.Fatalf("insert %s: %v", ev.DedupeKey, err)
+		}
+	}
+
+	all := hearthOf(t, st, "")
+	if got := vessel(t, all, "flathub").Population; got != 320 {
+		t.Errorf("unscoped flathub vessel = %d, want 320", got)
+	}
+
+	lumen, err := st.Scoped("Lumen Notes").Hearth(ctx, "", "USD")
+	if err != nil {
+		t.Fatalf("scoped hearth: %v", err)
+	}
+	if got := vessel(t, lumen, "flathub").Population; got != 300 {
+		t.Errorf("Lumen's flathub vessel = %d, want 300: Orbit's people are not aboard", got)
+	}
+	if lumen.Unknown.Population != 300 {
+		t.Errorf("Lumen unknown = %d, want 300", lumen.Unknown.Population)
+	}
+
+	none, err := st.Scoped("Never Shipped").Hearth(ctx, "", "USD")
+	if err != nil {
+		t.Fatalf("unknown scope: %v", err)
+	}
+	if len(none.Fleet) != 0 {
+		t.Errorf("an unknown scope has a fleet: %+v", none.Fleet)
 	}
 }

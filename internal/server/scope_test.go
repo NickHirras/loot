@@ -216,6 +216,20 @@ func TestScopedEndpoints(t *testing.T) {
 		if c, _ := countries[0].(map[string]any); c["country"] != "US" {
 			t.Errorf("Nistis country = %v, want US", c["country"])
 		}
+
+		// The fleet narrows with the map: the unclaimed app's Flathub installs
+		// belong to nobody else's globe.
+		allFleet, _ := all["fleet"].([]any)
+		if len(allFleet) != 1 {
+			t.Fatalf("unscoped fleet = %#v, want the flathub vessel", allFleet)
+		}
+		v, _ := allFleet[0].(map[string]any)
+		if v["source"] != "flathub" || v["population"].(float64) != 7 {
+			t.Errorf("unscoped vessel = %v, want flathub with 7 people", v)
+		}
+		if fleet, _ := one["fleet"].([]any); len(fleet) != 0 {
+			t.Errorf("Nistis fleet = %#v, want nothing afloat", fleet)
+		}
 	})
 
 	t.Run("drops", func(t *testing.T) {

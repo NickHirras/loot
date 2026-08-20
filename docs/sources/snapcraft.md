@@ -217,4 +217,5 @@ no user-level series to switch to.
 Devices the store could not place are reported under a non-ISO series name
 (`??`). Those are skipped rather than invented into a country; they still appear
 in the day's total `install` event, which carries no country and therefore lands
-in the Hearth's **unknown lands**.
+aboard the Hearth's **fleet** — for Snapcraft, an offshore rig in the North Sea
+called *Snapcraft Platform Nine*.

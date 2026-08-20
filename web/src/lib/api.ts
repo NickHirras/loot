@@ -12,6 +12,7 @@ import type {
   HearthCountry,
   HearthDrop,
   HearthTier,
+  HearthVessel,
   Mystery,
   NewQuest,
   Quest,
@@ -206,8 +207,9 @@ export function websocketURL(): string {
  */
 export async function fetchHearth(): Promise<Hearth> {
   const data = await getJSON<
-    Omit<Hearth, 'countries' | 'tiers' | 'recent'> & {
+    Omit<Hearth, 'countries' | 'fleet' | 'tiers' | 'recent'> & {
       countries: HearthCountry[] | null
+      fleet: HearthVessel[] | null
       tiers: HearthTier[] | null
       recent: HearthDrop[] | null
     }
@@ -215,6 +217,7 @@ export async function fetchHearth(): Promise<Hearth> {
   return {
     ...data,
     countries: data.countries ?? [],
+    fleet: data.fleet ?? [],
     tiers: data.tiers ?? [],
     recent: data.recent ?? [],
   }

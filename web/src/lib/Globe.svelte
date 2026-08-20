@@ -4,18 +4,25 @@
   import { borders, centroidOf, countries as landFeatures, countryName } from './geo'
   import { rarityColor } from './palette'
   import { prefersReducedMotion } from './route.svelte'
+  import { anchorageOf, vesselKind, vesselName, vesselWhy } from './sea'
   import { loot } from './state.svelte'
-  import type { Drop, HearthCountry } from './types'
+  import type { Drop, HearthCountry, HearthVessel } from './types'
   import { currency, flagEmoji, integer } from './types'
 
   let {
     countries,
+    fleet = [],
     capital,
     code,
     ambient = false,
   }: {
     /** Every settlement, biggest first. */
     countries: HearthCountry[]
+    /**
+     * The fleet: one vessel per source that counted people it could not place.
+     * They are drawn at sea and are never countries.
+     */
+    fleet?: HearthVessel[]
     /** ISO2 of the capital, or "" when Loot has never seen a country. */
     capital: string
     /** Display currency, for the tooltip. */
@@ -54,10 +61,20 @@
   /** City lights: warm sodium gold, exactly what you see from orbit. */
   const CITY = [245, 196, 81]
   const CAPITAL = [110, 231, 255]
+  /**
+   * Deck lights: the same idea as a city's, cooled and desaturated. A vessel
+   * has to read as "not a settlement" at a glance and from across a room, and
+   * cold against warm does that faster than shape alone.
+   */
+  const VESSEL = [141, 196, 224]
 
   /** Marker radius per tier index, at the reference scale. */
   const TIER_RADIUS = [1.3, 1.9, 2.6, 3.5, 4.6, 6]
+  /** A vessel's half-width per tier index — roughly 8px to 15px of ship. */
+  const VESSEL_SIZE = [4, 4.6, 5.3, 6.1, 6.9, 7.6]
   const REFERENCE_SCALE = 260
+  /** One slow bob of the swell, in milliseconds. */
+  const BOB_MS = 2_600
 
   // ------------------------------------------------------------------- state
 
@@ -127,6 +144,8 @@
 
   /** The settlement under the pointer, and where to put its tooltip. */
   let hovered = $state<{ country: HearthCountry; x: number; y: number } | null>(null)
+  /** The vessel under the pointer. Only ever one of the two is set. */
+  let hoveredShip = $state<{ vessel: HearthVessel; x: number; y: number } | null>(null)
 
   let stars: { x: number; y: number; r: number; a: number }[] = []
 
@@ -147,6 +166,21 @@
   )
 
   const capitalPoint = $derived(capital ? centroidOf(capital) : null)
+
+  /**
+   * The fleet, anchored. A vessel is always placeable — its anchorage is a
+   * fixed piece of open ocean picked from its source id — so unlike a
+   * settlement, none of them can fall off the map.
+   *
+   * The phase staggers the bobbing, so eight ships do not rise and fall as one.
+   */
+  const vessels = $derived(
+    fleet.map((vessel, i) => ({
+      vessel,
+      point: anchorageOf(vessel.source),
+      phase: (i * 2.3) % (Math.PI * 2),
+    })),
+  )
 
   // ------------------------------------------------------------ the sun
 
@@ -196,6 +230,12 @@
 
   function markerRadius(tierIndex: number): number {
     const base = TIER_RADIUS[Math.min(tierIndex, TIER_RADIUS.length - 1)] ?? TIER_RADIUS[0]
+    return base * (scale / REFERENCE_SCALE)
+  }
+
+  /** Half the width of a vessel's hull, on the same tier ladder as a city. */
+  function vesselSize(tierIndex: number): number {
+    const base = VESSEL_SIZE[Math.min(tierIndex, VESSEL_SIZE.length - 1)] ?? VESSEL_SIZE[0]
     return base * (scale / REFERENCE_SCALE)
   }
 
@@ -261,6 +301,7 @@
 
     drawNight(ctx, path, sun)
     drawCities(ctx, sun, now)
+    drawFleet(ctx, sun, now)
     drawArcs(ctx, centre, now)
     drawPulses(ctx, now)
 
@@ -397,6 +438,115 @@
     ctx.closePath()
     ctx.fillStyle = fill
     ctx.fill()
+  }
+
+  /**
+   * The fleet: everybody a source counted but could not place, drawn as a ship
+   * at that source's anchorage.
+   *
+   * They are lit like cities — brighter on the night side, bigger with tier —
+   * but cold rather than warm, and a hull rather than a dot, because the one
+   * thing this must never say is "a country lives here".
+   */
+  function drawFleet(ctx: CanvasRenderingContext2D, sun: [number, number], now: number) {
+    for (const { vessel, point, phase } of vessels) {
+      if (!visible(point)) continue
+      const projected = projection(point)
+      if (!projected) continue
+
+      const tier = vessel.tier?.index ?? 0
+      const size = vesselSize(tier)
+      const night = geoDistance(point, sun) > Math.PI / 2
+      const lit = night ? 1 : 0.62
+      const strength = (0.45 + tier * 0.1) * lit
+      // The swell. Nothing here is going anywhere, so it is a rise and fall of
+      // a fraction of the hull rather than a journey — and it stops entirely
+      // for anyone who asked the page to hold still.
+      const bob = reduced ? 0 : Math.sin((now / BOB_MS) * Math.PI * 2 + phase) * size * 0.16
+      const x = projected[0]
+      const y = projected[1] + bob
+
+      const glowRadius = size * (night ? 3.4 : 2.4)
+      const glow = ctx.createRadialGradient(x, y, 0, x, y, glowRadius)
+      glow.addColorStop(0, rgba(VESSEL, Math.min(0.7, strength + 0.14)))
+      glow.addColorStop(0.45, rgba(VESSEL, strength * 0.3))
+      glow.addColorStop(1, rgba(VESSEL, 0))
+      ctx.beginPath()
+      ctx.arc(x, y, glowRadius, 0, Math.PI * 2)
+      ctx.fillStyle = glow
+      ctx.fill()
+
+      const ink = rgba(VESSEL, Math.min(1, 0.62 + strength))
+      ctx.save()
+      ctx.translate(x, y)
+      ctx.fillStyle = ink
+      ctx.strokeStyle = ink
+      ctx.lineWidth = Math.max(0.8, size * 0.16)
+      ctx.lineCap = 'round'
+      if (vesselKind(vessel.source) === 'rig') drawRig(ctx, size)
+      else drawShip(ctx, size)
+
+      // A waterline, so the hull sits *on* something.
+      ctx.beginPath()
+      ctx.moveTo(-size * 1.25, size * 0.6)
+      ctx.lineTo(size * 1.25, size * 0.6)
+      ctx.strokeStyle = rgba(VESSEL, 0.22 * lit + 0.08)
+      ctx.lineWidth = Math.max(0.6, size * 0.1)
+      ctx.stroke()
+      ctx.restore()
+    }
+  }
+
+  /** A hull, a mast and a sail, in as few strokes as read at 12 pixels. */
+  function drawShip(ctx: CanvasRenderingContext2D, s: number) {
+    ctx.beginPath()
+    ctx.moveTo(-s, -s * 0.1)
+    ctx.quadraticCurveTo(0, s * 0.8, s, -s * 0.1)
+    ctx.closePath()
+    ctx.fill()
+
+    ctx.beginPath()
+    ctx.moveTo(0, -s * 0.14)
+    ctx.lineTo(0, -s * 1.55)
+    ctx.stroke()
+
+    ctx.beginPath()
+    ctx.moveTo(s * 0.1, -s * 1.42)
+    ctx.lineTo(s * 0.1, -s * 0.26)
+    ctx.lineTo(s * 0.98, -s * 0.32)
+    ctx.closePath()
+    ctx.fill()
+  }
+
+  /**
+   * A rig: a pontoon on legs with two derricks. Snapcraft gets one because a
+   * platform in the North Sea is funnier than another boat, and because a rig
+   * is exactly what an app store that reports no country is — parked offshore,
+   * pumping numbers up from somewhere nobody names.
+   */
+  function drawRig(ctx: CanvasRenderingContext2D, s: number) {
+    ctx.beginPath()
+    ctx.rect(-s, s * 0.14, s * 2, s * 0.34)
+    ctx.fill()
+
+    ctx.beginPath()
+    ctx.moveTo(-s * 0.62, s * 0.14)
+    ctx.lineTo(-s * 0.62, -s * 0.42)
+    ctx.moveTo(s * 0.62, s * 0.14)
+    ctx.lineTo(s * 0.62, -s * 0.42)
+    ctx.stroke()
+
+    ctx.beginPath()
+    ctx.rect(-s * 0.95, -s * 0.68, s * 1.9, s * 0.28)
+    ctx.fill()
+
+    ctx.beginPath()
+    for (const dx of [-s * 0.45, s * 0.45]) {
+      ctx.moveTo(dx - s * 0.32, -s * 0.68)
+      ctx.lineTo(dx, -s * 1.55)
+      ctx.lineTo(dx + s * 0.32, -s * 0.68)
+    }
+    ctx.stroke()
   }
 
   /**
@@ -576,10 +726,17 @@
    * A drop landed. Cursed news flashes red where it happened and goes no
    * further; everything else flies to the capital, and a first-ever country
    * founds itself with a ring and a label on the way.
+   *
+   * A drop with no country at all sails instead: it leaves from its source's
+   * anchorage, which is where that source's people are already drawn. It used
+   * to leave from nowhere — the globe simply ignored it — so a Flathub day was
+   * invisible on the one screen that is about where your customers are.
    */
   function receive(drop: Drop) {
-    if (!drop.country) return
-    const from = centroidOf(drop.country)
+    // A vessel is never founded. It has no first day and no ring: it is
+    // already out there the moment the source counts anybody at all.
+    const founding = drop.kind === 'settlement' && drop.country !== ''
+    const from = drop.country ? centroidOf(drop.country) : anchorageOf(drop.source)
     if (!from) return
 
     const now = performance.now()
@@ -590,7 +747,7 @@
       return
     }
 
-    if (drop.kind === 'settlement') {
+    if (founding) {
       pulses = push(pulses, { at: from, color: colour, start: now, duration: FOUND_MS, label: 'New settlement' }, MAX_PULSES)
     }
 
@@ -663,7 +820,7 @@
       lastMove = { x: event.clientX, y: event.clientY, t: now }
       interactingUntil = now + INTERACTION_PAUSE_MS
       turn = null
-      hovered = null
+      hovered = hoveredShip = null
       return
     }
     trackHover(event)
@@ -680,7 +837,11 @@
     ;(event.currentTarget as HTMLCanvasElement).releasePointerCapture?.(event.pointerId)
   }
 
-  /** Finds the settlement nearest the pointer, if one is close enough. */
+  /**
+   * Finds the settlement or vessel nearest the pointer, if one is close
+   * enough. Both are hunted in the same pass and the closer one wins, so a
+   * ship anchored near a coast cannot steal its neighbour's tooltip.
+   */
   function trackHover(event: PointerEvent) {
     const rect = canvas?.getBoundingClientRect()
     if (!rect) return
@@ -688,6 +849,7 @@
     const y = event.clientY - rect.top
 
     let best: { country: HearthCountry; x: number; y: number } | null = null
+    let bestShip: { vessel: HearthVessel; x: number; y: number } | null = null
     let bestDistance = Infinity
     for (const { country, point } of cities) {
       if (!visible(point)) continue
@@ -701,7 +863,20 @@
         best = { country, x: projected[0], y: projected[1] }
       }
     }
+    for (const { vessel, point } of vessels) {
+      if (!visible(point)) continue
+      const projected = projection(point)
+      if (!projected) continue
+      const distance = Math.hypot(projected[0] - x, projected[1] - y)
+      const reach = Math.max(16, vesselSize(vessel.tier?.index ?? 0) * 2.2)
+      if (distance < reach && distance < bestDistance) {
+        bestDistance = distance
+        best = null
+        bestShip = { vessel, x: projected[0], y: projected[1] }
+      }
+    }
     hovered = best
+    hoveredShip = bestShip
   }
 
   function wheel(event: WheelEvent) {
@@ -808,9 +983,9 @@
     onpointermove={pointerMove}
     onpointerup={pointerUp}
     onpointercancel={pointerUp}
-    onpointerleave={() => (hovered = null)}
+    onpointerleave={() => (hovered = hoveredShip = null)}
     ondblclick={reset}
-    aria-label="A globe of every country you have sold in"
+    aria-label="A globe of every country you have sold in, and the fleet at sea"
   ></canvas>
 
   {#if hovered}
@@ -829,6 +1004,27 @@
         <div><dt>Revenue</dt><dd>{currency(hovered.country.revenue_base, code)}</dd></div>
         <div><dt>Drops</dt><dd>{integer(hovered.country.drops)}</dd></div>
         <div><dt>First customer</dt><dd>{hovered.country.first_seen || '—'}</dd></div>
+      </dl>
+    </div>
+  {/if}
+
+  {#if hoveredShip}
+    <div
+      class="tip"
+      style="left: {hoveredShip.x}px; top: {hoveredShip.y}px"
+      class:below={hoveredShip.y < 160}
+    >
+      <div class="tip-head">
+        <span class="flag">⚓</span>
+        <span class="name">{vesselName(hoveredShip.vessel.source)}</span>
+      </div>
+      <p class="why">{vesselWhy(hoveredShip.vessel.source)}</p>
+      <dl>
+        <div><dt>Aboard</dt><dd>{integer(hoveredShip.vessel.population)}</dd></div>
+        {#if hoveredShip.vessel.revenue_base}
+          <div><dt>Revenue</dt><dd>{currency(hoveredShip.vessel.revenue_base, code)}</dd></div>
+        {/if}
+        <div><dt>Sailing since</dt><dd>{hoveredShip.vessel.first_seen || '—'}</dd></div>
       </dl>
     </div>
   {/if}
@@ -897,6 +1093,14 @@
 
   .name {
     font-weight: 650;
+  }
+
+  .why {
+    margin: 0 0 0.35rem;
+    max-width: 210px;
+    font-size: 0.66rem;
+    line-height: 1.35;
+    color: var(--text-faint);
   }
 
   .tier {

@@ -135,11 +135,20 @@ class HearthState {
    */
   #applyDrop(drop: Drop): void {
     const data = this.data
-    if (!data || !drop.country) return
+    if (!data) return
     // A scoped globe must not light up a country because another app sold
     // there. `loot` already filters live drops, but the Hearth also replays
     // chest cascades, which are never scoped.
     if (!scope.includes(drop.product)) return
+
+    // A drop with no country belongs to a vessel, and a vessel is never
+    // founded — it has no ring, no label and no first day, it is simply out
+    // there once its source has counted anybody. Its population is the
+    // server's to count, so all this can do is ask sooner.
+    if (!drop.country) {
+      this.markStale()
+      return
+    }
 
     const arrival: HearthDrop = {
       id: drop.id,

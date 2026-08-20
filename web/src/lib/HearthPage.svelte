@@ -5,6 +5,7 @@
   import { hearth } from './hearth.svelte'
   import { rarityColor } from './palette'
   import { router } from './route.svelte'
+  import { vesselName } from './sea'
   import { loot } from './state.svelte'
   import { currency, flagEmoji, integer, timeAgo } from './types'
 
@@ -17,6 +18,8 @@
   const code = $derived(data?.display_currency ?? 'USD')
   const ambient = $derived(router.ambient)
   const settlements = $derived(data?.countries ?? [])
+  /** The vessels: people no source could place. Empty means no section. */
+  const fleet = $derived(data?.fleet ?? [])
   const capitalName = $derived(data?.capital ? countryName(data.capital) : '')
 
   /** How much of the era bar is filled, live. */
@@ -59,7 +62,7 @@
     label, not a control, apart from the two buttons in the corner.
   -->
   <section class="stage" class:idle aria-label="The Hearth, ambient">
-    <Globe countries={settlements} capital={data?.capital ?? ''} {code} ambient />
+    <Globe countries={settlements} fleet={data?.fleet ?? []} capital={data?.capital ?? ''} {code} ambient />
 
     <div class="overlay top">
       <div class="era-mini">
@@ -111,7 +114,7 @@
     {:else}
       <div class="layout">
         <div class="globe-card">
-          <Globe countries={settlements} capital={data.capital} {code} />
+          <Globe countries={settlements} fleet={data.fleet ?? []} capital={data.capital} {code} />
           <p class="hint">Drag to turn · scroll to zoom · double click to recentre</p>
         </div>
 
@@ -138,14 +141,28 @@
               <div><dt>Population</dt><dd>{integer(data.population)}</dd></div>
               <div><dt>Revenue</dt><dd>{currency(data.revenue_base, code)}</dd></div>
             </dl>
-            {#if data.unknown.population > 0 || data.unknown.revenue_base > 0}
-              <p class="unknown">
-                <strong>{integer(data.unknown.population)}</strong> in unknown lands
-                {#if data.unknown.revenue_base}· {currency(data.unknown.revenue_base, code)}{/if}
-                <span class="fine">Flathub counts installs but never says from where, so its people have no country to stand in.</span>
-              </p>
-            {/if}
           </div>
+
+          {#if fleet.length}
+            <div class="card">
+              <h3>The fleet</h3>
+              <ul class="fleet">
+                {#each fleet as ship (ship.source)}
+                  <li>
+                    <span class="anchor">⚓</span>
+                    <span class="ship-name">{vesselName(ship.source)}</span>
+                    <span class="numbers">
+                      <span class="pop">{integer(ship.population)}</span>
+                      {#if ship.revenue_base}
+                        <span class="money">{currency(ship.revenue_base, code)}</span>
+                      {/if}
+                    </span>
+                  </li>
+                {/each}
+              </ul>
+              <p class="fine">People whose store never says where they are. They sail.</p>
+            </div>
+          {/if}
 
           <div class="card grow">
             <h3>Settlements</h3>
@@ -465,17 +482,37 @@
     font-variant-numeric: tabular-nums;
   }
 
-  .unknown {
-    margin: 0.6rem 0 0;
-    padding-top: 0.5rem;
-    border-top: 1px dashed var(--border);
-    font-size: 0.76rem;
-    color: var(--text-dim);
+  .fleet {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
   }
 
-  .unknown .fine {
-    display: block;
-    margin-top: 0.2rem;
+  .fleet li {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-size: 0.78rem;
+  }
+
+  .anchor {
+    font-size: 0.8rem;
+    opacity: 0.75;
+  }
+
+  .ship-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .fine {
+    margin: 0.55rem 0 0;
+    padding-top: 0.45rem;
+    border-top: 1px dashed var(--border);
     font-size: 0.68rem;
     color: var(--text-faint);
   }
