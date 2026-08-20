@@ -276,6 +276,10 @@ func (p *Pipeline) mintDrop(ctx context.Context, ev core.Event) (*core.Drop, err
 		return nil, fmt.Errorf("classify %s/%s: %w", ev.Source, ev.Kind, err)
 	}
 
+	// Stamp with the pipeline's clock, not the wall clock the rules engine
+	// used — they are the same in production, but auto-open ages chests by
+	// this timestamp, so it must follow the injected clock in tests.
+	drop.CreatedAt = p.now().UTC()
 	if p.Backdate && !ev.OccurredAt.IsZero() {
 		drop.CreatedAt = ev.OccurredAt.UTC()
 		drop.ID = core.NewIDAt(ev.OccurredAt)
@@ -434,9 +438,11 @@ func (p *Pipeline) RunChestAutoOpen(ctx context.Context) {
 	}
 }
 
-// OpenDueChests opens every chest that is older than the configured delay,
-// measured from midnight UTC of the chest's own day. Exported so tests and a
-// future CLI can force a sweep.
+// OpenDueChests opens every chest that has sat unchanged for longer than the
+// configured delay — measured from the moment the chest was last *filled*,
+// not from its business day. Seen for real: aging by report date silently
+// opened a whole month of freshly backfilled chests before anyone got to
+// them. Exported so tests and a future CLI can force a sweep.
 func (p *Pipeline) OpenDueChests(ctx context.Context) {
 	if p.ChestAutoOpenAfterHours <= 0 {
 		return
@@ -449,11 +455,7 @@ func (p *Pipeline) OpenDueChests(ctx context.Context) {
 
 	deadline := time.Duration(p.ChestAutoOpenAfterHours) * time.Hour
 	for _, c := range chests {
-		day, err := time.Parse(core.DayLayout, c.Date)
-		if err != nil {
-			continue
-		}
-		if p.now().Sub(day.UTC()) < deadline {
+		if c.FilledAt.IsZero() || p.now().Sub(c.FilledAt) < deadline {
 			continue
 		}
 		if _, err := p.RevealChest(ctx, c.Date); err != nil {

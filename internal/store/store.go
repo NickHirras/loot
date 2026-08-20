@@ -481,7 +481,7 @@ type Chest struct {
 // the cheap query behind the UI badge and the `chest` bus message.
 func (s *Store) ChestSummaries(ctx context.Context) ([]core.ChestSummary, error) {
 	rows, err := s.q.QueryContext(ctx, `
-        SELECT chest_date, rarity, COUNT(*), COALESCE(SUM(xp), 0)
+        SELECT chest_date, rarity, COUNT(*), COALESCE(SUM(xp), 0), MAX(created_at)
         FROM drops d
         WHERE `+unrevealed+`
         GROUP BY chest_date, rarity
@@ -499,8 +499,9 @@ func (s *Store) ChestSummaries(ctx context.Context) ([]core.ChestSummary, error)
 		var (
 			date, rarity string
 			n, xp        int
+			filled       int64
 		)
-		if err := rows.Scan(&date, &rarity, &n, &xp); err != nil {
+		if err := rows.Scan(&date, &rarity, &n, &xp, &filled); err != nil {
 			return nil, fmt.Errorf("scan chest summary: %w", err)
 		}
 		i, ok := index[date]
@@ -512,6 +513,9 @@ func (s *Store) ChestSummaries(ctx context.Context) ([]core.ChestSummary, error)
 		out[i].Count += n
 		out[i].XP += xp
 		out[i].ByRarity[rarity] += n
+		if at := time.UnixMilli(filled).UTC(); at.After(out[i].FilledAt) {
+			out[i].FilledAt = at
+		}
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("iterate chest summaries: %w", err)

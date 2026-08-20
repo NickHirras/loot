@@ -552,27 +552,41 @@ func TestChestDisabledPublishesImmediately(t *testing.T) {
 	}
 }
 
-func TestAutoOpenOnlyOpensStaleChests(t *testing.T) {
+func TestAutoOpenAgesChestsFromWhenTheyWereFilled(t *testing.T) {
 	ctx := context.Background()
 	p, st, _ := newPipeline(t)
 	p.ChestAutoOpenAfterHours = 36
-	// 2026-08-18 10:00 UTC: the 17th's chest is 34h old, the 16th's is 58h.
-	p.Now = func() time.Time { return time.Date(2026, 8, 18, 10, 0, 0, 0, time.UTC) }
 
-	for _, day := range []string{"2026-08-16", "2026-08-17"} {
-		if _, err := p.Ingest(ctx, salesDay("com.example.app", day, 3, 9, "USD")); err != nil {
-			t.Fatalf("ingest %s: %v", day, err)
-		}
+	// The 16th's chest was filled when the 16th's report landed — 48h ago.
+	p.Now = func() time.Time { return time.Date(2026, 8, 16, 10, 0, 0, 0, time.UTC) }
+	if _, err := p.Ingest(ctx, salesDay("com.example.app", "2026-08-16", 3, 9, "USD")); err != nil {
+		t.Fatalf("ingest: %v", err)
+	}
+	// The 17th's landed an hour ago.
+	p.Now = func() time.Time { return time.Date(2026, 8, 18, 9, 0, 0, 0, time.UTC) }
+	if _, err := p.Ingest(ctx, salesDay("com.example.app", "2026-08-17", 3, 9, "USD")); err != nil {
+		t.Fatalf("ingest: %v", err)
+	}
+	// A month-old business day backfilled seconds ago: brand new to the user.
+	// Seen for real — aging by report date silently opened a whole month of
+	// freshly backfilled chests before anyone got to them.
+	if _, err := p.Ingest(ctx, salesDay("com.example.app", "2026-07-01", 3, 9, "USD")); err != nil {
+		t.Fatalf("ingest: %v", err)
 	}
 
+	p.Now = func() time.Time { return time.Date(2026, 8, 18, 10, 0, 0, 0, time.UTC) }
 	p.OpenDueChests(ctx)
 
 	chests, err := st.ChestSummaries(ctx)
 	if err != nil {
 		t.Fatalf("chest summaries: %v", err)
 	}
-	if len(chests) != 1 || chests[0].Date != "2026-08-17" {
-		t.Fatalf("chests left = %+v, want only 2026-08-17", chests)
+	var left []string
+	for _, c := range chests {
+		left = append(left, c.Date)
+	}
+	if len(left) != 2 || left[0] != "2026-07-01" || left[1] != "2026-08-17" {
+		t.Fatalf("chests left = %v, want the backfilled 07-01 and the fresh 08-17 (only the stale 08-16 opens)", left)
 	}
 }
 

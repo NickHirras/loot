@@ -154,6 +154,11 @@ type ChestSummary struct {
 	Count    int            `json:"count"`
 	XP       int            `json:"xp"`
 	ByRarity map[string]int `json:"by_rarity"`
+	// FilledAt is when the newest drop landed in this chest — the moment the
+	// chest last changed, which is what auto-open ages against. A chest full
+	// of backfilled history is brand new to the person who just wired the
+	// source, no matter how old its business day is.
+	FilledAt time.Time `json:"filled_at"`
 }
 
 // revealRank orders a chest reveal cascade. It is deliberately *not*
