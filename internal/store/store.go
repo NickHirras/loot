@@ -649,6 +649,45 @@ func (s *Store) RevealChest(ctx context.Context, chestDate string, now time.Time
 	return drops, nil
 }
 
+// RevealedChest is one chest opened by a bulk reveal: the day it belongs to
+// and the drops it held, in cascade order.
+type RevealedChest struct {
+	Date  string     `json:"date"`
+	Drops []DropView `json:"drops"`
+}
+
+// RevealAllChests opens every chest currently waiting, oldest day first, and
+// returns them in that order with each chest's drops in cascade order.
+//
+// The claim stays per chest rather than becoming one giant UPDATE over every
+// unrevealed row. Each chest is still opened atomically by RevealChest, so a
+// bulk open racing a single open of one of the same days cannot hand the same
+// drop to both callers; the loser simply sees that chest come back empty and
+// leaves it out of the result. One statement across all days would have been
+// atomic too, but it could not report *which* chest each drop came from
+// without a second read, and the caller — the "Open all" button, `loot chest
+// open --all` — wants the haul grouped by day.
+func (s *Store) RevealAllChests(ctx context.Context, now time.Time) ([]RevealedChest, error) {
+	chests, err := s.ChestSummaries(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]RevealedChest, 0, len(chests))
+	for _, c := range chests {
+		drops, err := s.RevealChest(ctx, c.Date, now)
+		if err != nil {
+			return nil, err
+		}
+		// No drops means somebody else claimed this chest between the summary
+		// read and the claim. That chest is not this call's to report.
+		if len(drops) == 0 {
+			continue
+		}
+		out = append(out, RevealedChest{Date: c.Date, Drops: drops})
+	}
+	return out, nil
+}
+
 // Stats is the aggregate shown in the dashboard header. Every drop count
 // excludes drops still held in an unopened chest — an unopened chest must not
 // leak its contents through the XP counter.

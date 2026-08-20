@@ -36,6 +36,20 @@
         "loot.yaml"
       ],
       "port": 8080
+    },
+    {
+      "name": "loot-demo-dev",
+      "runtimeExecutable": "/opt/homebrew/bin/go",
+      "runtimeArgs": [
+        "run",
+        "./cmd/loot",
+        "serve",
+        "--demo",
+        "--dev",
+        "--listen",
+        ":8082"
+      ],
+      "port": 8082
     }
   ]
 }

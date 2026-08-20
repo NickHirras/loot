@@ -515,6 +515,107 @@ func TestRevealChestCascadesInOrder(t *testing.T) {
 	}
 }
 
+// A bulk open is a fill, not a cascade: the spacing shrinks so that however
+// many drops there are, the run fits inside the budget.
+func TestBulkCascadeSpacingFitsTheBudget(t *testing.T) {
+	// Small hauls keep the full gap.
+	for _, n := range []int{1, 10, 40, 66} {
+		if got := pipeline.BulkCascadeSpacing(n); got != pipeline.BulkCascadeDelay {
+			t.Errorf("spacing for %d drops = %v, want %v", n, got, pipeline.BulkCascadeDelay)
+		}
+	}
+	// Big ones are squeezed, and never past the budget.
+	for _, n := range []int{100, 400, 5000} {
+		got := pipeline.BulkCascadeSpacing(n)
+		if got >= pipeline.BulkCascadeDelay {
+			t.Errorf("spacing for %d drops = %v, want less than %v", n, got, pipeline.BulkCascadeDelay)
+		}
+		if total := time.Duration(n) * got; total > pipeline.BulkCascadeBudget {
+			t.Errorf("%d drops at %v = %v, over the %v budget", n, got, total, pipeline.BulkCascadeBudget)
+		}
+	}
+}
+
+// Opening every chest at once reveals every chest exactly once, oldest day
+// first, and cascades the whole haul onto the bus quickly rather than at the
+// single-chest 600 ms — followed by one chest update saying nothing is left.
+func TestRevealAllChestsOpensEverythingQuickly(t *testing.T) {
+	ctx := context.Background()
+	p, st, b := newPipeline(t)
+
+	days := []string{"2026-08-14", "2026-08-15", "2026-08-16"}
+	for _, day := range days {
+		for _, app := range []string{"com.example.a", "com.example.b"} {
+			if _, err := p.Ingest(ctx, salesDay(app, day, 5, 10, "USD")); err != nil {
+				t.Fatalf("ingest %s/%s: %v", app, day, err)
+			}
+		}
+	}
+
+	msgs, cancel := b.Subscribe()
+	defer cancel()
+
+	start := time.Now()
+	opened, err := p.RevealAllChests(ctx)
+	if err != nil {
+		t.Fatalf("reveal all: %v", err)
+	}
+	if len(opened) != 3 {
+		t.Fatalf("opened %d chests, want 3", len(opened))
+	}
+	for i, c := range opened {
+		if c.Date != days[i] {
+			t.Errorf("chest %d is %s, want %s", i, c.Date, days[i])
+		}
+		if len(c.Drops) != 2 {
+			t.Errorf("chest %s holds %d drops, want 2", c.Date, len(c.Drops))
+		}
+	}
+
+	// Every revealed drop is republished as a chest drop, then exactly one
+	// chest message closes the run — and the whole fill beats what a
+	// single-chest cascade would have spent on its first two drops.
+	seenDrops, sawChest := 0, false
+	deadline := time.After(5 * time.Second)
+	for !sawChest {
+		select {
+		case msg := <-msgs:
+			switch msg.Type {
+			case "drop":
+				if !msg.Chest {
+					t.Fatalf("revealed drop was not marked chest:true: %+v", msg)
+				}
+				seenDrops++
+			case "chest":
+				if seenDrops != 6 {
+					t.Fatalf("chest update arrived after %d of 6 drops", seenDrops)
+				}
+				if len(msg.Chests) != 0 {
+					t.Errorf("chest update still lists %d chests", len(msg.Chests))
+				}
+				sawChest = true
+			}
+		case <-deadline:
+			t.Fatalf("bulk cascade stalled after %d drops (chest update seen: %v)", seenDrops, sawChest)
+		}
+	}
+	if elapsed := time.Since(start); elapsed > pipeline.BulkCascadeBudget+time.Second {
+		t.Errorf("bulk cascade of 6 drops took %v, want well under the budget", elapsed)
+	}
+
+	// Every drop is now in the feed, and a second bulk open finds nothing.
+	if feed := listDrops(t, st); len(feed) != 6 {
+		t.Errorf("feed holds %d drops after the bulk open, want 6", len(feed))
+	}
+	again, err := p.RevealAllChests(ctx)
+	if err != nil {
+		t.Fatalf("second reveal all: %v", err)
+	}
+	if len(again) != 0 {
+		t.Fatalf("second bulk open returned %d chests", len(again))
+	}
+}
+
 func TestRevealOldestChestByDefault(t *testing.T) {
 	ctx := context.Background()
 	p, _, _ := newPipeline(t)

@@ -129,7 +129,15 @@ export async function fetchChests(): Promise<ChestSummary[]> {
 
 /** What POST /api/chest/open answers with. */
 export interface ChestOpenResult {
+  /** The first (oldest) chest opened, or "" if there was nothing to open. */
   opened: string
+  /**
+   * Every chest opened, oldest first. One entry for a single open; the whole
+   * batch for `{"all":true}`. `drops` is one flat list across all of them,
+   * already in the order it should be revealed: chest by chest, and within a
+   * chest quietest news first.
+   */
+  opened_dates: string[]
   count: number
   drops: Drop[]
   /**
@@ -140,16 +148,29 @@ export interface ChestOpenResult {
   chests: ChestSummary[] | null
 }
 
-/** Opens a chest. An empty date opens the oldest one, which is the default. */
-export async function openChest(date = ''): Promise<ChestOpenResult> {
-  const res = await postJSON('/api/chest/open', date ? { date } : {})
+async function postChestOpen(body: Record<string, unknown>): Promise<ChestOpenResult> {
+  const res = await postJSON('/api/chest/open', body)
   const data = (await res.json()) as Partial<ChestOpenResult>
+  const drops = data.drops ?? []
   return {
     opened: data.opened ?? '',
+    // A server that predates bulk opens answers with `opened` alone; derive
+    // the list from it so callers only have to read one field.
+    opened_dates: data.opened_dates ?? (data.opened ? [data.opened] : []),
     count: data.count ?? 0,
-    drops: data.drops ?? [],
+    drops,
     chests: data.chests ?? null,
   }
+}
+
+/** Opens a chest. An empty date opens the oldest one, which is the default. */
+export function openChest(date = ''): Promise<ChestOpenResult> {
+  return postChestOpen(date ? { date } : {})
+}
+
+/** Opens every chest waiting, oldest first, in one request. */
+export function openAllChests(): Promise<ChestOpenResult> {
+  return postChestOpen({ all: true })
 }
 
 /** The body POST /api/dev/fake accepts; every field is optional. */

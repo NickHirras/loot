@@ -19,6 +19,7 @@ import (
 const chestUsage = `Usage:
   loot chest [flags]              List the chests waiting to be opened
   loot chest open [date] [flags]  Open a chest (default: the oldest one)
+  loot chest open --all           Open every chest waiting, oldest first
 
 Flags:
 `
@@ -42,6 +43,7 @@ func runChest(args []string) error {
 	fs := flag.NewFlagSet("chest", flag.ExitOnError)
 	rawURL := fs.String("url", "http://localhost:8080", "Loot server base URL")
 	plain := fs.Bool("no-color", false, "disable ANSI colors")
+	all := fs.Bool("all", false, "open every chest waiting, oldest first")
 	fs.Usage = func() {
 		fmt.Fprint(fs.Output(), chestUsage)
 		fs.PrintDefaults()
@@ -59,13 +61,19 @@ func runChest(args []string) error {
 			return fmt.Errorf("date must be YYYY-MM-DD, got %q", date)
 		}
 	}
+	if *all && date != "" {
+		return fmt.Errorf("--all opens every chest; drop the %s argument", date)
+	}
+	if *all && sub != "open" {
+		return fmt.Errorf("--all only applies to `loot chest open`")
+	}
 
 	ctx := context.Background()
 	switch sub {
 	case "", "list":
 		return listChests(ctx, base)
 	case "open":
-		return openChest(ctx, base, date, *plain)
+		return openChest(ctx, base, date, *all, *plain)
 	default:
 		return fmt.Errorf("unknown chest command %q\n\n%s", sub, chestUsage)
 	}
@@ -90,21 +98,36 @@ func listChests(ctx context.Context, base string) error {
 	return nil
 }
 
-type chestOpenResponse struct {
-	Opened string `json:"opened"`
-	Count  int    `json:"count"`
-	Drops  []struct {
-		Rarity   core.Rarity `json:"rarity"`
-		Title    string      `json:"title"`
-		Subtitle string      `json:"subtitle"`
-		XP       int         `json:"xp"`
-		Source   string      `json:"source"`
-		Country  string      `json:"country"`
-	} `json:"drops"`
+type chestOpenDrop struct {
+	Rarity    core.Rarity `json:"rarity"`
+	Title     string      `json:"title"`
+	Subtitle  string      `json:"subtitle"`
+	XP        int         `json:"xp"`
+	Source    string      `json:"source"`
+	Country   string      `json:"country"`
+	ChestDate string      `json:"chest_date"`
 }
 
-func openChest(ctx context.Context, base, date string, plain bool) error {
-	body, err := json.Marshal(map[string]string{"date": date})
+type chestOpenResponse struct {
+	// Opened is the first (oldest) chest opened; OpenedDates is all of them,
+	// which is only ever longer than one for --all.
+	Opened      string          `json:"opened"`
+	OpenedDates []string        `json:"opened_dates"`
+	Count       int             `json:"count"`
+	Drops       []chestOpenDrop `json:"drops"`
+}
+
+// openChest opens one chest, or — with all — every chest waiting. The bulk
+// haul comes back as one flat list already grouped by day in reveal order, so
+// it is printed chest by chest with a grand total underneath.
+func openChest(ctx context.Context, base, date string, all, plain bool) error {
+	req := map[string]any{}
+	if all {
+		req["all"] = true
+	} else {
+		req["date"] = date
+	}
+	body, err := json.Marshal(req)
 	if err != nil {
 		return err
 	}
@@ -114,26 +137,55 @@ func openChest(ctx context.Context, base, date string, plain bool) error {
 		return err
 	}
 	if out.Count == 0 {
-		fmt.Println("no chest to open")
+		if all {
+			fmt.Println("no chests to open")
+		} else {
+			fmt.Println("no chest to open")
+		}
 		return nil
 	}
 
-	total := 0
-	fmt.Printf("📦 opened %s — %s\n", out.Opened, plural(out.Count, "drop"))
-	for _, d := range out.Drops {
-		color, reset := rarityColor[d.Rarity], ansiReset
-		dim := ansiDim
-		if plain {
-			color, reset, dim = "", "", ""
-		}
-		fmt.Printf("   %s%-9s%s %s", color, strings.ToUpper(string(d.Rarity)), reset, d.Title)
-		if d.Subtitle != "" {
-			fmt.Printf(" %s· %s%s", dim, d.Subtitle, reset)
-		}
-		fmt.Printf(" %s[+%d xp %s]%s\n", dim, d.XP, d.Source, reset)
-		total += d.XP
+	dates := out.OpenedDates
+	if len(dates) == 0 && out.Opened != "" {
+		dates = []string{out.Opened}
 	}
-	fmt.Printf("   %stotal +%d xp%s\n", ansiDim, total, ansiReset)
+
+	dim, reset := ansiDim, ansiReset
+	if plain {
+		dim, reset = "", ""
+	}
+
+	grand := 0
+	for _, day := range dates {
+		drops := make([]chestOpenDrop, 0, len(out.Drops))
+		for _, d := range out.Drops {
+			// A single open of an older server answers without chest_date on
+			// every drop; with one chest open, they are all its own.
+			if d.ChestDate == day || (len(dates) == 1 && d.ChestDate == "") {
+				drops = append(drops, d)
+			}
+		}
+		fmt.Printf("📦 opened %s — %s\n", day, plural(len(drops), "drop"))
+		total := 0
+		for _, d := range drops {
+			color := rarityColor[d.Rarity]
+			if plain {
+				color = ""
+			}
+			fmt.Printf("   %s%-9s%s %s", color, strings.ToUpper(string(d.Rarity)), reset, d.Title)
+			if d.Subtitle != "" {
+				fmt.Printf(" %s· %s%s", dim, d.Subtitle, reset)
+			}
+			fmt.Printf(" %s[+%d xp %s]%s\n", dim, d.XP, d.Source, reset)
+			total += d.XP
+		}
+		fmt.Printf("   %stotal +%d xp%s\n", dim, total, reset)
+		grand += total
+	}
+	if len(dates) > 1 {
+		fmt.Printf("📦 %s, %s, %s+%d xp%s\n",
+			plural(len(dates), "chest"), plural(out.Count, "drop"), dim, grand, reset)
+	}
 	return nil
 }
 

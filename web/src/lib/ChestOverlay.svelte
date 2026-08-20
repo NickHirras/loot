@@ -10,6 +10,10 @@
   const revealed = $derived(loot.chestRevealed)
   const total = $derived(loot.chestExpected.length)
   const best = $derived(loot.chestBest)
+  const bulk = $derived(loot.chestBulk)
+  const byRarity = $derived(loot.chestHaulByRarity)
+  const highlights = $derived(loot.chestHighlights)
+  const highlightCount = $derived(loot.chestHighlightCount)
 
   /** Rarity dots for a chest row, skipping rarities the chest does not hold. */
   function dots(chest: ChestSummary): { rarity: Rarity; count: number }[] {
@@ -17,6 +21,16 @@
       rarity: r,
       count: chest.by_rarity[r],
     }))
+  }
+
+  /** "6 chests · Aug 12 – Aug 17", the label over a bulk haul. */
+  function bulkLabel(days: string[]): string {
+    if (days.length === 0) return 'Every chest'
+    const span =
+      days.length === 1
+        ? dayLabelLong(days[0])
+        : `${dayLabelLong(days[0])} – ${dayLabelLong(days[days.length - 1])}`
+    return `${days.length} ${days.length === 1 ? 'chest' : 'chests'} · ${span}`
   }
 
   function dayLabelLong(day: string): string {
@@ -91,6 +105,13 @@
         <button class="primary" onclick={() => loot.open()} disabled={loot.chestBusy}>
           Open the oldest chest
         </button>
+
+        {#if chests.length > 1}
+          <button class="bulk" onclick={() => loot.openAll()} disabled={loot.chestBusy}>
+            Open all · {chests.length} chests
+            <span class="bulk-sub">{integer(loot.chestCount)} drops in one go</span>
+          </button>
+        {/if}
       {/if}
 
       {#if loot.chestError}
@@ -101,7 +122,72 @@
         <div class="lid-stage">
           <ChestIcon size={190} open glow />
         </div>
-        <p class="opening">Opening {loot.chestDate || 'the chest'}…</p>
+        <p class="opening">
+          {#if bulk}
+            Opening every chest…
+          {:else}
+            Opening {loot.chestDate || 'the chest'}…
+          {/if}
+        </p>
+      </div>
+    {:else if bulk}
+      <div class="stage">
+        <div class="progress">
+          <span class="counter mono">{revealed.length} / {total} drops</span>
+          {#if phase === 'cascade'}
+            <button class="skip" onclick={() => loot.skipCascade()}>Skip</button>
+          {/if}
+        </div>
+
+        {#if phase === 'done'}
+          <div class="final">
+            <p class="final-label">{bulkLabel(loot.chestDates)}</p>
+            <p class="final-xp">+{integer(loot.chestHaulXP)} XP</p>
+
+            <ul class="tally">
+              {#each RARITIES as rarity (rarity)}
+                <li class="tally-item rarity-{rarity}" class:empty={!byRarity[rarity]}>
+                  <span class="tally-count">{byRarity[rarity] ?? 0}</span>
+                  <span class="tally-name">{rarity}</span>
+                </li>
+              {/each}
+            </ul>
+
+            {#if best}
+              <div class="best rarity-{best.rarity}">
+                <span class="badge">best · {best.rarity}</span>
+                <span class="best-title">{best.title}</span>
+              </div>
+            {/if}
+
+            {#if highlights.length}
+              <ul class="highlights">
+                {#each highlights as drop (drop.id)}
+                  <li class="haul-row rarity-{drop.rarity}">
+                    <span class="pip"></span>
+                    <span class="haul-title">{drop.title}</span>
+                    <span class="haul-xp">+{drop.xp}</span>
+                  </li>
+                {/each}
+                {#if highlightCount > highlights.length}
+                  <li class="more">and {highlightCount - highlights.length} more below</li>
+                {/if}
+              </ul>
+            {/if}
+
+            <button class="primary" onclick={() => loot.hideChest()}>Nice.</button>
+          </div>
+        {/if}
+
+        <ul class="grid">
+          {#each revealed as drop (drop.id)}
+            <li class="cell rarity-{drop.rarity}" title="{drop.title} · +{drop.xp} XP">
+              <span class="pip"></span>
+              <span class="cell-title">{drop.title}</span>
+              <span class="cell-xp">+{drop.xp}</span>
+            </li>
+          {/each}
+        </ul>
       </div>
     {:else}
       <div class="stage">
@@ -325,6 +411,37 @@
     cursor: wait;
   }
 
+  /* A second, quieter action under the primary one: same shape, no gold. */
+  .bulk {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.1rem;
+    width: 100%;
+    margin-top: 0.45rem;
+    padding: 0.45rem 0.55rem;
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: var(--text);
+    border: 1px solid color-mix(in oklab, var(--legendary) 35%, var(--border));
+    background: color-mix(in oklab, var(--legendary) 7%, #0e121b);
+  }
+
+  .bulk:hover {
+    background: color-mix(in oklab, var(--legendary) 14%, #0e121b);
+  }
+
+  .bulk:disabled {
+    opacity: 0.6;
+    cursor: wait;
+  }
+
+  .bulk-sub {
+    font-weight: 400;
+    font-size: 0.7rem;
+    color: var(--text-faint);
+  }
+
   .error {
     margin: 0.7rem 0 0;
     font-size: 0.78rem;
@@ -481,6 +598,99 @@
     white-space: nowrap;
   }
 
+  /* --- the bulk fill ------------------------------------------------------ */
+
+  .grid {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr));
+    gap: 0.25rem;
+  }
+
+  .cell {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.28rem 0.5rem;
+    border: 1px solid color-mix(in oklab, var(--r) 22%, var(--border-soft));
+    border-radius: var(--radius-sm);
+    background: color-mix(in oklab, var(--r) 6%, #0e121b);
+    font-size: 0.76rem;
+    animation: pop 0.22s ease-out both;
+  }
+
+  .cell-title {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--text-dim);
+  }
+
+  .cell-xp {
+    font-size: 0.72rem;
+    color: color-mix(in oklab, var(--r) 75%, var(--text));
+  }
+
+  /* The six counters on a bulk haul, mirroring the header's rarity tally. */
+  .tally {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.35rem;
+    list-style: none;
+    margin: 0 0 0.9rem;
+    padding: 0;
+  }
+
+  .tally-item {
+    min-width: 62px;
+    padding: 0.25rem 0.45rem;
+    border-radius: var(--radius-sm);
+    background: color-mix(in oklab, var(--r) 8%, #0d111a);
+    border: 1px solid color-mix(in oklab, var(--r) 26%, transparent);
+  }
+
+  .tally-item.empty {
+    opacity: 0.35;
+  }
+
+  .tally-count {
+    display: block;
+    font-weight: 700;
+    font-size: 0.95rem;
+    line-height: 1.15;
+    color: var(--r);
+  }
+
+  .tally-name {
+    display: block;
+    font-size: 0.6rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-faint);
+  }
+
+  /* Settlements and trophies: the drops of a bulk haul worth reading. */
+  .highlights {
+    list-style: none;
+    margin: 0 0 0.9rem;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    text-align: left;
+  }
+
+  .highlights .more {
+    padding: 0.1rem 0.55rem;
+    font-size: 0.72rem;
+    color: var(--text-faint);
+  }
+
   /* --- the growing haul --------------------------------------------------- */
 
   .haul {
@@ -542,6 +752,19 @@
     from {
       opacity: 0;
       transform: translateX(-8px);
+    }
+  }
+
+  /* Reduced motion fills the haul instantly (see LootState.openAll); the
+     cards must not animate their way in behind it either. */
+  @media (prefers-reduced-motion: reduce) {
+    .scrim,
+    .sheet,
+    .big,
+    .final,
+    .cell,
+    .haul-row {
+      animation: none;
     }
   }
 </style>

@@ -78,7 +78,7 @@ Six screens, all of them demo data at 1400×900. Because the demo world comes fr
 </td>
 <td width="50%">
 <img src="docs/screenshots/chest.png" alt="The chest cascade: a rare drop revealed on top of the drops already opened">
-<b>The cascade</b> — a chest opens one drop at a time, 600 ms apart, quietest first, so the day ends on its best news.
+<b>The cascade</b> — a chest opens one drop at a time, 600 ms apart, quietest first, so the day ends on its best news. (A backlog of chests can be emptied in one go instead; see <a href="#the-daily-chest">the daily chest</a>.)
 </td>
 </tr>
 <tr>
@@ -426,6 +426,7 @@ A chest is opened from the dashboard, by `loot chest open`, or by itself once it
 ./bin/loot chest                      # what is waiting
 ./bin/loot chest open                 # open the oldest chest
 ./bin/loot chest open 2026-08-17      # open a specific day
+./bin/loot chest open --all           # open every chest waiting, oldest first
 ```
 
 ```
@@ -439,6 +440,8 @@ A chest is opened from the dashboard, by `loot chest open`, or by itself once it
 ```
 
 In the dashboard a chest icon appears in the header with the number of drops waiting. Clicking it opens the chest overlay: the chests by date with their counts, XP and rarity dots, and an **Open** button per chest (or one for the oldest). The lid swings open, the drops cascade in one at a time as they arrive over the websocket — each with its rarity sound — and settle into a growing haul, ending on the total XP and the best drop. The haul then sits in the feed, tagged 📦.
+
+**Opening all of them.** Come back from a holiday, or wire up a source that backfills a month, and there are thirty chests waiting — at 600 ms a drop that is a quarter of an hour of clicking. With two or more waiting the overlay offers a second button, **Open all · N chests**, and `POST /api/chest/open` takes `{"all": true}` (as does `loot chest open --all`). Every chest is claimed atomically on its own, oldest day first, drops still ordered cursed → common → … → legendary inside each one; the reply is one flat haul in that order, with `opened_dates` naming each day and `opened` still the oldest for anything that only reads one date. A bulk open is a *fill* rather than a cascade, and deliberately so: the bus gets the whole haul roughly 60 ms a drop, squeezed tighter if that would run past four seconds, followed by one chest update — thirty seconds of bells in `loot tail` is exactly the tedium the button exists to remove. The dashboard fills a compact grid in about six seconds however many drops there are, plays a sound only for rare and above, and ends on a combined haul screen: total XP, the six rarity counters, the best drop, and any settlements and trophies listed by name, because those are the ones worth reading. Opening one chest is untouched — that ritual is the point, and it stays a ritual.
 
 Everything an unopened chest holds is invisible until it is opened: `GET /api/drops` excludes it, `GET /api/stats` does not count its XP, and the vault does not count its drops. Set `chest.enabled: false` to publish everything the moment it is ingested.
 
@@ -699,7 +702,7 @@ Adding a source means implementing `core.Source` (and optionally `core.WebhookHa
 | `GET /api/vault/summary?range=30d` | revenue, units, series and breakdowns in the display currency |
 | `GET /api/hearth` | the globe: settlements with population and tier, capital, era, recent arrivals |
 | `GET /api/chest` | the chests waiting to be opened, oldest first |
-| `POST /api/chest/open` | `{"date":"2026-08-17"}` (or `{}` for the oldest) — reveals and returns the cascade |
+| `POST /api/chest/open` | `{"date":"2026-08-17"}` (or `{}` for the oldest, `{"all":true}` for every chest waiting) — reveals and returns the cascade |
 | `GET /ws` | websocket stream, see below |
 | `POST /hooks/{source}` | source webhook receiver |
 | `POST /api/dev/fake` | synthetic drop, only when `dev.enabled` |

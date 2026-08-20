@@ -29,6 +29,37 @@ type Converter interface {
 // play them as a run of sounds rather than one noise.
 const CascadeDelay = 600 * time.Millisecond
 
+// BulkCascadeDelay and BulkCascadeBudget pace a bulk open ("Open all"), which
+// is a different ritual from opening one chest.
+//
+// One chest is an event: 600 ms between drops, each with its own sound, ending
+// on the day's best news. Fifty chests at that spacing would be thirty seconds
+// of bells in `loot tail` and half a minute of a UI that must not be touched —
+// which is precisely the tedium the bulk open exists to remove. So a bulk
+// cascade is a *fill*, not a cascade: drops go out ~60 ms apart, and the whole
+// run is capped at BulkCascadeBudget however many there are (past ~66 drops
+// the spacing shrinks below 60 ms to fit). Everything still travels the same
+// {"type":"drop","chest":true} messages in the same order, so a client that
+// knows nothing about bulk opens simply sees a fast cascade.
+const (
+	BulkCascadeDelay  = 60 * time.Millisecond
+	BulkCascadeBudget = 4 * time.Second
+)
+
+// BulkCascadeSpacing is the gap between two drops of a bulk cascade of n
+// drops: BulkCascadeDelay, squeezed down so that n of them fit inside
+// BulkCascadeBudget.
+func BulkCascadeSpacing(n int) time.Duration {
+	if n <= 0 {
+		return BulkCascadeDelay
+	}
+	space := BulkCascadeDelay
+	if time.Duration(n)*space > BulkCascadeBudget {
+		space = BulkCascadeBudget / time.Duration(n)
+	}
+	return space
+}
+
 // chestSweepInterval is how often the auto-open ticker looks for a chest whose
 // day has gone stale.
 const chestSweepInterval = 5 * time.Minute
@@ -398,15 +429,57 @@ func (p *Pipeline) RevealChest(ctx context.Context, date string) ([]store.DropVi
 	return drops, nil
 }
 
-// cascade publishes revealed drops one at a time. Each carries chest:true so a
-// client can tell a chest reveal from a live drop.
+// RevealAllChests opens every chest waiting, oldest day first, and returns
+// them grouped by day with each chest's drops in cascade order. It is what the
+// dashboard's "Open all" button and `loot chest open --all` call after a
+// backfill or a holiday, when opening 30 chests by hand is a chore rather than
+// a ritual.
+//
+// The bus gets the whole haul as one fast fill (see BulkCascadeSpacing) and
+// then a single chest update, published *after* the fill rather than before
+// it: with every chest now empty there is one final state to send, and sending
+// it first would tell clients the chests were gone while their drops were
+// still arriving.
+func (p *Pipeline) RevealAllChests(ctx context.Context) ([]store.RevealedChest, error) {
+	opened, err := p.Store.RevealAllChests(ctx, p.now())
+	if err != nil {
+		return nil, err
+	}
+	if len(opened) == 0 {
+		return nil, nil
+	}
+
+	drops := make([]store.DropView, 0, len(opened)*4)
+	for _, c := range opened {
+		drops = append(drops, c.Drops...)
+	}
+	p.Logger.Info("chests opened in bulk", "chests", len(opened), "drops", len(drops))
+
+	if p.Bus != nil {
+		space := BulkCascadeSpacing(len(drops))
+		go func() {
+			bg := context.WithoutCancel(ctx)
+			p.cascadeAt(bg, drops, space)
+			p.publishChestState(bg)
+		}()
+	}
+	return opened, nil
+}
+
+// cascade publishes revealed drops one at a time, CascadeDelay apart.
 func (p *Pipeline) cascade(ctx context.Context, drops []store.DropView) {
+	p.cascadeAt(ctx, drops, CascadeDelay)
+}
+
+// cascadeAt publishes revealed drops one at a time, `space` apart. Each
+// carries chest:true so a client can tell a chest reveal from a live drop.
+func (p *Pipeline) cascadeAt(ctx context.Context, drops []store.DropView, space time.Duration) {
 	for i, d := range drops {
-		if i > 0 {
+		if i > 0 && space > 0 {
 			select {
 			case <-ctx.Done():
 				return
-			case <-time.After(CascadeDelay):
+			case <-time.After(space):
 			}
 		}
 		drop := d.Drop

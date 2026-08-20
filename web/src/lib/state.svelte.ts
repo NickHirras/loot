@@ -1,4 +1,12 @@
-import { fetchChests, fetchDrops, fetchSources, fetchStats, openChest, websocketURL } from './api'
+import {
+  fetchChests,
+  fetchDrops,
+  fetchSources,
+  fetchStats,
+  openAllChests,
+  openChest,
+  websocketURL,
+} from './api'
 import { bossesState } from './bosses.svelte'
 import { codexState } from './codex.svelte'
 import { questsState } from './quests.svelte'
@@ -6,7 +14,7 @@ import { prefersReducedMotion } from './route.svelte'
 import { scope } from './scope.svelte'
 import { sounds } from './sound'
 import type { ChestSummary, Drop, Rarity, SourceInfo, Stats, WSMessage } from './types'
-import { RARITIES, RARITY_RANK } from './types'
+import { RARITIES, RARITY_RANK, isFlashy } from './types'
 import { vault } from './vault.svelte'
 
 /** A drop plus client-only presentation state. */
@@ -31,6 +39,22 @@ const PACE_MS = 520
 const STALL_MS = 1600
 /** How often the cascade engine looks at its queue. */
 const TICK_MS = 120
+
+/**
+ * The bulk reveal ("Open all") is a different ritual and has its own clock.
+ *
+ * One chest is an event: 600 ms a drop, a sound each, a card centre stage.
+ * Thirty chests at that pace is eight minutes of sitting still, which is the
+ * tedium the button exists to remove — so a bulk open is a *fill*: a drop
+ * every BULK_STEP_MS into a compact grid, and if there are more drops than fit
+ * in BULK_TOTAL_MS, several per tick instead of a longer run. The reveal
+ * therefore takes about the same six seconds whether it holds 12 drops or 300,
+ * and the emotional payload moves to the haul screen at the end.
+ */
+const BULK_STEP_MS = 110
+const BULK_TOTAL_MS = 6000
+/** How many settlements and trophies the bulk haul screen lists by name. */
+const MAX_HIGHLIGHTS = 6
 
 /** Where an open chest is in its reveal. */
 export type ChestPhase = 'idle' | 'opening' | 'cascade' | 'done'
@@ -78,9 +102,13 @@ class LootState {
   chestExpected = $state<Drop[]>([])
   /** What has been revealed so far, in arrival order. */
   chestRevealed = $state<Drop[]>([])
-  /** The drop currently centre stage. */
+  /** The drop currently centre stage. Never set during a bulk reveal. */
   chestCurrent = $state<Drop | null>(null)
   chestError = $state('')
+  /** True while "Open all" is running, which the overlay renders differently. */
+  chestBulk = $state(false)
+  /** Every day opened by the reveal in progress, oldest first. */
+  chestDates = $state<string[]>([])
 
   #chestsLoaded = false
   /**
@@ -97,6 +125,10 @@ class LootState {
   #queued = new Set<string>()
   #lastShownAt = 0
   #cascadeTimer: ReturnType<typeof setInterval> | null = null
+  /** How far the bulk pacer has walked through `chestExpected`. */
+  #bulkNext = 0
+  /** How many drops the bulk pacer reveals per tick; >1 for a big haul. */
+  #bulkStep = 1
 
   /**
    * Everyone who wants to hear about a drop the moment it lands. The websocket
@@ -179,6 +211,36 @@ class LootState {
       if (better || (rank === bestRank && drop.rarity !== 'cursed' && drop.xp > best.xp)) best = drop
     }
     return best
+  }
+
+  /** The haul so far, counted by rarity — the six counters on the end screen. */
+  get chestHaulByRarity(): Record<Rarity, number> {
+    const counts = emptyByRarity()
+    for (const drop of this.chestRevealed) counts[drop.rarity] = (counts[drop.rarity] ?? 0) + 1
+    return counts
+  }
+
+  /**
+   * The drops of the haul that are news rather than numbers: a new country
+   * settled, a trophy unlocked. A bulk open buries these among fifty sales
+   * summaries, so the end screen lists them by name — they are the reason
+   * anyone reads the haul at all.
+   *
+   * Capped, and rarest first: a first run against a real backfill can unlock
+   * twenty trophies at once, and twenty rows would push the end screen's own
+   * total and its close button off the bottom of the sheet. The rest are one
+   * scroll away in the grid underneath.
+   */
+  get chestHighlights(): Drop[] {
+    return this.chestRevealed
+      .filter((d) => d.kind === 'settlement' || d.kind === 'achievement')
+      .sort((a, b) => (RARITY_RANK[b.rarity] ?? 0) - (RARITY_RANK[a.rarity] ?? 0) || b.xp - a.xp)
+      .slice(0, MAX_HIGHLIGHTS)
+  }
+
+  /** How many settlements and trophies the haul held, capped list or not. */
+  get chestHighlightCount(): number {
+    return this.chestRevealed.filter((d) => d.kind === 'settlement' || d.kind === 'achievement').length
   }
 
   /**
@@ -494,12 +556,16 @@ class LootState {
   #resetChest(): void {
     this.chestPhase = 'idle'
     this.chestDate = ''
+    this.chestDates = []
+    this.chestBulk = false
     this.chestExpected = []
     this.chestRevealed = []
     this.chestCurrent = null
     this.#queue = []
     this.#shown.clear()
     this.#queued.clear()
+    this.#bulkNext = 0
+    this.#bulkStep = 1
   }
 
   /**
@@ -547,10 +613,93 @@ class LootState {
     this.#cascadeTimer = setInterval(() => this.#tick(), TICK_MS)
   }
 
+  /**
+   * Opens every chest waiting, in one request, and fills them in as one haul.
+   *
+   * Where `open` treats the POST response as a script the websocket paces, a
+   * bulk reveal inverts that: the response *is* the clock, walked at a fixed
+   * rate by `#bulkTick`, and socket arrivals are only confirmations — they are
+   * swallowed by `#enqueue` after being recorded in the dedupe sets, so a drop
+   * that arrives both ways still renders exactly once. Fifty drops arriving
+   * over four seconds of bus traffic cannot be allowed to set the pace of a
+   * reveal that has to feel deliberate.
+   */
+  async openAll(): Promise<void> {
+    if (this.chestBusy) return
+    this.#resetChest()
+    this.chestError = ''
+    this.chestBulk = true
+    this.chestPhase = 'opening'
+
+    let result
+    try {
+      result = await openAllChests()
+    } catch (err) {
+      this.chestError = err instanceof Error ? err.message : String(err)
+      this.#resetChest()
+      return
+    }
+
+    if (result.chests) this.#setChests(result.chests)
+    if (result.count === 0 || result.drops.length === 0) {
+      this.#resetChest()
+      this.chestError = 'Those chests are already open.'
+      if (!result.chests) void this.#refreshChests()
+      return
+    }
+
+    this.chestDates = result.opened_dates
+    this.chestDate = result.opened
+    this.chestExpected = result.drops
+
+    const reduced = prefersReducedMotion()
+    await new Promise((r) => setTimeout(r, reduced ? LID_MS_REDUCED : LID_MS))
+    this.chestPhase = 'cascade'
+
+    // Reduced motion asked for no animation, not for a faster one: the haul
+    // appears whole and the end screen comes straight up.
+    if (reduced) {
+      this.skipCascade()
+      return
+    }
+
+    // Everything fits inside BULK_TOTAL_MS: a normal haul goes one drop a
+    // tick, a 300-drop backlog goes several, and both take about six seconds.
+    this.#bulkStep = Math.max(1, Math.ceil(result.drops.length / Math.floor(BULK_TOTAL_MS / BULK_STEP_MS)))
+    this.#bulkNext = 0
+    if (this.#cascadeTimer) clearInterval(this.#cascadeTimer)
+    this.#cascadeTimer = setInterval(() => this.#bulkTick(), BULK_STEP_MS)
+  }
+
+  /**
+   * Reveals the next slice of a bulk haul. Commons and uncommons land silently
+   * — fifty of their sounds in six seconds is noise, not a reward — and at
+   * most one sound plays per tick, so a batch of several stays a single chime.
+   */
+  #bulkTick(): void {
+    if (this.chestPhase !== 'cascade') return
+
+    let revealed = 0
+    let played = false
+    while (revealed < this.#bulkStep && this.#bulkNext < this.chestExpected.length) {
+      const drop = this.chestExpected[this.#bulkNext++]
+      if (this.#shown.has(drop.id)) continue
+      const loud = isFlashy(drop.rarity) && !played
+      if (loud) played = true
+      this.#show(drop, !loud)
+      revealed++
+    }
+
+    if (this.#bulkNext >= this.chestExpected.length) this.#finish()
+  }
+
   /** True when a websocket arrival belongs to the reveal happening right now. */
   #wantsArrival(drop: Drop): boolean {
     if (!this.chestBusy) return false
     if (this.#shown.has(drop.id) || this.#queued.has(drop.id)) return false
+    // A bulk open is opening every chest there is, so every chest drop on the
+    // wire belongs to it, whatever day it is for.
+    if (this.chestBulk) return true
     // While the POST is still in flight the date is not known yet, so accept
     // any chest drop; afterwards, only the chest actually being opened.
     return !this.chestDate || !drop.chest_date || drop.chest_date === this.chestDate
@@ -558,9 +707,13 @@ class LootState {
 
   #enqueue(drop: Drop): void {
     this.#queued.add(drop.id)
-    this.#queue.push(drop)
     // A drop the POST response did not mention still counts towards the haul.
     if (!this.chestExpected.some((d) => d.id === drop.id)) this.chestExpected = [...this.chestExpected, drop]
+    // A single cascade is paced by the socket, so the arrival goes in the
+    // queue and the next tick shows it. A bulk fill is paced by its own clock:
+    // the arrival is a confirmation, already recorded in `#queued` above, and
+    // `#bulkTick` will show this drop from the script in its own time.
+    if (!this.chestBulk) this.#queue.push(drop)
   }
 
   #tick(): void {
@@ -588,7 +741,9 @@ class LootState {
     this.#shown.add(drop.id)
     this.#queued.delete(drop.id)
     this.chestRevealed = [...this.chestRevealed, drop]
-    this.chestCurrent = drop
+    // A bulk fill has no centre stage: fifty drops taking turns in the big
+    // card would be a strobe. They go straight into the grid.
+    if (!this.chestBulk) this.chestCurrent = drop
     this.#lastShownAt = Date.now()
     this.receive(drop, quiet)
   }
@@ -604,6 +759,13 @@ class LootState {
   }
 
   #finish(): void {
+    // A drop the socket delivered after the last tick looked — it is in the
+    // haul's expected list and in the dedupe sets, so nothing else will ever
+    // render it. Sweep it in quietly rather than stranding it. The single
+    // cascade only finishes when nothing is missing, so there this is a no-op.
+    for (const drop of this.chestExpected) {
+      if (!this.#shown.has(drop.id)) this.#show(drop, true)
+    }
     if (this.#cascadeTimer) clearInterval(this.#cascadeTimer)
     this.#cascadeTimer = null
     this.chestPhase = 'done'

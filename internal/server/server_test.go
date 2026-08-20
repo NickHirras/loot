@@ -480,6 +480,111 @@ func TestChestEndpoints(t *testing.T) {
 	}
 }
 
+// `{"all":true}` empties every chest in one request: one flat haul in reveal
+// order, oldest chest first, with `opened_dates` naming each day — and nothing
+// left for a second call.
+func TestChestOpenAll(t *testing.T) {
+	h := newHarness(t, true)
+
+	// Three days, minted newest first so date order cannot come for free.
+	h.post(t, "/api/dev/fake", `{"rarity":"legendary","chest":true,"day":"2026-08-18"}`)
+	h.post(t, "/api/dev/fake", `{"rarity":"common","chest":true,"day":"2026-08-18"}`)
+	h.post(t, "/api/dev/fake", `{"rarity":"epic","chest":true,"day":"2026-08-17"}`)
+	h.post(t, "/api/dev/fake", `{"rarity":"rare","chest":true,"day":"2026-08-16"}`)
+
+	resp, body := h.post(t, "/api/chest/open", `{"all":true}`)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("open-all status = %d", resp.StatusCode)
+	}
+	if body["count"].(float64) != 4 {
+		t.Fatalf("opened %v drops, want 4", body["count"])
+	}
+	// `opened` keeps its old meaning — the first chest of the batch — so a
+	// client that only knows the single-open shape still works.
+	if body["opened"] != "2026-08-16" {
+		t.Errorf("opened = %v, want 2026-08-16", body["opened"])
+	}
+	dates, _ := body["opened_dates"].([]any)
+	want := []string{"2026-08-16", "2026-08-17", "2026-08-18"}
+	if len(dates) != len(want) {
+		t.Fatalf("opened_dates = %v, want %v", dates, want)
+	}
+	for i, d := range want {
+		if dates[i] != d {
+			t.Errorf("opened_dates[%d] = %v, want %s", i, dates[i], d)
+		}
+	}
+
+	// The drops come back chest by chest, and inside a chest still quietest
+	// first, so a client can play the list straight through.
+	list, _ := body["drops"].([]any)
+	if len(list) != 4 {
+		t.Fatalf("got %d drops, want 4", len(list))
+	}
+	var gotDays, gotRarities []string
+	for _, raw := range list {
+		d, _ := raw.(map[string]any)
+		gotDays = append(gotDays, d["chest_date"].(string))
+		gotRarities = append(gotRarities, d["rarity"].(string))
+	}
+	wantDays := []string{"2026-08-16", "2026-08-17", "2026-08-18", "2026-08-18"}
+	for i := range wantDays {
+		if gotDays[i] != wantDays[i] {
+			t.Errorf("drop %d belongs to %s, want %s", i, gotDays[i], wantDays[i])
+		}
+	}
+	if gotRarities[2] != "common" || gotRarities[3] != "legendary" {
+		t.Errorf("last chest reveals %v, want common then legendary", gotRarities[2:])
+	}
+
+	if remaining, _ := body["chests"].([]any); len(remaining) != 0 {
+		t.Errorf("chests remaining = %v, want none", remaining)
+	}
+
+	// Every drop is in the feed now.
+	_, drops := h.get(t, "/api/drops")
+	if feed, _ := drops["drops"].([]any); len(feed) != 4 {
+		t.Errorf("feed has %d drops after the bulk open, want 4", len(feed))
+	}
+
+	// Idempotent: a second open-all opens nothing and says so in the same
+	// shape, rather than erroring.
+	resp, again := h.post(t, "/api/chest/open", `{"all":true}`)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("second open-all status = %d", resp.StatusCode)
+	}
+	if again["count"].(float64) != 0 || again["opened"] != "" {
+		t.Fatalf("second open-all = %v, want nothing opened", again)
+	}
+	if dates, _ := again["opened_dates"].([]any); len(dates) != 0 {
+		t.Errorf("second open-all opened_dates = %v, want empty", dates)
+	}
+	if list, _ := again["drops"].([]any); len(list) != 0 {
+		t.Errorf("second open-all returned %d drops", len(list))
+	}
+}
+
+// A date alongside `all` is not a narrower bulk open: "everything waiting"
+// already says which chests.
+func TestChestOpenAllIgnoresADate(t *testing.T) {
+	h := newHarness(t, true)
+
+	h.post(t, "/api/dev/fake", `{"rarity":"rare","chest":true,"day":"2026-08-16"}`)
+	h.post(t, "/api/dev/fake", `{"rarity":"epic","chest":true,"day":"2026-08-17"}`)
+
+	_, body := h.post(t, "/api/chest/open", `{"all":true,"date":"2026-08-17"}`)
+	if body["count"].(float64) != 2 {
+		t.Fatalf("opened %v drops, want both chests", body["count"])
+	}
+
+	// And the query-string form works the same way, like `?date=` does.
+	h.post(t, "/api/dev/fake", `{"rarity":"common","chest":true,"day":"2026-08-19"}`)
+	_, q := h.post(t, "/api/chest/open?all=1", ``)
+	if q["count"].(float64) != 1 || q["opened"] != "2026-08-19" {
+		t.Fatalf("?all=1 opened %v", q)
+	}
+}
+
 func TestVaultSummaryEndpoint(t *testing.T) {
 	h := newHarness(t, true)
 

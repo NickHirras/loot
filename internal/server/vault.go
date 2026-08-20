@@ -79,14 +79,21 @@ func (s *Server) handleChest(w http.ResponseWriter, r *http.Request) {
 }
 
 // chestOpenRequest is the body of POST /api/chest/open. An empty date opens
-// the oldest chest, which is what a single "open" button should do.
+// the oldest chest, which is what a single "open" button should do; All opens
+// every chest waiting and wins over Date if both are given.
 type chestOpenRequest struct {
 	Date string `json:"date"`
+	All  bool   `json:"all"`
 }
 
 // handleChestOpen reveals a chest and returns its drops in cascade order. The
 // same drops also go out on the bus, spaced apart, so every connected client
 // plays the reveal rather than the opener alone.
+//
+// `{"all":true}` opens every chest waiting instead, oldest day first, each
+// chest claimed atomically on its own. The reply has the same shape — the
+// drops are one flat list in the order they should be revealed — and the bus
+// gets them as a fast fill rather than a half-minute cascade.
 func (s *Server) handleChestOpen(w http.ResponseWriter, r *http.Request) {
 	var req chestOpenRequest
 	if r.Body != nil {
@@ -95,7 +102,15 @@ func (s *Server) handleChestOpen(w http.ResponseWriter, r *http.Request) {
 	if v := r.URL.Query().Get("date"); v != "" {
 		req.Date = v
 	}
+	if v := r.URL.Query().Get("all"); v != "" {
+		req.All = truthy(v)
+	}
 	req.Date = strings.TrimSpace(req.Date)
+	if req.All {
+		// "everything waiting" already says which chests; a date alongside it
+		// would only be a narrower way of saying the same thing.
+		req.Date = ""
+	}
 	if req.Date != "" {
 		if _, err := time.Parse(core.DayLayout, req.Date); err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "date must be YYYY-MM-DD"})
@@ -103,7 +118,24 @@ func (s *Server) handleChestOpen(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	drops, err := s.Pipeline.RevealChest(r.Context(), req.Date)
+	var (
+		drops []store.DropView
+		dates []string
+		err   error
+	)
+	if req.All {
+		opened, oerr := s.Pipeline.RevealAllChests(r.Context())
+		err = oerr
+		for _, c := range opened {
+			dates = append(dates, c.Date)
+			drops = append(drops, c.Drops...)
+		}
+	} else {
+		drops, err = s.Pipeline.RevealChest(r.Context(), req.Date)
+		if len(drops) > 0 {
+			dates = []string{drops[0].ChestDate}
+		}
+	}
 	if err != nil {
 		s.fail(w, "chest open", err)
 		return
@@ -122,16 +154,24 @@ func (s *Server) handleChestOpen(w http.ResponseWriter, r *http.Request) {
 		chests = []core.ChestSummary{}
 	}
 
+	// `opened` stays the single date it has always been — the first (oldest)
+	// chest of the batch — so an older client reading it keeps working, and
+	// `opened_dates` carries the whole list. Both are always present: a bulk
+	// open that found nothing answers "" and [], exactly like a single one.
 	opened := ""
-	if len(drops) > 0 {
-		opened = drops[0].ChestDate
+	if len(dates) > 0 {
+		opened = dates[0]
 	} else {
+		dates = []string{}
+	}
+	if drops == nil {
 		drops = []store.DropView{}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"opened": opened,
-		"count":  len(drops),
-		"drops":  drops,
-		"chests": chests,
+		"opened":       opened,
+		"opened_dates": dates,
+		"count":        len(drops),
+		"drops":        drops,
+		"chests":       chests,
 	})
 }

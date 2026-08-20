@@ -401,6 +401,97 @@ func TestRevealChestHandsOutItsDropsExactlyOnce(t *testing.T) {
 	}
 }
 
+// A bulk open takes every chest, oldest day first, each chest's drops still in
+// cascade order — and leaves nothing behind for a second call.
+func TestRevealAllChestsOpensEveryChestOldestFirst(t *testing.T) {
+	ctx := context.Background()
+	st := newStore(t)
+
+	// Three days, minted out of order, each with its drops out of order too.
+	chestDrop(t, st, "2026-08-17", "c:17:1", core.Legendary, 1000)
+	chestDrop(t, st, "2026-08-17", "c:17:2", core.Common, 10)
+	chestDrop(t, st, "2026-08-15", "c:15:1", core.Rare, 250)
+	chestDrop(t, st, "2026-08-15", "c:15:2", core.Cursed, 5)
+	chestDrop(t, st, "2026-08-16", "c:16:1", core.Epic, 500)
+
+	now := time.Now().UTC()
+	opened, err := st.RevealAllChests(ctx, now)
+	if err != nil {
+		t.Fatalf("reveal all: %v", err)
+	}
+	if len(opened) != 3 {
+		t.Fatalf("opened %d chests, want 3", len(opened))
+	}
+
+	wantDates := []string{"2026-08-15", "2026-08-16", "2026-08-17"}
+	total := 0
+	for i, c := range opened {
+		if c.Date != wantDates[i] {
+			t.Errorf("chest %d is %s, want %s", i, c.Date, wantDates[i])
+		}
+		for _, d := range c.Drops {
+			if d.ChestDate != c.Date {
+				t.Errorf("drop %s of chest %s carries chest_date %s", d.ID, c.Date, d.ChestDate)
+			}
+			if d.RevealedAt == nil {
+				t.Errorf("drop %s came back without a revealed_at", d.ID)
+			}
+			total++
+		}
+		// Within a chest the cascade still climbs towards the best news.
+		for j := 1; j < len(c.Drops); j++ {
+			prev, cur := c.Drops[j-1].Rarity, c.Drops[j].Rarity
+			if core.RevealRank(cur) < core.RevealRank(prev) {
+				t.Errorf("chest %s reveals %s before %s, which is downhill", c.Date, prev, cur)
+			}
+		}
+	}
+	if total != 5 {
+		t.Errorf("bulk open handed out %d drops, want 5", total)
+	}
+	if first := opened[0].Drops; len(first) != 2 || first[0].Rarity != core.Cursed {
+		t.Errorf("oldest chest = %+v, want the cursed drop first", first)
+	}
+
+	// Everything is open, so a second bulk open is a no-op — the same
+	// idempotence a single open has.
+	again, err := st.RevealAllChests(ctx, now.Add(time.Second))
+	if err != nil {
+		t.Fatalf("second reveal all: %v", err)
+	}
+	if len(again) != 0 {
+		t.Fatalf("second bulk open handed out %d chests again", len(again))
+	}
+	if chests, err := st.ChestSummaries(ctx); err != nil {
+		t.Fatal(err)
+	} else if len(chests) != 0 {
+		t.Errorf("%d chests still listed as unopened after a bulk open", len(chests))
+	}
+}
+
+// A bulk open racing a single open of one of its days must not hand the same
+// drop to both: the chest each one claims is claimed atomically.
+func TestRevealAllChestsSkipsAChestSomebodyElseClaimed(t *testing.T) {
+	ctx := context.Background()
+	st := newStore(t)
+
+	chestDrop(t, st, "2026-08-16", "c:16:1", core.Rare, 250)
+	chestDrop(t, st, "2026-08-17", "c:17:1", core.Common, 10)
+
+	now := time.Now().UTC()
+	if taken, err := st.RevealChest(ctx, "2026-08-16", now); err != nil || len(taken) != 1 {
+		t.Fatalf("single open of the 16th = %d drops, %v", len(taken), err)
+	}
+
+	opened, err := st.RevealAllChests(ctx, now)
+	if err != nil {
+		t.Fatalf("reveal all: %v", err)
+	}
+	if len(opened) != 1 || opened[0].Date != "2026-08-17" {
+		t.Fatalf("bulk open returned %+v, want only the 17th", opened)
+	}
+}
+
 // The same guarantee under concurrency. Loot opens SQLite with one connection,
 // so the goroutines serialize at the pool — which is exactly the case that
 // used to interleave a SELECT and an UPDATE.
