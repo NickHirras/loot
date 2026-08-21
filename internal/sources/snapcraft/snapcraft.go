@@ -53,6 +53,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/nickhirras/loot/internal/config"
@@ -74,11 +75,27 @@ type Source struct {
 	log *slog.Logger
 	// Since, when set (from --since), overrides the backfill start.
 	Since string
-	// BaseURL and Client are swappable for tests.
+	// BaseURL, AuthURL and Client are swappable for tests. AuthURL is Ubuntu
+	// One SSO, which is a different host from the store and is used for
+	// exactly one thing: refreshing the discharge macaroon (refresh.go).
 	BaseURL string
+	AuthURL string
 	Client  *http.Client
 	// Now is swappable for tests.
 	Now func() time.Time
+
+	// mu guards the refreshed discharge. Poll is driven one cycle at a time by
+	// the scheduler, but `loot serve` can force a poll while one is running and
+	// Check shares the Source, so the refresh is single-flighted rather than
+	// assumed to be alone.
+	mu sync.Mutex
+	// discharge is the unbound discharge Ubuntu One last handed back, replacing
+	// the login file's own. Empty until the first refresh.
+	discharge string
+	// dischargeFor is the Origin fingerprint of the login file discharge was
+	// refreshed for; a mismatch means the user re-exported and the cached
+	// discharge belongs to a login that is no longer on disk.
+	dischargeFor string
 }
 
 // state is the persisted cursor.
@@ -89,6 +106,13 @@ type state struct {
 	// Cursor maps snap name -> last day emitted (YYYY-MM-DD). A snap with no
 	// entry has never been polled and gets the backfill window.
 	Cursor map[string]string `json:"cursor"`
+	// RefreshedDischarge is the unbound discharge macaroon Loot last obtained
+	// from Ubuntu One SSO, and RefreshedFor fingerprints the login file it was
+	// obtained for. They live here rather than in the login file because that
+	// file is the user's export and Loot does not rewrite it; keeping them
+	// means a restart does not start from a discharge that is already stale.
+	RefreshedDischarge string `json:"refreshed_discharge,omitempty"`
+	RefreshedFor       string `json:"refreshed_for,omitempty"`
 }
 
 // New builds the source from its config. The login file is checked for
@@ -111,6 +135,7 @@ func New(cfg config.Snapcraft, log *slog.Logger) (*Source, error) {
 		cfg:     cfg,
 		log:     log,
 		BaseURL: DefaultBaseURL,
+		AuthURL: DefaultAuthURL,
 		Client:  &http.Client{Timeout: 60 * time.Second},
 		Now:     time.Now,
 	}, nil
@@ -125,8 +150,14 @@ func (s *Source) PollInterval() time.Duration { return 6 * time.Hour }
 // Check implements core.Checker: it reads the login file, resolves one snap's
 // id and asks for a single day of metrics, so a stale macaroon or a missing
 // ACL is reported now rather than in six hours.
+//
+// It goes through the same do() as a poll, so a discharge that went stale since
+// the export is refreshed here too and `loot check` reports the tick it would
+// have reported the day it was set up. Check has no state blob to write the
+// refreshed discharge back to; it is kept in memory for this process, and a
+// serving Loot persists its own.
 func (s *Source) Check(ctx context.Context) error {
-	auth, err := loadLogin(s.cfg.LoginPath)
+	auth, err := s.auth()
 	if err != nil {
 		return err
 	}
@@ -135,7 +166,7 @@ func (s *Source) Check(ctx context.Context) error {
 	}
 	snap := s.cfg.Snaps[0]
 
-	id, err := s.resolveSnapID(ctx, auth, snap)
+	id, err := s.resolveSnapID(ctx, &auth, snap)
 	if err != nil {
 		return err
 	}
@@ -143,7 +174,7 @@ func (s *Source) Check(ctx context.Context) error {
 	now := s.now().UTC()
 	day := now.AddDate(0, 0, -2).Format(core.DayLayout)
 	end := now.AddDate(0, 0, -1).Format(core.DayLayout)
-	if _, err := s.fetchMetrics(ctx, auth, id, day, day, end); err != nil {
+	if _, err := s.fetchMetrics(ctx, &auth, id, day, day, end); err != nil {
 		return err
 	}
 	// An empty or all-null answer is a pass: it proves the credentials were
@@ -156,8 +187,11 @@ func (s *Source) Check(ctx context.Context) error {
 // completed days newer than the stored cursor.
 func (s *Source) Poll(ctx context.Context, raw []byte) ([]core.Event, []byte, error) {
 	st := decodeState(raw)
+	// A discharge refreshed by an earlier run is newer than the login file's,
+	// and using it saves the first request of every restart being a 401.
+	s.seedDischarge(st.RefreshedDischarge, st.RefreshedFor)
 
-	auth, err := loadLogin(s.cfg.LoginPath)
+	auth, err := s.auth()
 	if err != nil {
 		return nil, raw, err
 	}
@@ -176,7 +210,7 @@ func (s *Source) Poll(ctx context.Context, raw []byte) ([]core.Event, []byte, er
 	for _, snap := range s.cfg.Snaps {
 		id := st.SnapIDs[snap]
 		if id == "" {
-			id, err = s.resolveSnapID(ctx, auth, snap)
+			id, err = s.resolveSnapID(ctx, &auth, snap)
 			if err != nil {
 				s.log.Warn("snapcraft: could not resolve snap id", "snap", snap, "error", err)
 				if firstErr == nil {
@@ -201,7 +235,7 @@ func (s *Source) Poll(ctx context.Context, raw []byte) ([]core.Event, []byte, er
 
 		// The country filter starts one day early because a per-country
 		// install is the difference between two installed-base readings.
-		resp, err := s.fetchMetrics(ctx, auth, id, floor, addDays(floor, 1), yesterday)
+		resp, err := s.fetchMetrics(ctx, &auth, id, floor, addDays(floor, 1), yesterday)
 		if err != nil {
 			s.log.Warn("snapcraft poll failed", "snap", snap, "error", err)
 			if firstErr == nil {
@@ -218,11 +252,76 @@ func (s *Source) Poll(ctx context.Context, raw []byte) ([]core.Event, []byte, er
 		s.log.Debug("snapcraft polled", "snap", snap, "events", len(evs), "cursor", st.Cursor[snap])
 	}
 
+	// Persist whatever discharge is current, so the next process starts with
+	// it. The login file itself is left alone: it is the user's export.
+	st.RefreshedDischarge, st.RefreshedFor = s.dischargeSnapshot()
+
 	out, err := json.Marshal(st)
 	if err != nil {
 		return events, raw, fmt.Errorf("snapcraft: encode state: %w", err)
 	}
 	return events, out, firstErr
+}
+
+// auth returns the credentials to send: the login file's, with the most
+// recently refreshed discharge swapped in when one applies.
+//
+// The file is re-read every time rather than cached, so replacing it takes
+// effect at the next poll without a restart — and when it is replaced, the
+// fingerprint mismatch drops the refreshed discharge that belonged to the old
+// export.
+func (s *Source) auth() (credentials, error) {
+	file, err := loadLogin(s.cfg.LoginPath)
+	if err != nil {
+		return credentials{}, err
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.discharge != "" && s.dischargeFor != file.Origin {
+		s.log.Info("snapcraft: login file changed; discarding the refreshed discharge")
+		s.discharge, s.dischargeFor = "", ""
+	}
+	if s.discharge == "" || !file.refreshable() {
+		return file, nil
+	}
+	refreshed, err := file.withDischarge(s.discharge)
+	if err != nil {
+		// A stored discharge that no longer binds is not worth failing over:
+		// drop it and let the file's own credential try, refreshing if the
+		// store says it is stale.
+		s.log.Warn("snapcraft: stored discharge is unusable; falling back to the login file", "error", err)
+		s.discharge, s.dischargeFor = "", ""
+		return file, nil
+	}
+	return refreshed, nil
+}
+
+// seedDischarge adopts a discharge persisted by an earlier run. An in-memory
+// refresh always wins: it is at least as new as anything on disk.
+func (s *Source) seedDischarge(discharge, origin string) {
+	if discharge == "" {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.discharge == "" {
+		s.discharge, s.dischargeFor = discharge, origin
+	}
+}
+
+// dischargeSnapshot reports the refreshed discharge to persist.
+func (s *Source) dischargeSnapshot() (string, string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.discharge, s.dischargeFor
+}
+
+func (s *Source) authURL() string {
+	if s.AuthURL == "" {
+		return DefaultAuthURL
+	}
+	return s.AuthURL
 }
 
 // firstRunFloor returns the exclusive lower bound for a snap's very first poll:

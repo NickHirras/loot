@@ -86,11 +86,52 @@ Failures name the fix:
 
 | what you see | what happened |
 |---|---|
-| `401 … the exported login has expired or been revoked` | the `--expires` date passed, or you revoked the token. Export a new one. |
+| `401 … the exported login has expired or been revoked` | the `--expires` date passed, or you revoked the token — Ubuntu One would not refresh the discharge either (see below). Export a new one. |
 | `403 … missing the package_metrics ACL` | you exported without `--acls=package_metrics`. |
 | `403 … restricted to other snaps` | the snap is not in the `--snaps` list you exported with. |
 | `unknown snap "…"` | the name is wrong — check `snapcraft list`. |
 | `502 … the Snap Store is having trouble` | not you. Loot retries on the next poll. |
+
+## Two macaroons, two lifetimes
+
+An exported Ubuntu One login is **two** macaroons with completely different
+lifetimes, and it is worth knowing which one you are looking at when something
+returns a 401:
+
+- the **root** macaroon, minted by the Snap Store, which lives until the
+  `--expires` date you gave `export-login` — months, if you asked for months;
+- the **discharge** macaroon, minted by Ubuntu One SSO to prove the root is
+  yours, which goes stale in **a day or two** no matter what `--expires` said.
+
+When the discharge goes stale the store answers
+
+```
+401 Expired macaroon (age: 139631 seconds) (macaroon-needs-refresh)
+```
+
+which reads like "your login expired" but is not: the root is fine, and the fix
+is to ask SSO for a new discharge, not to export a new login. The snapcraft CLI
+does that silently on every command, which is why nobody running `snapcraft`
+ever sees this.
+
+**Loot does the same.** On a `macaroon-needs-refresh` 401 it POSTs the *unbound*
+discharge to `https://login.ubuntu.com/api/v2/tokens/refresh`, binds the new
+discharge it gets back to the same root, and retries the request — during a poll
+and in `loot check` alike. The refreshed discharge is kept in Loot's own source
+state so a restart does not begin with another 401; **your login file is never
+rewritten**, because it is your export, not Loot's cache. Replace it and Loot
+notices at the next poll and throws away the discharge it had refreshed for the
+old one.
+
+So you re-run `export-login` only when the *root* is gone — the `--expires` date
+passed, or you revoked the credential — which is the one case where the refresh
+itself is refused and the `401 … expired or been revoked` message above is the
+honest answer. Not every 1.6 days.
+
+Two credential shapes cannot be refreshed, and for them that 401 is terminal:
+candid tokens (no discharge at all) and a snapcraft 7+ export that is already a
+finished `Macaroon root=…, discharge=…` header, whose discharge was bound at
+export time. Prefer format 1 below if you want unattended refresh.
 
 ## Credential formats
 
@@ -103,7 +144,9 @@ three, and says which one it used in debug logs:
    one to prefer. The exported discharge is *unbound*, so Loot rebinds it to the
    root macaroon (the same thing pymacaroons' `prepare_for_request` does) before
    sending `Authorization: Macaroon root=…, discharge=…`. That is the only
-   cryptography involved and it uses nothing but the Go standard library.
+   cryptography involved and it uses nothing but the Go standard library. Since
+   the unbound discharge is kept, this is the format Loot can refresh
+   automatically.
 2. **snapcraft 7+ (craft-store, Ubuntu One)** — the already-bound credential
    serialized as the finished header value, usually base64-wrapped for
    `SNAPCRAFT_STORE_CREDENTIALS`. Used verbatim. A base64-wrapped copy of format

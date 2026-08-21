@@ -23,6 +23,18 @@ type credentials struct {
 	// Email and Expires are informational; both formats may omit them.
 	Email   string
 	Expires string
+	// Root and Discharge are the Ubuntu One pair Header was built from: the
+	// root macaroon verbatim, and the *unbound* discharge (Header carries the
+	// bound copy). They are what a discharge refresh needs — see refresh.go —
+	// and are empty for credential formats that cannot be refreshed: a candid
+	// token, or a snapcraft 7+ export that is already a finished header and
+	// whose discharge was therefore bound before Loot ever saw it.
+	Root      string
+	Discharge string
+	// Origin fingerprints the login file this credential was read from, so a
+	// discharge refreshed for a previous export is not reused after the user
+	// exports a new login. See fingerprint in refresh.go.
+	Origin string
 }
 
 // loadLogin reads and parses the file written by `snapcraft export-login`.
@@ -164,10 +176,13 @@ func buildUbuntuOne(root, discharge, format, email, expires string) (credentials
 		return credentials{}, fmt.Errorf("bind discharge: %w", err)
 	}
 	return credentials{
-		Header:  fmt.Sprintf("Macaroon root=%s, discharge=%s", root, bound),
-		Format:  format,
-		Email:   email,
-		Expires: expires,
+		Header:    fmt.Sprintf("Macaroon root=%s, discharge=%s", root, bound),
+		Format:    format,
+		Email:     email,
+		Expires:   expires,
+		Root:      root,
+		Discharge: discharge,
+		Origin:    fingerprint(root, discharge),
 	}, nil
 }
 

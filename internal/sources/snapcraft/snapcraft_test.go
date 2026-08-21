@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -296,6 +297,9 @@ func testSource(t *testing.T, baseURL string, backfillDays int) *Source {
 		t.Fatalf("New: %v", err)
 	}
 	src.BaseURL = baseURL
+	// Ubuntu One SSO is served by the same test mux; no test may reach the
+	// real login.ubuntu.com.
+	src.AuthURL = baseURL
 	src.Now = func() time.Time { return fixtureToday }
 	return src
 }
@@ -313,13 +317,67 @@ type storeServer struct {
 	accountCalls  int
 	lastAuth      string
 	lastFilters   []Filter
+
+	// Ubuntu One SSO stands on the same test server: a different host in
+	// production, but the source reaches it through AuthURL, and pointing that
+	// at the same mux keeps every test off the network. The zero value refuses
+	// to refresh, so a test that does not opt in exercises "refresh is not
+	// possible" rather than quietly reaching login.ubuntu.com.
+	refreshWith   string // discharge to hand back; empty means refuse
+	refreshStatus int    // status for a refusal, default 401
+	refreshDelay  time.Duration
+	refreshCalls  int
+	refreshSent   string // the discharge_macaroon the source sent
+	refreshBound  bool   // did the source send a *bound* discharge?
+
+	// staleAuth, when set, is an Authorization header value the store answers
+	// exactly as production did: 401 macaroon-needs-refresh. It is the header
+	// built from the *exported* discharge, so a request only gets through once
+	// the source has refreshed and rebound.
+	staleAuth string
+	staleHits int
+
+	// mu guards the counters, which the single-flight test writes from two
+	// request goroutines at once.
+	mu sync.Mutex
+}
+
+// rejectStale answers the production 401 for a request still carrying the
+// stale discharge, and reports whether it did.
+func (s *storeServer) rejectStale(w http.ResponseWriter, r *http.Request) bool {
+	s.mu.Lock()
+	stale := s.staleAuth != "" && r.Header.Get("Authorization") == s.staleAuth
+	if stale {
+		s.staleHits++
+	}
+	s.mu.Unlock()
+	if !stale {
+		return false
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusUnauthorized)
+	io.WriteString(w, `{"error_list":[{"message":"Expired macaroon (age: 139631 seconds)",`+
+		`"code":"macaroon-needs-refresh"}]}`)
+	return true
+}
+
+// counts reads the call counters under the lock.
+func (s *storeServer) counts() (metrics, info, refresh, stale int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.metricsCalls, s.infoCalls, s.refreshCalls, s.staleHits
 }
 
 func (s *storeServer) start() *httptest.Server {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/dev/api/snaps/metrics", func(w http.ResponseWriter, r *http.Request) {
+		if s.rejectStale(w, r) {
+			return
+		}
+		s.mu.Lock()
 		s.metricsCalls++
 		s.lastAuth = r.Header.Get("Authorization")
+		s.mu.Unlock()
 		if r.Method != http.MethodPost {
 			s.t.Errorf("metrics method = %s, want POST", r.Method)
 		}
@@ -332,7 +390,9 @@ func (s *storeServer) start() *httptest.Server {
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 			s.t.Errorf("decode metrics request: %v", err)
 		}
+		s.mu.Lock()
 		s.lastFilters = body.Filters
+		s.mu.Unlock()
 		w.Header().Set("Content-Type", "application/json")
 		if s.metricsStatus != 0 && s.metricsStatus != http.StatusOK {
 			w.WriteHeader(s.metricsStatus)
@@ -340,8 +400,13 @@ func (s *storeServer) start() *httptest.Server {
 		io.WriteString(w, s.metricsBody)
 	})
 	mux.HandleFunc("/dev/api/snaps/info/", func(w http.ResponseWriter, r *http.Request) {
+		if s.rejectStale(w, r) {
+			return
+		}
+		s.mu.Lock()
 		s.infoCalls++
 		s.lastAuth = r.Header.Get("Authorization")
+		s.mu.Unlock()
 		w.Header().Set("Content-Type", "application/json")
 		switch s.infoStatus {
 		case 0, http.StatusOK:
@@ -355,7 +420,12 @@ func (s *storeServer) start() *httptest.Server {
 		}
 	})
 	mux.HandleFunc("/dev/api/account", func(w http.ResponseWriter, r *http.Request) {
+		if s.rejectStale(w, r) {
+			return
+		}
+		s.mu.Lock()
 		s.accountCalls++
+		s.mu.Unlock()
 		w.Header().Set("Content-Type", "application/json")
 		if s.accountBody == "" {
 			w.WriteHeader(http.StatusForbidden)
@@ -363,6 +433,46 @@ func (s *storeServer) start() *httptest.Server {
 			return
 		}
 		io.WriteString(w, s.accountBody)
+	})
+	mux.HandleFunc(tokensRefreshPath, func(w http.ResponseWriter, r *http.Request) {
+		s.mu.Lock()
+		s.refreshCalls++
+		s.mu.Unlock()
+		if s.refreshDelay > 0 {
+			time.Sleep(s.refreshDelay)
+		}
+		if r.Method != http.MethodPost {
+			s.t.Errorf("refresh method = %s, want POST", r.Method)
+		}
+		if ct := r.Header.Get("Content-Type"); ct != "application/json" {
+			s.t.Errorf("refresh content-type = %q", ct)
+		}
+		if auth := r.Header.Get("Authorization"); auth != "" {
+			s.t.Errorf("refresh carried an Authorization header (%q); SSO takes the "+
+				"discharge in the body", auth)
+		}
+		var body struct {
+			DischargeMacaroon string `json:"discharge_macaroon"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			s.t.Errorf("decode refresh request: %v", err)
+		}
+		s.mu.Lock()
+		s.refreshSent = body.DischargeMacaroon
+		s.refreshBound = body.DischargeMacaroon != "" && body.DischargeMacaroon != dischargeMac
+		s.mu.Unlock()
+
+		w.Header().Set("Content-Type", "application/json")
+		if s.refreshWith == "" {
+			status := s.refreshStatus
+			if status == 0 {
+				status = http.StatusUnauthorized
+			}
+			w.WriteHeader(status)
+			io.WriteString(w, `{"code":"invalid-credentials","message":"Invalid credentials"}`)
+			return
+		}
+		io.WriteString(w, `{"discharge_macaroon":"`+s.refreshWith+`"}`)
 	})
 	srv := httptest.NewServer(mux)
 	s.t.Cleanup(srv.Close)

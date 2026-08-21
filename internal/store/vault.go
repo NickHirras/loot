@@ -305,7 +305,11 @@ func (s *Store) vaultBreakdowns(ctx context.Context, from, to string, totalReven
 		bySource = append(bySource, SourceSlice{Source: r.Key, Slice: r.Slice})
 	}
 
-	apps, err := group("e.app")
+	// By app means by *product*: the same app is "Nistis: Fasting Timer" to
+	// Apple and "com.nistis.app" to Google, and showing two rows for one app
+	// was a bug the owner caught on the first real multi-store day. Events
+	// whose (source, app) pair is unmapped keep their raw name.
+	apps, err := group("COALESCE(NULLIF(e.product, ''), e.app)")
 	if err != nil {
 		return nil, nil, nil, err
 	}

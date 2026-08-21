@@ -127,7 +127,7 @@ func ParseMetrics(body []byte) (MetricsResponse, error) {
 // fetchMetrics asks for both metrics in one request. The country filter starts
 // one day earlier than the device-change filter because per-country installs
 // are derived from the difference between two consecutive installed-base days.
-func (s *Source) fetchMetrics(ctx context.Context, auth credentials, snapID, countryStart, start, end string) (MetricsResponse, error) {
+func (s *Source) fetchMetrics(ctx context.Context, auth *credentials, snapID, countryStart, start, end string) (MetricsResponse, error) {
 	req := struct {
 		Filters []Filter `json:"filters"`
 	}{Filters: []Filter{
@@ -149,7 +149,7 @@ func (s *Source) fetchMetrics(ctx context.Context, auth credentials, snapID, cou
 // takes. The direct lookup needs the `package_access` ACL; a login exported
 // with `--acls=package_metrics` alone gets a 403 there, so the account listing
 // is tried as a fallback before giving up.
-func (s *Source) resolveSnapID(ctx context.Context, auth credentials, snap string) (string, error) {
+func (s *Source) resolveSnapID(ctx context.Context, auth *credentials, snap string) (string, error) {
 	raw, err := s.do(ctx, http.MethodGet, "/dev/api/snaps/info/"+snap, nil, auth)
 	if err == nil {
 		var info struct {
@@ -179,7 +179,7 @@ func (s *Source) resolveSnapID(ctx context.Context, auth credentials, snap strin
 
 // snapIDFromAccount reads GET /dev/api/account, whose `snaps` object is keyed
 // by series ("16") and then by snap name, with the id under `snap-id`.
-func (s *Source) snapIDFromAccount(ctx context.Context, auth credentials, snap string) (string, error) {
+func (s *Source) snapIDFromAccount(ctx context.Context, auth *credentials, snap string) (string, error) {
 	raw, err := s.do(ctx, http.MethodGet, "/dev/api/account", nil, auth)
 	if err != nil {
 		return "", err
@@ -207,9 +207,36 @@ func (s *Source) snapIDFromAccount(ctx context.Context, auth credentials, snap s
 	return "", fmt.Errorf("snapcraft: %q is not among this account's snaps", snap)
 }
 
-// do performs one authenticated request and maps the store's error bodies onto
-// messages that say what to actually do about them.
-func (s *Source) do(ctx context.Context, method, path string, body []byte, auth credentials) ([]byte, error) {
+// do performs one authenticated request, refreshing the Ubuntu One discharge
+// macaroon and retrying once if the store says the discharge has gone stale.
+//
+// The refresh is the whole reason auth is a pointer: a poll makes several
+// requests, and the caller's credentials are updated in place so the rest of
+// them go out with the new discharge instead of each earning its own 401.
+//
+// A refresh that fails is not reported: the 401 the store already returned
+// carries the right advice for the case a refresh cannot fix (the root macaroon
+// really has expired or been revoked), and burying it under an SSO error would
+// only make that harder to read.
+func (s *Source) do(ctx context.Context, method, path string, body []byte, auth *credentials) ([]byte, error) {
+	raw, err := s.doOnce(ctx, method, path, body, *auth)
+	if err == nil || !needsDischargeRefresh(err) || !auth.refreshable() {
+		return raw, err
+	}
+	fresh, refreshErr := s.refreshCredentials(ctx, *auth)
+	if refreshErr != nil {
+		s.log.Warn("snapcraft: could not refresh the ubuntu one discharge macaroon",
+			"error", refreshErr, "store_error", err)
+		return raw, err
+	}
+	*auth = fresh
+	s.log.Info("snapcraft: refreshed the ubuntu one discharge macaroon", "retrying", method+" "+path)
+	return s.doOnce(ctx, method, path, body, fresh)
+}
+
+// doOnce performs one authenticated request and maps the store's error bodies
+// onto messages that say what to actually do about them.
+func (s *Source) doOnce(ctx context.Context, method, path string, body []byte, auth credentials) ([]byte, error) {
 	var rdr io.Reader
 	if body != nil {
 		rdr = bytes.NewReader(body)

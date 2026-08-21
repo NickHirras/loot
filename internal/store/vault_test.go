@@ -348,3 +348,37 @@ func TestVaultSubscriptionsIgnoreStaleSnapshots(t *testing.T) {
 		t.Errorf("as_of = %v, want 2026-08-17", summary.Subscriptions.AsOf)
 	}
 }
+
+// Seen for real on the first day with Apple and Google money at once: the same
+// product appeared as two by_app rows, one per store's raw app name.
+func TestVaultByAppGroupsByProduct(t *testing.T) {
+	ctx := context.Background()
+	st := newStore(t)
+
+	today := core.DayOf(time.Now().UTC())
+	a := ledgerRow("appstore", "Nistis: Fasting Timer", today, "US", 1, 14, "as:by1")
+	a.Product = "Nistis"
+	b := ledgerRow("googleplay", "com.nistis.app", today, "US", 1, 3, "gp:by1")
+	b.Product = "Nistis"
+	c := ledgerRow("appstore", "Mystery App", today, "US", 1, 5, "as:by2") // unmapped
+	for _, ev := range []core.Event{a, b, c} {
+		if _, err := st.InsertEvent(ctx, ev); err != nil {
+			t.Fatalf("insert: %v", err)
+		}
+	}
+
+	weekAgo := core.DayOf(time.Now().UTC().AddDate(0, 0, -7))
+	sum, err := st.VaultSummary(ctx, weekAgo, today, "USD", today)
+	if err != nil {
+		t.Fatalf("summary: %v", err)
+	}
+	if len(sum.ByApp) != 2 {
+		t.Fatalf("by_app rows = %d (%+v), want 2: Nistis merged + the unmapped raw name", len(sum.ByApp), sum.ByApp)
+	}
+	if sum.ByApp[0].App != "Nistis" || sum.ByApp[0].RevenueBase != 17 {
+		t.Fatalf("top row = %+v, want Nistis at 17", sum.ByApp[0])
+	}
+	if sum.ByApp[1].App != "Mystery App" {
+		t.Fatalf("second row = %+v, want the unmapped raw name", sum.ByApp[1])
+	}
+}
