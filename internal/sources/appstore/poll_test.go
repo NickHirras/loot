@@ -715,8 +715,10 @@ func TestPollRecoversASaleFromALateNoSalesDay(t *testing.T) {
 	if !got {
 		t.Fatal("the late report's sale never arrived — the day was written off prematurely")
 	}
-	if st := decodeTestState(t, state); len(st["skipped_days"].(map[string]any)) != 0 {
-		t.Fatalf("answered day should leave the retry list, got %v", st["skipped_days"])
+	if st := decodeTestState(t, state); st["skipped_days"] != nil {
+		if skipped := st["skipped_days"].(map[string]any); len(skipped) != 0 {
+			t.Fatalf("answered day should leave the retry list, got %v", skipped)
+		}
 	}
 
 	// And a third poll must not double-ingest (dedupe keys are stable).

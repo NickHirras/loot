@@ -450,7 +450,10 @@ func (s *Source) daysToFetch(st state, today string) []string {
 	// Retries first: they are older than the cursor, and the per-poll cap must
 	// not be spent on the forward window before they get a look in.
 	for day, rec := range st.SkippedDays {
-		if rec.Attempts >= maxSkipAttempts || rec.LastTry == today {
+		// A recent day retries every poll; only older days throttle to one
+		// attempt per calendar day.
+		recent := day >= addDays(yesterday, -assumeEmptyAfterDays)
+		if rec.Attempts >= maxSkipAttempts || (!recent && rec.LastTry == today) {
 			continue
 		}
 		if day > yesterday || day < retention {
