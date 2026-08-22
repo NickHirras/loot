@@ -662,7 +662,71 @@ func TestPollWalksPastADefinitiveNoSalesDay(t *testing.T) {
 	if pending, _ := st["pending_days"].([]any); len(pending) != 0 {
 		t.Fatalf("pending = %v, want none", pending)
 	}
-	if skipped, _ := st["skipped_days"].(map[string]any); len(skipped) != 0 {
-		t.Fatalf("a definitive empty day must not be retried, got skipped=%v", skipped)
+	// Seen for real (the owner's own purchase, Aug 2026): Apple answers the
+	// SAME "no sales for the date specified" for a report that simply is not
+	// generated yet. A recent empty day is therefore provisional: stepped
+	// over, but re-asked on later polls.
+	if skipped, _ := st["skipped_days"].(map[string]any); len(skipped) != 1 {
+		t.Fatalf("a recent no-sales day must stay on the retry list, got skipped=%v", skipped)
+	}
+}
+
+// The full production incident: Apple said "no sales" for a day at dawn, the
+// cursor settled it, and the report — containing a $29.99 sale — appeared
+// hours later. The next poll must pick it up.
+func TestPollRecoversASaleFromALateNoSalesDay(t *testing.T) {
+	fixture := readFixture(t, salesFixture)
+	fake := &fakeASC{
+		sales: map[string][]byte{"2026-08-15": fixture, "2026-08-16": fixture},
+		empty: map[string]bool{"2026-08-17": true}, // Apple's premature answer
+	}
+	src := newTestSource(t, fake, 3)
+
+	events, state, err := src.Poll(context.Background(), nil)
+	if err != nil {
+		t.Fatalf("first poll: %v", err)
+	}
+	for _, ev := range events {
+		if ev.Day == "2026-08-17" {
+			t.Fatalf("no events should exist for the empty answer yet")
+		}
+	}
+	st := decodeTestState(t, state)
+	if st["last_complete_day"] != "2026-08-17" {
+		t.Fatalf("cursor = %v, want the walk to continue past the empty day", st["last_complete_day"])
+	}
+
+	// Apple generates the report after all.
+	fake.mu.Lock()
+	delete(fake.empty, "2026-08-17")
+	fake.sales["2026-08-17"] = fixture
+	fake.mu.Unlock()
+
+	events, state, err = src.Poll(context.Background(), state)
+	if err != nil {
+		t.Fatalf("second poll: %v", err)
+	}
+	var got bool
+	for _, ev := range events {
+		if ev.Day == "2026-08-17" && ev.Kind == "sale" {
+			got = true
+		}
+	}
+	if !got {
+		t.Fatal("the late report's sale never arrived — the day was written off prematurely")
+	}
+	if st := decodeTestState(t, state); len(st["skipped_days"].(map[string]any)) != 0 {
+		t.Fatalf("answered day should leave the retry list, got %v", st["skipped_days"])
+	}
+
+	// And a third poll must not double-ingest (dedupe keys are stable).
+	events, _, err = src.Poll(context.Background(), state)
+	if err != nil {
+		t.Fatalf("third poll: %v", err)
+	}
+	for _, ev := range events {
+		if ev.Day == "2026-08-17" {
+			t.Fatalf("day already settled; got %s again", ev.DedupeKey)
+		}
 	}
 }

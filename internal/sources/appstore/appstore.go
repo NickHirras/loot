@@ -262,10 +262,19 @@ func (s *Source) Poll(ctx context.Context, raw []byte) ([]core.Event, []byte, er
 		report, err := s.fetchReport(ctx, salesSummaryDaily, day)
 		if err != nil {
 			if errors.Is(err, errNoSales) {
-				// Apple says, in so many words, that nothing happened. That is
-				// an answer, not a delay: settle the day and keep walking.
+				// Apple says "there were no sales for the date specified" —
+				// but, seen for real (Aug 2026, the owner's own $29.99
+				// purchase), Apple gives that same answer for a day whose
+				// report simply hasn't been generated yet. So the answer is
+				// only provisional while the day is recent: step over it (an
+				// empty day must not stall the walk) but keep asking on later
+				// polls until it's old enough to believe.
 				st.LastCompleteDay = maxDay(st.LastCompleteDay, day)
-				delete(st.SkippedDays, day)
+				if day >= addDays(yesterday, -assumeEmptyAfterDays) {
+					s.recordSkipped(&st, day, today)
+				} else {
+					delete(st.SkippedDays, day)
+				}
 				continue
 			}
 			if errors.Is(err, errNotReady) {
@@ -378,7 +387,19 @@ func (s *Source) recordSkipped(st *state, day, today string) {
 		st.SkippedDays = map[string]SkippedDay{}
 	}
 	rec := st.SkippedDays[day]
-	if rec.LastTry == today && rec.Attempts > 0 {
+	// A recent day is retried on every poll — a report published at noon
+	// must not wait a day for the next attempt. Once the day is older than
+	// the grace window, attempts throttle to one per calendar day.
+	recent := day >= addDays(addDays(today, -1), -assumeEmptyAfterDays)
+	if !recent && rec.LastTry == today && rec.Attempts > 0 {
+		return
+	}
+	if recent {
+		// Recent retries also don't consume the write-off budget: the five
+		// counted attempts start once the day is old enough to distrust.
+		rec.LastTry = today
+		st.SkippedDays[day] = rec
+		s.log().Debug("appstore: report still absent for a recent day; will ask again next poll", "day", day)
 		return
 	}
 	rec.Attempts++
