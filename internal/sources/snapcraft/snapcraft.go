@@ -30,6 +30,11 @@
 //	install         silent   Quantity = derived per-country gain, one per country
 //	installs_day    chest    Quantity = new devices — the day's one drop
 //
+// Plus, once per (snap, country) ever:
+//
+//	install         silent   Quantity = the standing installed base in that
+//	                                    country the first time it is seen
+//
 // # Caveats
 //
 //   - **Metrics lag.** A day's figures appear a day or two late, and the store
@@ -37,7 +42,9 @@
 //     null is skipped without moving the cursor, so it is picked up later.
 //   - **Country figures are derived.** installed_base_by_country is a base, not
 //     an arrival count; see countryDeltas in metrics.go for the derivation and
-//     what it cannot see.
+//     what it cannot see, and countryBaselines for the one-off event that gives
+//     each country a starting point rather than founding it only if it happens
+//     to grow while Loot is watching.
 //
 // # Credentials
 //
@@ -106,6 +113,16 @@ type state struct {
 	// Cursor maps snap name -> last day emitted (YYYY-MM-DD). A snap with no
 	// entry has never been polled and gets the backfill window.
 	Cursor map[string]string `json:"cursor"`
+	// Baselined maps snap name -> country -> the day that (snap, country) pair
+	// was founded on: the day its standing installed base was attributed, and
+	// therefore the day its deltas start counting *after*. See
+	// countryBaselines in metrics.go.
+	//
+	// The day matters as well as the membership. Dedupe already makes a second
+	// baseline event harmless, but a re-read of the founding day — which
+	// happens whenever an unpublished day holds the cursor behind it — would
+	// otherwise let the delta logic charge that day's arrival a second time.
+	Baselined map[string]map[string]string `json:"baselined,omitempty"`
 	// RefreshedDischarge is the unbound discharge macaroon Loot last obtained
 	// from Ubuntu One SSO, and RefreshedFor fingerprints the login file it was
 	// obtained for. They live here rather than in the login file because that
@@ -244,10 +261,20 @@ func (s *Source) Poll(ctx context.Context, raw []byte) ([]core.Event, []byte, er
 			continue
 		}
 
-		evs, newest := EventsFromMetrics(snap, id, resp, floor, today, now)
+		evs, newest, founded := EventsFromMetrics(snap, id, resp, floor, today, now, st.Baselined[snap])
 		events = append(events, evs...)
 		if newest > st.Cursor[snap] {
 			st.Cursor[snap] = newest
+		}
+		if len(founded) > 0 {
+			if st.Baselined[snap] == nil {
+				st.Baselined[snap] = make(map[string]string, len(founded))
+			}
+			for cc, day := range founded {
+				st.Baselined[snap][cc] = day
+			}
+			s.log.Info("snapcraft: founded new countries",
+				"snap", snap, "countries", len(founded))
 		}
 		s.log.Debug("snapcraft polled", "snap", snap, "events", len(evs), "cursor", st.Cursor[snap])
 	}
@@ -341,19 +368,33 @@ func (s *Source) firstRunFloor(now time.Time) string {
 	return now.AddDate(0, 0, -(days + 1)).Format(core.DayLayout)
 }
 
+func newState() *state {
+	return &state{
+		SnapIDs:   map[string]string{},
+		Cursor:    map[string]string{},
+		Baselined: map[string]map[string]string{},
+	}
+}
+
 func decodeState(raw []byte) *state {
-	st := &state{SnapIDs: map[string]string{}, Cursor: map[string]string{}}
+	st := newState()
 	if len(raw) == 0 {
 		return st
 	}
 	if err := json.Unmarshal(raw, st); err != nil {
-		return &state{SnapIDs: map[string]string{}, Cursor: map[string]string{}}
+		return newState()
 	}
 	if st.SnapIDs == nil {
 		st.SnapIDs = map[string]string{}
 	}
 	if st.Cursor == nil {
 		st.Cursor = map[string]string{}
+	}
+	// Absent on state written before per-country baselines existed, which is
+	// exactly the case that wants founding: every country the snap is already
+	// installed in gets its baseline on the next poll.
+	if st.Baselined == nil {
+		st.Baselined = map[string]map[string]string{}
 	}
 	return st
 }

@@ -379,6 +379,26 @@ func (p dayPayload) raw() json.RawMessage {
 	return b
 }
 
+// baselinePayload is what a per-country *baseline* event carries. It is
+// deliberately not a dayPayload: the daily_device_change figures have nothing
+// to do with a baseline, and zeroed new/continued/lost fields would only invite
+// being read as real. Base is a figure the store reported, not a difference
+// Loot computed, so there is no "derived" flag here either.
+type baselinePayload struct {
+	Snap     string `json:"snap"`
+	SnapID   string `json:"snap_id,omitempty"`
+	Country  string `json:"country"`
+	Date     string `json:"date"`
+	Baseline bool   `json:"baseline"`
+	Base     int    `json:"base"`
+	AsOf     string `json:"as_of"`
+}
+
+func (p baselinePayload) raw() json.RawMessage {
+	b, _ := json.Marshal(p)
+	return b
+}
+
 // EventsFromMetrics turns one snap's metrics response into events for every
 // completed day strictly after floor and strictly before today, and reports how
 // far the caller may advance its cursor.
@@ -394,31 +414,56 @@ func (p dayPayload) raw() json.RawMessage {
 // read again once its figures landed. Events for the days beyond the gap are
 // still emitted (their dedupe keys make the re-read free); it is only the
 // cursor that waits.
-func EventsFromMetrics(snap, snapID string, resp MetricsResponse, floor, today string, observed time.Time) ([]core.Event, string) {
+//
+// baselined maps a country code to the day this snap was already founded there
+// on, as remembered by the caller's state; countries missing from it are
+// founded now (see countryBaselines) and returned as the third result so the
+// caller can remember them too. Baseline events ignore floor entirely: the
+// standing installed base is a fact about days before the window, and it is
+// only worth saying once.
+func EventsFromMetrics(snap, snapID string, resp MetricsResponse, floor, today string, observed time.Time, baselined map[string]string) ([]core.Event, string, map[string]string) {
 	change, ok := resp.Metric(metricDailyDeviceChange)
 	if !ok {
-		return nil, ""
+		return nil, "", nil
 	}
 	country, hasCountry := resp.Metric(metricBaseByCountry)
 	countryIdx := map[string]int{}
+
+	var (
+		events []core.Event
+		newest string
+		fresh  map[string]string
+		// founded is baselined plus whatever was founded in this pass: the
+		// day each country's deltas are measured *from*, so the delta logic
+		// can avoid counting the baseline day twice.
+		founded = baselined
+	)
 	if hasCountry {
 		countryIdx = country.bucketIndex()
+		var baselines []core.Event
+		baselines, fresh = countryBaselines(snap, snapID, country, baselined, today, observed)
+		events = append(events, baselines...)
+		if len(fresh) > 0 {
+			founded = make(map[string]string, len(baselined)+len(fresh))
+			for cc, d := range baselined {
+				founded[cc] = d
+			}
+			for cc, d := range fresh {
+				founded[cc] = d
+			}
+		}
 	}
 
 	days := append([]string(nil), change.Buckets...)
 	sort.Strings(days)
 
-	var (
-		events []core.Event
-		newest string
-		// broken records that an unpublished day has been passed, which is
-		// where the contiguous run — and therefore the cursor — stops. Days
-		// the store simply does not carry a bucket for are not holes: it
-		// truncates the range to what it has rather than padding it, so
-		// treating a missing bucket as a hole would stall the cursor forever
-		// on a snap younger than the backfill window.
-		broken bool
-	)
+	// broken records that an unpublished day has been passed, which is where
+	// the contiguous run — and therefore the cursor — stops. Days the store
+	// simply does not carry a bucket for are not holes: it truncates the range
+	// to what it has rather than padding it, so treating a missing bucket as a
+	// hole would stall the cursor forever on a snap younger than the backfill
+	// window.
+	var broken bool
 	for _, day := range days {
 		if day >= today || (floor != "" && day <= floor) {
 			continue
@@ -485,7 +530,7 @@ func EventsFromMetrics(snap, snapID string, resp MetricsResponse, floor, today s
 		}
 
 		if hasCountry {
-			for _, d := range countryDeltas(country, countryIdx, day) {
+			for _, d := range countryDeltas(country, countryIdx, day, founded) {
 				p := base
 				p.Country = d.country
 				p.Installs = d.delta
@@ -505,7 +550,153 @@ func EventsFromMetrics(snap, snapID string, resp MetricsResponse, floor, today s
 				fmt.Sprintf("snapcraft:installs_day:%s:%s", snap, day), false, true, base, ""))
 		}
 	}
-	return events, newest
+	return events, newest, fresh
+}
+
+// countryBaselines founds this snap in every country it has never been seen in,
+// with one event carrying the standing installed base.
+//
+// Per-country installs are day-over-day differences of a *base*, so on its own
+// the delta logic can only ever see countries that grow while Loot is watching.
+// A snap with a settled base in Australia that neither gains nor loses a device
+// this week emits nothing for Australia, ever — and the Hearth, which founds a
+// settlement on the first event carrying a country, never learns the snap is
+// installed there at all. That was the bug: a globe with two settlements for a
+// snap running in twenty countries.
+//
+// The baseline is the missing first term. The first time a (snap, country) pair
+// is seen with a positive base, one event carries the whole base, dated the
+// oldest day the deltas will be measured from, so that
+//
+//	baseline(day0) + Σ delta(day0+1 … dayN) == base(dayN)
+//
+// exactly. day0 is the start of the *contiguous* run of buckets rather than
+// simply the oldest bucket in the window because differencing cannot cross a
+// gap: a baseline placed before a gap would leave the growth across it
+// unattributed. Deltas on day0 itself are suppressed (see countryDeltas) — for
+// a country appearing mid-life, base[day0] − 0 *is* the baseline, and counting
+// both would double it.
+//
+// Countries already founded are never re-baselined, not even after a data gap.
+// They have a settlement already, re-founding says nothing new, and the drift a
+// gap introduces is accepted and documented rather than papered over with a
+// second baseline that would double-count everything before it.
+//
+// The returned map is country -> baseline day for the countries founded here,
+// for the caller to merge into its state. The dedupe key alone would make a
+// re-emission harmless, but re-deriving it every six hours would hand the
+// pipeline the same forty rows forever.
+func countryBaselines(snap, snapID string, country Metric, baselined map[string]string, today string, observed time.Time) ([]core.Event, map[string]string) {
+	start := contiguousRunStart(country.Buckets)
+	if start < 0 {
+		return nil, nil
+	}
+
+	type founding struct {
+		cc   string
+		day  string
+		base int
+	}
+	found := make([]founding, 0, len(country.Series))
+	for _, s := range country.Series {
+		cc := strings.ToUpper(strings.TrimSpace(s.Name))
+		if !validCountry(cc) {
+			continue
+		}
+		if _, done := baselined[cc]; done {
+			continue
+		}
+		day, base, ok := firstPositiveBase(country, s.Name, start, today)
+		if !ok {
+			continue
+		}
+		found = append(found, founding{cc: cc, day: day, base: base})
+	}
+	// Sorted so a first poll's forty settlements arrive in a stable order
+	// rather than in Go's map-ish series order.
+	sort.Slice(found, func(a, b int) bool { return found[a].cc < found[b].cc })
+
+	var (
+		events []core.Event
+		fresh  map[string]string
+	)
+	for _, f := range found {
+		if _, dup := fresh[f.cc]; dup {
+			// The store would have to report a country twice for this; take
+			// the first reading rather than emitting two events with the same
+			// dedupe key.
+			continue
+		}
+		occurred, err := parseDay(f.day)
+		if err != nil {
+			continue
+		}
+		payload := baselinePayload{
+			Snap:     snap,
+			SnapID:   snapID,
+			Country:  f.cc,
+			Date:     f.day,
+			Baseline: true,
+			Base:     f.base,
+			AsOf:     f.day,
+		}
+		events = append(events, core.Event{
+			ID:         core.NewIDAt(occurred),
+			Source:     Name,
+			Kind:       "install",
+			App:        snap,
+			OccurredAt: occurred,
+			ObservedAt: observed,
+			Day:        f.day,
+			Country:    f.cc,
+			Quantity:   f.base,
+			DedupeKey:  fmt.Sprintf("snapcraft:baseline:%s:%s", snap, f.cc),
+			IsLedger:   false,
+			// Silent, and not chest-hinted: the pipeline treats a silent event
+			// as a backfill, so the settlement it founds lands in that day's
+			// chest instead of spraying flags across the live feed.
+			Silent:  true,
+			Chest:   false,
+			Payload: payload.raw(),
+		})
+		if fresh == nil {
+			fresh = make(map[string]string, len(found))
+		}
+		fresh[f.cc] = f.day
+	}
+	return events, fresh
+}
+
+// contiguousRunStart returns the index of the oldest bucket in the unbroken
+// calendar run that ends at the newest bucket, or -1 when there are none.
+// Buckets arrive in ascending order.
+func contiguousRunStart(buckets []string) int {
+	if len(buckets) == 0 {
+		return -1
+	}
+	i := len(buckets) - 1
+	for i > 0 && buckets[i-1] == addDays(buckets[i], -1) {
+		i--
+	}
+	return i
+}
+
+// firstPositiveBase finds the oldest bucket at or after index from whose value
+// for series is present and above zero, which is the day that country's
+// baseline belongs on. Days at or after today are skipped: the store has not
+// finished counting them.
+func firstPositiveBase(m Metric, series string, from int, today string) (string, int, bool) {
+	for i := from; i < len(m.Buckets); i++ {
+		if today != "" && m.Buckets[i] >= today {
+			break
+		}
+		v, ok := m.at(series, i)
+		if !ok || int(v) <= 0 {
+			continue
+		}
+		return m.Buckets[i], int(v), true
+	}
+	return "", 0, false
 }
 
 // countryDelta is one country's derived install count for a day.
@@ -529,7 +720,12 @@ type countryDelta struct {
 // that grew today" is the question being asked; the authoritative daily install
 // count is the un-countried daily_device_change "new" series, which is emitted
 // separately and is not the sum of these.
-func countryDeltas(country Metric, idx map[string]int, day string) []countryDelta {
+//
+// founded maps a country to the day its baseline was struck on (countryBaselines).
+// A country's deltas start the day *after* that: the baseline already carries
+// base[day0], so for a country appearing mid-life the day0 difference
+// base[day0] − 0 is the very same arrival and would count it twice.
+func countryDeltas(country Metric, idx map[string]int, day string, founded map[string]string) []countryDelta {
 	i, ok := idx[day]
 	if !ok || i == 0 {
 		return nil
@@ -544,6 +740,10 @@ func countryDeltas(country Metric, idx map[string]int, day string) []countryDelt
 	for _, s := range country.Series {
 		cc := strings.ToUpper(strings.TrimSpace(s.Name))
 		if !validCountry(cc) {
+			continue
+		}
+		// baseline == base[day0]; deltas run from day0+1.
+		if day0, seen := founded[cc]; seen && day <= day0 {
 			continue
 		}
 		cur, okCur := country.at(s.Name, i)

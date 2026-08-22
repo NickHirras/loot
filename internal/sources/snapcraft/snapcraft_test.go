@@ -9,6 +9,8 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"reflect"
+	"sort"
 	"strings"
 	"sync"
 	"testing"
@@ -88,7 +90,7 @@ func TestCountryDeltaDerivation(t *testing.T) {
 	// 2026-08-15: US 100 -> 110 = +10. DE 50 -> 47 clamps to nothing (a net
 	// loss is not a negative install). FR's previous reading is null, so it
 	// cannot be differenced. "??" is not a country.
-	got := countryDeltas(country, idx, "2026-08-15")
+	got := countryDeltas(country, idx, "2026-08-15", nil)
 	if len(got) != 1 || got[0].country != "US" || got[0].delta != 10 {
 		t.Fatalf("2026-08-15 deltas = %+v, want one US +10", got)
 	}
@@ -97,7 +99,7 @@ func TestCountryDeltaDerivation(t *testing.T) {
 	}
 
 	// 2026-08-16: US +8, FR +4, DE flat (0 is not an arrival).
-	got = countryDeltas(country, idx, "2026-08-16")
+	got = countryDeltas(country, idx, "2026-08-16", nil)
 	if len(got) != 2 {
 		t.Fatalf("2026-08-16 deltas = %+v, want 2", got)
 	}
@@ -109,11 +111,11 @@ func TestCountryDeltaDerivation(t *testing.T) {
 	}
 
 	// The very first bucket has no predecessor to difference against.
-	if got := countryDeltas(country, idx, "2026-08-14"); got != nil {
+	if got := countryDeltas(country, idx, "2026-08-14", nil); got != nil {
 		t.Errorf("first bucket produced deltas: %+v", got)
 	}
 	// A day the metric never reported.
-	if got := countryDeltas(country, idx, "2026-01-01"); got != nil {
+	if got := countryDeltas(country, idx, "2026-01-01", nil); got != nil {
 		t.Errorf("unknown day produced deltas: %+v", got)
 	}
 }
@@ -124,18 +126,29 @@ func TestCountryDeltaRequiresContiguousBuckets(t *testing.T) {
 		Buckets:    []string{"2026-08-10", "2026-08-16"},
 		Series:     []Series{{Name: "US", Values: []*float64{f(100), f(140)}}},
 	}
-	if got := countryDeltas(m, m.bucketIndex(), "2026-08-16"); got != nil {
+	if got := countryDeltas(m, m.bucketIndex(), "2026-08-16", nil); got != nil {
 		t.Errorf("a six day gap was treated as one day's installs: %+v", got)
 	}
 }
 
 func f(v float64) *float64 { return &v }
 
+// alreadyFounded is a baseline map old enough that no day in the fixture is on
+// or before it, so the per-day derivation behaves exactly as it did before
+// baselines existed. The founding itself is covered by the TestBaseline* tests
+// below.
+var alreadyFounded = map[string]string{
+	"US": "2026-01-01", "DE": "2026-01-01", "FR": "2026-01-01",
+}
+
 func TestEventsFromMetrics(t *testing.T) {
 	resp := loadFixture(t)
-	events, newest := EventsFromMetrics("tide-clock", testSnapID, resp,
-		"2026-08-14", "2026-08-18", fixtureToday)
+	events, newest, fresh := EventsFromMetrics("tide-clock", testSnapID, resp,
+		"2026-08-14", "2026-08-18", fixtureToday, alreadyFounded)
 
+	if len(fresh) != 0 {
+		t.Errorf("re-founded already-baselined countries: %v", fresh)
+	}
 	if newest != "2026-08-16" {
 		t.Errorf("newest = %q, want 2026-08-16 (08-17 is all null and must not move the cursor)", newest)
 	}
@@ -222,8 +235,8 @@ func TestEventsFromMetrics(t *testing.T) {
 
 func TestEventsFromMetricsRespectsFloor(t *testing.T) {
 	resp := loadFixture(t)
-	events, newest := EventsFromMetrics("tide-clock", testSnapID, resp,
-		"2026-08-15", "2026-08-18", fixtureToday)
+	events, newest, _ := EventsFromMetrics("tide-clock", testSnapID, resp,
+		"2026-08-15", "2026-08-18", fixtureToday, alreadyFounded)
 	if newest != "2026-08-16" {
 		t.Errorf("newest = %q", newest)
 	}
@@ -252,8 +265,8 @@ func TestEventsFromMetricsCursorStopsAtAnUnpublishedDay(t *testing.T) {
 		},
 	}}}
 
-	events, newest := EventsFromMetrics("tide-clock", testSnapID, resp,
-		"2026-08-11", "2026-08-16", fixtureToday)
+	events, newest, _ := EventsFromMetrics("tide-clock", testSnapID, resp,
+		"2026-08-11", "2026-08-16", fixtureToday, nil)
 	if newest != "2026-08-13" {
 		t.Fatalf("cursor = %q, want 2026-08-13: the 14th was never published", newest)
 	}
@@ -361,6 +374,14 @@ func (s *storeServer) rejectStale(w http.ResponseWriter, r *http.Request) bool {
 	return true
 }
 
+// serve replaces the metrics body between polls, so one test can walk a snap
+// through several days of the store's answers.
+func (s *storeServer) serve(body string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.metricsBody = body
+}
+
 // counts reads the call counters under the lock.
 func (s *storeServer) counts() (metrics, info, refresh, stale int) {
 	s.mu.Lock()
@@ -394,10 +415,13 @@ func (s *storeServer) start() *httptest.Server {
 		s.lastFilters = body.Filters
 		s.mu.Unlock()
 		w.Header().Set("Content-Type", "application/json")
-		if s.metricsStatus != 0 && s.metricsStatus != http.StatusOK {
-			w.WriteHeader(s.metricsStatus)
+		s.mu.Lock()
+		status, out := s.metricsStatus, s.metricsBody
+		s.mu.Unlock()
+		if status != 0 && status != http.StatusOK {
+			w.WriteHeader(status)
 		}
-		io.WriteString(w, s.metricsBody)
+		io.WriteString(w, out)
 	})
 	mux.HandleFunc("/dev/api/snaps/info/", func(w http.ResponseWriter, r *http.Request) {
 		if s.rejectStale(w, r) {
@@ -497,8 +521,9 @@ func TestPollEmitsThenStopsRepeating(t *testing.T) {
 	if err != nil {
 		t.Fatalf("poll 1: %v", err)
 	}
-	if len(events) != 11 {
-		t.Fatalf("poll 1 emitted %d events, want 11", len(events))
+	// 11 day events plus one baseline apiece for DE, FR and US.
+	if len(events) != 14 {
+		t.Fatalf("poll 1 emitted %d events, want 14", len(events))
 	}
 	if store.infoCalls != 1 {
 		t.Errorf("snap id lookups = %d, want 1", store.infoCalls)
@@ -539,6 +564,11 @@ func TestPollEmitsThenStopsRepeating(t *testing.T) {
 	}
 	if st.SnapIDs["tide-clock"] != testSnapID {
 		t.Errorf("snap_ids = %v", st.SnapIDs)
+	}
+	if got, want := st.Baselined["tide-clock"], map[string]string{
+		"DE": "2026-08-14", "US": "2026-08-14", "FR": "2026-08-15",
+	}; !reflect.DeepEqual(got, want) {
+		t.Errorf("baselined = %v, want %v", got, want)
 	}
 	if st.Cursor["tide-clock"] != "2026-08-16" {
 		t.Errorf("cursor = %q, want 2026-08-16", st.Cursor["tide-clock"])
@@ -756,5 +786,354 @@ func TestDecodeStateTolerablesGarbage(t *testing.T) {
 	st = decodeState([]byte(`{"snap_ids":{"a":"b"}}`))
 	if st.SnapIDs["a"] != "b" || st.Cursor == nil {
 		t.Errorf("state = %+v", st)
+	}
+}
+
+// ------------------------------------------------------- per-country baselines
+
+// changeMetric builds a daily_device_change metric whose figures are plausible
+// but beside the point: these tests are about the country series.
+func changeMetric(buckets []string, newDev ...int) Metric {
+	if len(newDev) != len(buckets) {
+		panic("changeMetric: one new-device figure per bucket")
+	}
+	var nv, cv, lv []*float64
+	for i := range buckets {
+		nv = append(nv, f(float64(newDev[i])))
+		cv = append(cv, f(float64(100+i)))
+		lv = append(lv, f(0))
+	}
+	return Metric{
+		Status:     "OK",
+		SnapID:     testSnapID,
+		MetricName: metricDailyDeviceChange,
+		Buckets:    buckets,
+		Series: []Series{
+			{Name: seriesNew, Values: nv},
+			{Name: seriesContinued, Values: cv},
+			{Name: seriesLost, Values: lv},
+		},
+	}
+}
+
+// countryMetric builds an installed_base_by_country metric. Each series' values
+// line up with buckets; a nil is the store's "no reading for that day".
+func countryMetric(buckets []string, series map[string][]*float64) Metric {
+	names := make([]string, 0, len(series))
+	for cc := range series {
+		names = append(names, cc)
+	}
+	sort.Strings(names)
+	m := Metric{
+		Status:     "OK",
+		SnapID:     testSnapID,
+		MetricName: metricBaseByCountry,
+		Buckets:    buckets,
+	}
+	for _, cc := range names {
+		if len(series[cc]) != len(buckets) {
+			panic("countryMetric: " + cc + " does not line up with the buckets")
+		}
+		m.Series = append(m.Series, Series{Name: cc, Values: series[cc]})
+	}
+	return m
+}
+
+func metricsBody(t *testing.T, metrics ...Metric) string {
+	t.Helper()
+	b, err := json.Marshal(MetricsResponse{Metrics: metrics})
+	if err != nil {
+		t.Fatalf("encode metrics: %v", err)
+	}
+	return string(b)
+}
+
+// baselineEvents indexes the emitted baselines by country.
+func baselineEvents(t *testing.T, events []core.Event) map[string]core.Event {
+	t.Helper()
+	out := map[string]core.Event{}
+	for _, e := range events {
+		if !strings.HasPrefix(e.DedupeKey, "snapcraft:baseline:") {
+			continue
+		}
+		if prev, dup := out[e.Country]; dup {
+			t.Errorf("duplicate baseline for %s in one batch: %q and %q",
+				e.Country, prev.DedupeKey, e.DedupeKey)
+		}
+		out[e.Country] = e
+	}
+	return out
+}
+
+// deltaEvents indexes the derived per-country installs by "<country>@<day>".
+func deltaEvents(events []core.Event) map[string]core.Event {
+	out := map[string]core.Event{}
+	for _, e := range events {
+		if e.Country == "" || strings.HasPrefix(e.DedupeKey, "snapcraft:baseline:") {
+			continue
+		}
+		out[e.Country+"@"+e.Day] = e
+	}
+	return out
+}
+
+func onDay(y, m, d int) time.Time { return time.Date(y, time.Month(m), d, 9, 0, 0, 0, time.UTC) }
+
+// The first poll must found every country the snap is already installed in,
+// with the standing base as the quantity — that is the whole fix. The poll
+// after it must not say it again.
+func TestBaselineFoundsEveryCountryOnTheFirstPoll(t *testing.T) {
+	store := &storeServer{t: t, metricsBody: metricsBody(t,
+		changeMetric([]string{"2026-08-16", "2026-08-17"}, 1, 1),
+		countryMetric([]string{"2026-08-15", "2026-08-16", "2026-08-17"}, map[string][]*float64{
+			"AU": {f(40), f(40), f(40)},
+			"GR": {f(5), f(5), f(5)},
+		}),
+	)}
+	src := testSource(t, store.start().URL, 30)
+
+	events, st1, err := src.Poll(context.Background(), nil)
+	if err != nil {
+		t.Fatalf("poll 1: %v", err)
+	}
+
+	base := baselineEvents(t, events)
+	if len(base) != 2 {
+		t.Fatalf("poll 1 founded %d countries, want AU and GR: %+v", len(base), base)
+	}
+	for _, want := range []struct {
+		cc  string
+		qty int
+	}{{"AU", 40}, {"GR", 5}} {
+		e, ok := base[want.cc]
+		if !ok {
+			t.Errorf("%s was never founded", want.cc)
+			continue
+		}
+		if e.Kind != "install" || e.Quantity != want.qty {
+			t.Errorf("%s baseline = kind %q qty %d, want install %d", want.cc, e.Kind, e.Quantity, want.qty)
+		}
+		if e.DedupeKey != "snapcraft:baseline:tide-clock:"+want.cc {
+			t.Errorf("%s dedupe key = %q", want.cc, e.DedupeKey)
+		}
+		// The oldest contiguous bucket: the day the deltas will count from.
+		if e.Day != "2026-08-15" || e.OccurredAt.Format(core.DayLayout) != "2026-08-15" {
+			t.Errorf("%s baseline dated %q / %s, want 2026-08-15", want.cc, e.Day, e.OccurredAt)
+		}
+		if !e.Silent || e.IsLedger || e.Chest {
+			t.Errorf("%s baseline = silent %v ledger %v chest %v, want silent only",
+				want.cc, e.Silent, e.IsLedger, e.Chest)
+		}
+		var p baselinePayload
+		if err := json.Unmarshal(e.Payload, &p); err != nil {
+			t.Fatalf("%s payload: %v", want.cc, err)
+		}
+		if !p.Baseline || p.Base != want.qty || p.AsOf != "2026-08-15" || p.Country != want.cc {
+			t.Errorf("%s payload = %+v", want.cc, p)
+		}
+	}
+	if got := deltaEvents(events); len(got) != 0 {
+		t.Errorf("a flat first window still produced deltas: %v", got)
+	}
+
+	// One day later: AU gains a device, GR is flat.
+	src.Now = func() time.Time { return onDay(2026, 8, 19) }
+	store.serve(metricsBody(t,
+		changeMetric([]string{"2026-08-18"}, 1),
+		countryMetric([]string{"2026-08-17", "2026-08-18"}, map[string][]*float64{
+			"AU": {f(40), f(41)},
+			"GR": {f(5), f(5)},
+		}),
+	))
+
+	events2, st2, err := src.Poll(context.Background(), st1)
+	if err != nil {
+		t.Fatalf("poll 2: %v", err)
+	}
+	if got := baselineEvents(t, events2); len(got) != 0 {
+		t.Fatalf("poll 2 re-baselined founded countries: %+v", got)
+	}
+	deltas := deltaEvents(events2)
+	if len(deltas) != 1 {
+		t.Fatalf("poll 2 country events = %+v, want exactly AU +1", deltas)
+	}
+	au, ok := deltas["AU@2026-08-18"]
+	if !ok || au.Quantity != 1 {
+		t.Fatalf("poll 2 AU delta = %+v, want +1 on 2026-08-18", au)
+	}
+
+	var decoded state
+	if err := json.Unmarshal(st2, &decoded); err != nil {
+		t.Fatalf("state: %v", err)
+	}
+	if got, want := decoded.Baselined["tide-clock"], map[string]string{
+		"AU": "2026-08-15", "GR": "2026-08-15",
+	}; !reflect.DeepEqual(got, want) {
+		t.Errorf("baselined = %v, want %v", got, want)
+	}
+}
+
+// A country that shows up mid-life is founded on the day it appears, and that
+// same day must not also be differenced: base[day0] − 0 is the baseline again.
+func TestBaselineForACountryThatAppearsLater(t *testing.T) {
+	store := &storeServer{t: t, metricsBody: metricsBody(t,
+		changeMetric([]string{"2026-08-16"}, 1),
+		countryMetric([]string{"2026-08-15", "2026-08-16"}, map[string][]*float64{
+			"AU": {f(40), f(40)},
+		}),
+	)}
+	src := testSource(t, store.start().URL, 30)
+
+	_, st1, err := src.Poll(context.Background(), nil)
+	if err != nil {
+		t.Fatalf("poll 1: %v", err)
+	}
+
+	// Brazil appears on the 17th with 3 devices and reaches 4 on the 18th.
+	src.Now = func() time.Time { return onDay(2026, 8, 19) }
+	store.serve(metricsBody(t,
+		changeMetric([]string{"2026-08-17", "2026-08-18"}, 3, 1),
+		countryMetric([]string{"2026-08-16", "2026-08-17", "2026-08-18"}, map[string][]*float64{
+			"AU": {f(40), f(40), f(40)},
+			"BR": {nil, f(3), f(4)},
+		}),
+	))
+
+	events, st2, err := src.Poll(context.Background(), st1)
+	if err != nil {
+		t.Fatalf("poll 2: %v", err)
+	}
+
+	base := baselineEvents(t, events)
+	if len(base) != 1 {
+		t.Fatalf("founded %d countries, want only BR: %+v", len(base), base)
+	}
+	br := base["BR"]
+	if br.Quantity != 3 || br.Day != "2026-08-17" {
+		t.Errorf("BR baseline = qty %d on %q, want 3 on 2026-08-17", br.Quantity, br.Day)
+	}
+
+	deltas := deltaEvents(events)
+	if _, dup := deltas["BR@2026-08-17"]; dup {
+		t.Errorf("BR was counted twice on its founding day: baseline 3 plus %+v", deltas["BR@2026-08-17"])
+	}
+	next, ok := deltas["BR@2026-08-18"]
+	if !ok || next.Quantity != 1 {
+		t.Fatalf("BR delta the day after founding = %+v, want +1", next)
+	}
+	if len(deltas) != 1 {
+		t.Errorf("country deltas = %+v, want only BR +1", deltas)
+	}
+
+	var decoded state
+	if err := json.Unmarshal(st2, &decoded); err != nil {
+		t.Fatalf("state: %v", err)
+	}
+	if decoded.Baselined["tide-clock"]["BR"] != "2026-08-17" {
+		t.Errorf("baselined = %v", decoded.Baselined["tide-clock"])
+	}
+}
+
+// A gap in the store's buckets must not re-found a country that already has a
+// settlement — the drift that costs is accepted and documented — but a country
+// first seen after the gap is new and must still be founded.
+func TestBaselineAcrossADataGap(t *testing.T) {
+	store := &storeServer{t: t, metricsBody: metricsBody(t,
+		changeMetric([]string{"2026-08-16"}, 1),
+		countryMetric([]string{"2026-08-15", "2026-08-16"}, map[string][]*float64{
+			"AU": {f(40), f(40)},
+		}),
+	)}
+	src := testSource(t, store.start().URL, 30)
+
+	first, st1, err := src.Poll(context.Background(), nil)
+	if err != nil {
+		t.Fatalf("poll 1: %v", err)
+	}
+	if got := baselineEvents(t, first)["AU"]; got.Quantity != 40 {
+		t.Fatalf("AU was not founded on poll 1: %+v", got)
+	}
+
+	// Five days later, with the 18th through the 21st missing entirely.
+	src.Now = func() time.Time { return onDay(2026, 8, 24) }
+	store.serve(metricsBody(t,
+		changeMetric([]string{"2026-08-22", "2026-08-23"}, 2, 1),
+		countryMetric([]string{"2026-08-17", "2026-08-22", "2026-08-23"}, map[string][]*float64{
+			"AU": {f(40), f(60), f(61)},
+			"CA": {nil, f(7), f(8)},
+		}),
+	))
+
+	events, _, err := src.Poll(context.Background(), st1)
+	if err != nil {
+		t.Fatalf("poll 2: %v", err)
+	}
+
+	base := baselineEvents(t, events)
+	if _, again := base["AU"]; again {
+		t.Errorf("AU was re-baselined after a gap: %+v", base["AU"])
+	}
+	ca, ok := base["CA"]
+	if !ok {
+		t.Fatalf("CA appeared after the gap and was never founded: %+v", base)
+	}
+	// The oldest bucket of the contiguous run, not the stale 08-17 reading.
+	if ca.Quantity != 7 || ca.Day != "2026-08-22" {
+		t.Errorf("CA baseline = qty %d on %q, want 7 on 2026-08-22", ca.Quantity, ca.Day)
+	}
+
+	deltas := deltaEvents(events)
+	// 2026-08-22's predecessor bucket is 2026-08-17, so nothing is differenced
+	// across the gap at all.
+	for key := range deltas {
+		if strings.HasSuffix(key, "@2026-08-22") {
+			t.Errorf("differenced across the gap: %s = %+v", key, deltas[key])
+		}
+	}
+	if got := deltas["AU@2026-08-23"]; got.Quantity != 1 {
+		t.Errorf("AU delta after the gap = %+v, want +1", got)
+	}
+	if got := deltas["CA@2026-08-23"]; got.Quantity != 1 {
+		t.Errorf("CA delta the day after founding = %+v, want +1", got)
+	}
+}
+
+// The point of dating the baseline on the oldest contiguous bucket: everything
+// Loot attributes to a country adds up to the base the store reports, exactly.
+func TestBaselinePlusDeltasEqualTheReportedBase(t *testing.T) {
+	store := &storeServer{t: t, metricsBody: metricsBody(t,
+		changeMetric([]string{"2026-08-15", "2026-08-16"}, 2, 1),
+		countryMetric([]string{"2026-08-14", "2026-08-15", "2026-08-16"}, map[string][]*float64{
+			"AU": {f(40), f(42), f(43)},
+		}),
+	)}
+	src := testSource(t, store.start().URL, 30)
+
+	events, _, err := src.Poll(context.Background(), nil)
+	if err != nil {
+		t.Fatalf("poll: %v", err)
+	}
+
+	if got := baselineEvents(t, events)["AU"]; got.Quantity != 40 || got.Day != "2026-08-14" {
+		t.Fatalf("AU baseline = qty %d on %q, want 40 on 2026-08-14", got.Quantity, got.Day)
+	}
+	deltas := deltaEvents(events)
+	if got := deltas["AU@2026-08-15"]; got.Quantity != 2 {
+		t.Errorf("AU 2026-08-15 = %+v, want +2", got)
+	}
+	if got := deltas["AU@2026-08-16"]; got.Quantity != 1 {
+		t.Errorf("AU 2026-08-16 = %+v, want +1", got)
+	}
+
+	attributed := 0
+	for _, e := range events {
+		if e.Country == "AU" {
+			attributed += e.Quantity
+		}
+	}
+	// baseline(2026-08-14) + Σ deltas(08-15, 08-16) == base[2026-08-16].
+	if attributed != 43 {
+		t.Errorf("attributed %d devices to AU, want 43 — the base the store reports "+
+			"on the last bucket (40 + 2 + 1)", attributed)
 	}
 }

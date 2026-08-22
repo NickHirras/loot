@@ -185,6 +185,12 @@ published it):
 | `install` (one per country) | derived country gain | silent | `snapcraft:installs:<snap>:<day>:<country>` |
 | **`installs_day`** | `new` devices | **chest drop** | `snapcraft:installs_day:<snap>:<day>` |
 
+Plus, exactly once per (snap, country) for as long as Loot's state survives:
+
+| kind | quantity | silent? | dedupe key |
+|---|---|---|---|
+| `install` (baseline) | the standing installed base in that country | silent | `snapcraft:baseline:<snap>:<country>` |
+
 `installs_day` is the only event that produces a drop, and it goes into that
 day's chest rather than the live feed — the same treatment Google Play's install
 days get, so a 30-day backfill fills chests instead of spraying a month of
@@ -218,11 +224,29 @@ until it lands. (Days the store has no bucket for at all are a different thing:
 it truncates the range to what it has rather than padding it with nulls, so a
 missing bucket is not treated as a hole.)
 
-### Per-country installs are derived, and they undercount
+### Per-country installs are a baseline plus derived daily gains
 
 This is the important one. `installed_base_by_country` is a **base**, not an
 arrival count: it says how many devices in each country were running the snap
-that day. Loot derives a country's daily installs as
+that day. Loot turns it into two different things.
+
+**The baseline — one event, the first time a country is ever seen.** The first
+poll that sees a positive base for a (snap, country) pair emits a single silent
+`install` carrying the *whole standing base*, dated the oldest day the deltas
+will be measured from:
+
+```
+baseline[country] = base[country][day0]      dedupe: snapcraft:baseline:<snap>:<country>
+```
+
+Without it the globe would be wrong in a way that is easy to miss. Differences
+can only see countries that **grow while Loot is watching**, so a snap with a
+settled base in Australia that neither gains nor loses a device this week emits
+nothing for Australia, ever — and since a settlement is founded by the first
+event carrying a country, the Hearth would show two flags for a snap running in
+twenty countries. The baseline is the missing first term.
+
+**The daily gain — one event per country per day, after that.**
 
 ```
 installs[country][day] = max(0, base[country][day] − base[country][day−1])
@@ -231,7 +255,18 @@ installs[country][day] = max(0, base[country][day] − base[country][day−1])
 which is why the country filter is always fetched one day further back than the
 device filter.
 
-Two consequences worth knowing:
+`day0` is the oldest bucket of the **contiguous** run rather than simply the
+oldest bucket in the window, and a country's deltas start at `day0 + 1`. Both
+choices exist to make the arithmetic close:
+
+```
+baseline(day0) + Σ delta(day0+1 … dayN) == base(dayN)
+```
+
+For a country that first appears mid-life, `base[day0] − 0` *is* the baseline,
+so counting the `day0` difference as well would double it. Loot suppresses it.
+
+Consequences worth knowing:
 
 - **Losses mask installs.** A country that gained 5 devices and lost 7 on the
   same day reads as **0**, not 5. The derived figure is a *net* gain, so it
@@ -240,14 +275,49 @@ Two consequences worth knowing:
   install count is the un-countried `daily_device_change` `new` series, which is
   emitted separately. Do not expect the per-country events to add up to it.
 
-The derived events exist because they are what founds **settlements** on the
-Hearth — "a country where the snap grew today" is exactly the question the globe
-asks. Every such event's payload carries `"derived": true` along with the two
-base readings it came from, so a surprising number can always be checked.
+Every derived event's payload carries `"derived": true` along with the two base
+readings it came from; a baseline's carries `"baseline": true` with `"base"` and
+`"as_of"`. Either way a surprising number can be checked against what the store
+said.
 
 A day whose preceding bucket is missing (the first day of a window, or a gap in
-the store's data) produces no country events at all: differencing across a gap
-would turn a week's growth into a one-day spike.
+the store's data) produces no *delta* events at all: differencing across a gap
+would turn a week's growth into a one-day spike. Baselines are unaffected —
+they do not difference anything.
+
+### What the Hearth's population actually means
+
+For Snapcraft, a settlement's population is **the installed base in that country
+at the moment Loot was wired up, plus every net daily gain since**. It is not a
+live headcount, and it never shrinks: losses are recorded as `lost` events but
+are never subtracted from a settlement, because settlements on the Hearth do not
+shrink by design.
+
+Two kinds of drift follow, both accepted:
+
+- **Decline.** A country whose base has fallen since its baseline keeps the
+  higher figure. Founded at 50 and now at 47, the Hearth still says 50.
+- **Gaps.** When the store leaves a hole in its buckets, the growth across that
+  hole is never differenced and so is never attributed. Countries that already
+  have a settlement are **not** re-baselined after a gap — re-founding them
+  would say nothing new about the globe, and a second baseline would double-count
+  everything before it. Only a country never seen before gets a baseline, and it
+  gets one from the first bucket of the contiguous run after the gap.
+
+Loot remembers which `(snap, country)` pairs it has founded, and on which day,
+in its source state (`baselined`). Delete that state and the next poll re-founds
+every country from its base at that moment — the dedupe keys mean no duplicate
+events are stored, but the figures are re-read from today's base rather than the
+original one.
+
+### Turning it on for a snap Loot already polls
+
+Baselines were added after the fact, so a snap with existing state simply has no
+`baselined` entry yet. On the very next poll, **every country the snap is
+currently installed in gets founded at once** — expect a burst of settlement
+drops in one chest, one per country, sized by that country's current base. It
+happens once. Nothing is emitted for countries the store reports a zero or
+missing base for.
 
 ### Devices, not people
 
