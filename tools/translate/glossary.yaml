@@ -1,0 +1,160 @@
+# Loot's vocabulary.
+#
+# `gloss` tells the translator what a word means *here* — "chest" is a thing
+# you open once a day, not a body part — and goes into every request.
+#
+# `translations` is where you pin a word. Leave one blank and the model picks
+# whatever sounds natural in that language, which is usually right and is how
+# this file ships. Fill one in and two things happen: every later request is
+# told to use it, and `tools/translate -check` warns about any translation of a
+# string containing the English word that does not.
+#
+# Pinning a term does not by itself retranslate anything. Change the English
+# source, run with `-force`, or delete the key from i18n.lock.json.
+#
+# Locales, from web/project.inlang/settings.json:
+#   de  es  fr  it  pt-BR  ja  ko  zh-Hans  ru  nl
+
+terms:
+  - term: Loot
+    gloss: >-
+      The product's name. Never translate it, decline it or transliterate it —
+      it stays "Loot" in every language, including Japanese and Chinese.
+    translations:
+      de: Loot
+      es: Loot
+      fr: Loot
+      it: Loot
+      pt-BR: Loot
+      ja: Loot
+      ko: Loot
+      zh-Hans: Loot
+      ru: Loot
+      nl: Loot
+
+  - term: drop
+    gloss: >-
+      The central noun. One piece of news from an app store — a sale, an
+      install, a new subscriber — presented as an item a game would drop, with
+      a rarity and an XP value. "A drop landed." Also a verb in "drops land".
+    translations: {de: "", es: "", fr: "", it: "", pt-BR: "", ja: "", ko: "", zh-Hans: "", ru: "", nl: ""}
+
+  - term: chest
+    gloss: >-
+      The daily chest: yesterday's drops held back and opened together once a
+      day, so there is one thing to look forward to rather than a stream.
+    translations: {de: "", es: "", fr: "", it: "", pt-BR: "", ja: "", ko: "", zh-Hans: "", ru: "", nl: ""}
+
+  - term: vault
+    gloss: >-
+      The tab where the money is: revenue, units, refunds, charts. A treasury
+      rather than a bank vault.
+    translations: {de: "", es: "", fr: "", it: "", pt-BR: "", ja: "", ko: "", zh-Hans: "", ru: "", nl: ""}
+
+  - term: hearth
+    gloss: >-
+      The tab with the globe: the map of everywhere you have sold, seen from
+      orbit. The hearth is home — the fire your settlements were founded from.
+    translations: {de: "", es: "", fr: "", it: "", pt-BR: "", ja: "", ko: "", zh-Hans: "", ru: "", nl: ""}
+
+  - term: codex
+    gloss: >-
+      The tab listing achievements: a collector's book of everything that can
+      be earned, with the locked ones still showing.
+    translations: {de: "", es: "", fr: "", it: "", pt-BR: "", ja: "", ko: "", zh-Hans: "", ru: "", nl: ""}
+
+  - term: settlement
+    gloss: >-
+      A country you have sold in at least once, drawn as a lit city on the
+      globe. Its size is its population — people who arrived, never money.
+    translations: {de: "", es: "", fr: "", it: "", pt-BR: "", ja: "", ko: "", zh-Hans: "", ru: "", nl: ""}
+
+  - term: settle
+    gloss: >-
+      To sell in a country for the first time, founding its settlement. "3 new
+      countries settled." Not the financial sense of settling an account.
+    translations: {de: "", es: "", fr: "", it: "", pt-BR: "", ja: "", ko: "", zh-Hans: "", ru: "", nl: ""}
+
+  - term: quest
+    gloss: >-
+      A goal with a deadline and a progress bar — "settle 3 new countries this
+      month". Some are generated, some are typed by the user.
+    translations: {de: "", es: "", fr: "", it: "", pt-BR: "", ja: "", ko: "", zh-Hans: "", ru: "", nl: ""}
+
+  - term: mystery
+    gloss: >-
+      Something odd in the numbers that Loot noticed and cannot explain — a
+      record day, a silent store — offered to the user to write an explanation
+      for. An open question, not a puzzle with an answer.
+    translations: {de: "", es: "", fr: "", it: "", pt-BR: "", ja: "", ko: "", zh-Hans: "", ru: "", nl: ""}
+
+  - term: boss
+    gloss: >-
+      A crash cluster that broke out of its own baseline, given a name and a
+      health bar so that fixing it feels like a fight you win. Video-game boss.
+    translations: {de: "", es: "", fr: "", it: "", pt-BR: "", ja: "", ko: "", zh-Hans: "", ru: "", nl: ""}
+
+  - term: era
+    gloss: >-
+      How far the settlement has come: Camp, Village, Town, City, Kingdom,
+      Empire, Dynasty. A stage of growth, driven by level.
+    translations: {de: "", es: "", fr: "", it: "", pt-BR: "", ja: "", ko: "", zh-Hans: "", ru: "", nl: ""}
+
+  - term: vessel
+    gloss: >-
+      A ship on the globe, one per connected source, named for its store ("The
+      Cupertino Clipper"). The names are jokes and should stay jokes.
+    translations: {de: "", es: "", fr: "", it: "", pt-BR: "", ja: "", ko: "", zh-Hans: "", ru: "", nl: ""}
+
+  - term: rarity
+    gloss: How valuable a drop is. The scale below.
+    translations: {de: "", es: "", fr: "", it: "", pt-BR: "", ja: "", ko: "", zh-Hans: "", ru: "", nl: ""}
+
+  - term: common
+    gloss: The lowest rarity. Use the word a game in this language would use.
+    translations: {de: "", es: "", fr: "", it: "", pt-BR: "", ja: "", ko: "", zh-Hans: "", ru: "", nl: ""}
+
+  - term: uncommon
+    gloss: The second rarity, above common.
+    translations: {de: "", es: "", fr: "", it: "", pt-BR: "", ja: "", ko: "", zh-Hans: "", ru: "", nl: ""}
+
+  - term: rare
+    gloss: The middle rarity.
+    translations: {de: "", es: "", fr: "", it: "", pt-BR: "", ja: "", ko: "", zh-Hans: "", ru: "", nl: ""}
+
+  - term: epic
+    gloss: The second-highest rarity.
+    translations: {de: "", es: "", fr: "", it: "", pt-BR: "", ja: "", ko: "", zh-Hans: "", ru: "", nl: ""}
+
+  - term: legendary
+    gloss: The highest rarity. Rare enough that seeing one should feel like news.
+    translations: {de: "", es: "", fr: "", it: "", pt-BR: "", ja: "", ko: "", zh-Hans: "", ru: "", nl: ""}
+
+  - term: cursed
+    gloss: >-
+      The rarity for bad news — a cancellation, a crash. Off the scale rather
+      than at the bottom of it. Never shaming: it is the event that is cursed,
+      not the reader.
+    translations: {de: "", es: "", fr: "", it: "", pt-BR: "", ja: "", ko: "", zh-Hans: "", ru: "", nl: ""}
+
+  - term: XP
+    gloss: >-
+      Experience points, earned per drop. Keep the abbreviation "XP" wherever
+      players in this language would — most do.
+    translations: {de: "", es: "", fr: "", it: "", pt-BR: "", ja: "", ko: "", zh-Hans: "", ru: "", nl: ""}
+
+  - term: level
+    gloss: The number XP adds up to. Game level, not a level surface or a tier.
+    translations: {de: "", es: "", fr: "", it: "", pt-BR: "", ja: "", ko: "", zh-Hans: "", ru: "", nl: ""}
+
+  - term: streak
+    gloss: >-
+      Consecutive days with at least one drop. Broken rather than lost, and
+      never something the reader is scolded about.
+    translations: {de: "", es: "", fr: "", it: "", pt-BR: "", ja: "", ko: "", zh-Hans: "", ru: "", nl: ""}
+
+  - term: record
+    gloss: >-
+      A best-ever: the highest a number has been. "A record day", "your record
+      is 41". Not a database row and not a recording.
+    translations: {de: "", es: "", fr: "", it: "", pt-BR: "", ja: "", ko: "", zh-Hans: "", ru: "", nl: ""}
