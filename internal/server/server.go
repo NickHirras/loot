@@ -23,6 +23,7 @@ import (
 	"github.com/nickhirras/loot/internal/mysteries"
 	"github.com/nickhirras/loot/internal/pipeline"
 	"github.com/nickhirras/loot/internal/quests"
+	"github.com/nickhirras/loot/internal/rules"
 	"github.com/nickhirras/loot/internal/store"
 )
 
@@ -47,6 +48,11 @@ type Server struct {
 	// Bosses is optional too: without it /api/bosses answers "peace in the
 	// realm" rather than 404.
 	Bosses *bosses.Service
+	// Rules is the same engine the pipeline classifies with. The API borrows
+	// it read-only, to re-render a drop's sentence in the reader's language on
+	// the way out; without it every response is the stored English. See
+	// lang.go.
+	Rules *rules.Engine
 
 	// index is the app shell with the configured language stamped into it,
 	// built once by indexBytes(); see spa.go.
@@ -135,6 +141,10 @@ func (s *Server) handleDrops(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, "list drops", err)
 		return
 	}
+
+	// Titles are stored in the language they were minted in and re-rendered
+	// per reader; nothing here is cached, so the page is rewritten in place.
+	s.localizeDrops(r, s.requestLang(r), drops)
 
 	next := ""
 	if len(drops) == limit && len(drops) > 0 {

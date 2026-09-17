@@ -34,6 +34,17 @@ export interface Drop {
   chest_date?: string
   /** When the chest holding this drop was opened; absent while it waits. */
   revealed_at?: string | null
+  /**
+   * Which rules-file entry wrote `title` and `subtitle` — `"fallback"` when
+   * the fallback did, absent for a drop minted before Loot recorded it.
+   * The server uses it to re-render the sentence in the reader's language;
+   * the dashboard only ever reads the text it is given.
+   */
+  rule?: string
+  /** The floor rule that relabelled the drop, if one did. */
+  floor_rule?: string
+  /** The language `title` and `subtitle` are written in. */
+  lang?: string
 
   source: string
   kind: string

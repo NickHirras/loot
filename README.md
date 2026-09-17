@@ -490,7 +490,15 @@ language: "auto"   # or a BCP-47 tag: "de", "pt-BR", "zh-Hans"
 
 Numbers, currencies and dates follow the chosen language too, through `Intl`, so the same revenue figure reads `$1,234.00` or `1.234,00 $` without a second setting.
 
-**Only English ships today.** The other languages are wired up and empty: anything untranslated falls back to English, so nothing breaks and nothing is half-translated. The translations themselves arrive in a later release.
+**Drop titles follow too.** A drop's headline ("New annual subscriber", "Best day ever on the App Store") is written by a rarity rule at ingest and stored as text, so it is re-rendered per reader rather than translated: each drop records which rule wrote it, and Loot re-runs that rule's translation of itself against the original event on the way out. That applies to the feed, the chest, the globe's arrivals ticker and the live websocket alike.
+
+Three things follow from that, all of them deliberate:
+
+- **Your own words are never translated.** If you point `rules_path` at a rules file of your own and rewrite a title, that title is what every reader sees, in every language. A rule you did not touch still translates, because Loot compares the template text against the defaults rather than trusting the rule's name.
+- **History stays as it was written.** Drops minted before this version did not record their rule, so there is nothing to re-render them from; they keep the language they were written in forever. New drops from the same rules do translate.
+- **A fixed `language` is written, not just displayed.** With `language: "de"` the drops themselves are stored in German, so `loot tail` and anything reading the websocket say what the dashboard says.
+
+**Only English ships today.** The other languages are wired up and empty: anything untranslated falls back to English, so nothing breaks and nothing is half-translated. The translations themselves arrive in a later release; the German rule overlay in `internal/rules/locales/` is the first of them, and is deliberately partial.
 
 ## The vault
 
@@ -643,6 +651,18 @@ The first sale from a country Loot has never seen does not use a floor rule. The
 `country_first` and `record_high` are answered by the database — the first is true when no earlier event carries that country, the second when the event's quantity beats every previous event for the same source, app and kind.
 
 **Template fields** for `title` and `subtitle`: `.Source .Kind .App .Day .Country .Flag .Amount .AmountFmt .AmountBase .AmountBaseFmt .Currency .Quantity .QuantityFmt .Payload`, plus `.BaseTitle` in floor rules. `.AmountBaseFmt` is the amount in your display currency.
+
+**Translations** live beside the defaults, in [`internal/rules/locales/`](internal/rules/locales/), one `default.<lang>.yaml` per language. An overlay carries nothing but titles and subtitles, keyed by rule name — rarity, XP and matching are decisions rather than words, and stay in `default.yaml` alone:
+
+```yaml
+rules:
+  - name: revenuecat-annual
+    then:
+      title: "Neues Jahresabo"
+      subtitle: "{{.AmountFmt}}{{if .App}} · {{.App}}{{end}}"
+```
+
+Every `{{…}}` expression is the English one; reordering them around the sentence is the point, changing what they say is not. An overlay entry applies only while the rule it names still has `default.yaml`'s own wording, which is what keeps a customised rules file in its author's words. See the **Language** section above.
 
 ## Development
 

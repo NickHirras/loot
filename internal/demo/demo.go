@@ -264,6 +264,10 @@ func (d *Demo) txPipeline(tx *store.Store) (*pipeline.Pipeline, error) {
 	pipe.ChestEnabled = true
 	pipe.Backdate = true
 	engine.SetDisplayCurrency(pipe.DisplayCurrency)
+	if d.live != nil && d.live.Rules != nil {
+		// A seeded world is written in the same language as a live one.
+		engine.SetLanguage(d.live.Rules.Language())
+	}
 	return &pipe, nil
 }
 

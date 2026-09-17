@@ -91,6 +91,9 @@ func newHarnessWith(t *testing.T, cfg config.Config, static fs.FS) *harness {
 
 	sources := []core.Source{revenuecat.New("", quietLogger())}
 	s := server.New(cfg, st, b, p, sources, static, quietLogger())
+	// The API borrows the pipeline's engine to re-render drop titles in the
+	// reader's language, exactly as `loot serve` hands it over.
+	s.Rules = engine
 
 	ts := httptest.NewServer(s.Handler())
 	t.Cleanup(ts.Close)
