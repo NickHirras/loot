@@ -146,9 +146,18 @@ type Boss struct {
 	// Name is the generated monster name, deterministic from Key.
 	Name string `json:"name"`
 	// Title is the human line under it: the issue title, or "Crashes in v2.3.1".
-	Title   string `json:"title"`
-	Version string `json:"version"`
-	IssueID string `json:"issue_id"`
+	Title string `json:"title"`
+	// IssueTitle is Title when the crash reporter wrote it, and "" when Loot
+	// generated it. A generated title is a sentence about a version, so the
+	// dashboard writes it itself, in its own language, from VersionLabel and
+	// Kind; an issue's own title is the reporter's words and is passed through
+	// untranslated. Computed on read — see bosses.Decorate.
+	IssueTitle string `json:"issue_title"`
+	Version    string `json:"version"`
+	// VersionLabel is Version as a title says it: "v2.3.1", "build 412", or ""
+	// for a fight with no version at all. Computed on read.
+	VersionLabel string `json:"version_label,omitempty"`
+	IssueID      string `json:"issue_id"`
 	// HPMax is the count on the spawn day (the worst it has been allowed to
 	// get); HP is the count on the most recent completed day.
 	HPMax float64 `json:"hp_max"`

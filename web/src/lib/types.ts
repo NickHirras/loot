@@ -592,8 +592,22 @@ export interface MysteryDetail {
   ratio: number
   /** `money` formats in the display currency, `count` as a plain number. */
   unit: 'money' | 'count'
-  /** One line on what tripped the detector. */
+  /**
+   * One line on what tripped the detector, in English, written when the
+   * mystery was raised. The card writes its own from the facts below and
+   * prints this only when it cannot — see prose.ts.
+   */
   why?: string
+
+  /** How many trailing days the baseline was measured over (a record's why). */
+  baseline_days?: number
+  /** A silent source: days missed, days reported in the seven before that. */
+  missing_days?: number
+  reported_days?: number
+  /** That store's own settlement lag, already allowed for in `missing_days`. */
+  lag_days?: number
+  /** How many countries were founded on the flagged day (a cluster). */
+  countries?: number
 }
 
 /** One flagged day: something the numbers did that the days before it do not
@@ -788,6 +802,19 @@ export interface RecapCountry {
   day: string
 }
 
+/**
+ * One line of the poster's caption, as facts rather than as a sentence.
+ *
+ * `kind` says which line it is and `args` carries what it is made of: days as
+ * YYYY-MM-DD, money as a raw number in the recap's display currency. The card
+ * writes the sentence — see `highlightLine` in prose.ts — and skips a kind it
+ * does not know, so a newer server can add one without breaking an older tab.
+ */
+export interface RecapHighlight {
+  kind: string
+  args?: Record<string, unknown>
+}
+
 /** One day of the recap sparkline. */
 export interface RecapPoint {
   day: string
@@ -830,8 +857,8 @@ export interface Recap {
   mysteries_solved: number
   achievements_unlocked: Achievement[]
 
-  /** Short, ordered, already-written lines: the caption of the poster. */
-  highlights: string[]
+  /** Short, ordered lines: the caption of the poster. */
+  highlights: RecapHighlight[]
   series: RecapPoint[]
 }
 
@@ -841,11 +868,17 @@ export interface RecapResponse {
   periods: RecapPeriod[]
 }
 
-/** "Aug 2026"-style month label for the recap picker. */
+/**
+ * "Aug 2026"-style month label for the recap picker.
+ *
+ * `period.label` is the server's own English rendering and is deliberately not
+ * used: the picker reads the same window in the reader's language. The key
+ * ("2026-08") is the fallback for a window whose days will not parse.
+ */
 export function monthLabel(period: RecapPeriod): string {
   if (period.kind === 'season') return period.key
   const parsed = new Date(`${period.from}T00:00:00Z`)
-  if (Number.isNaN(parsed.getTime())) return period.label
+  if (Number.isNaN(parsed.getTime())) return period.key
   return parsed.toLocaleDateString(currentLocale(), { month: 'short', year: 'numeric', timeZone: 'UTC' })
 }
 
@@ -879,7 +912,15 @@ export interface Boss {
   name: string
   /** The human line under it: the crash's own title, or "Crashes in v2.3.1". */
   title: string
+  /**
+   * The crash reporter's own title, or "" when Loot generated one. A generated
+   * title is a sentence the card writes itself; see `bossTitle` in prose.ts.
+   * Absent from a server older than this field.
+   */
+  issue_title?: string
   version: string
+  /** `version` as a title says it: "v2.3.1", "build 412", or "" for none. */
+  version_label?: string
   issue_id: string
   /** Opening strength, and what the most recent completed day says. */
   hp_max: number

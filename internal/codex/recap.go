@@ -113,9 +113,9 @@ type Recap struct {
 	MysteriesSolved int                `json:"mysteries_solved"`
 	Achievements    []core.Achievement `json:"achievements_unlocked"`
 
-	// Highlights are short, ordered, already-written lines: the caption of the
-	// poster. Best news first.
-	Highlights []string `json:"highlights"`
+	// Highlights are the caption of the poster: short, ordered, best news
+	// first. They are structure rather than prose — see Highlight.
+	Highlights []Highlight `json:"highlights"`
 	// Series is revenue per day, zero-filled, for the sparkline.
 	Series []store.DayValue `json:"series"`
 }
@@ -234,7 +234,7 @@ func BuildRecap(ctx context.Context, st *store.Store, p Period, displayCurrency 
 
 	r.Empty = agg.Drops == 0 && agg.RevenueBase == 0 && agg.Units == 0 &&
 		agg.Installs == 0 && len(agg.NewCountries) == 0
-	r.Highlights = highlights(r, agg, displayCurrency)
+	r.Highlights = highlights(r, agg)
 	return r, nil
 }
 
@@ -242,78 +242,80 @@ func BuildRecap(ctx context.Context, st *store.Store, p Period, displayCurrency 
 // stops being a highlight reel and becomes a table.
 const maxHighlights = 7
 
+// Highlight is one line of the caption, as facts rather than as a sentence:
+// which line it is, and the numbers it is made of.
+//
+// The sentence itself is written by whoever is reading — "Best day on Aug 14:
+// $612" in English, something with a different word order elsewhere — which is
+// only possible if the API never writes it. Days are YYYY-MM-DD and money is a
+// raw number in the recap's display currency; both are formatted at the far
+// end, in the reader's own locale.
+//
+// Kinds, and what their Args carry:
+//
+//	best_day         day, value          settled          country, day, more
+//	unlocked         key, title, more    legendary_drops  count
+//	epic_drops       count               era_reached      era
+//	level_up         from, to            most_countries   count, day
+//	quests_completed count                mysteries_solved count
+//	chests_opened    count               top_country      country
+//
+// A reader that does not know a kind renders nothing for it, so a new one can
+// be added here without breaking an older dashboard.
+type Highlight struct {
+	Kind string         `json:"kind"`
+	Args map[string]any `json:"args,omitempty"`
+}
+
 // highlights writes the caption, best news first. Every line is a fact; none
 // of them is a score.
-func highlights(r Recap, agg store.RecapAggregates, currency string) []string {
-	out := []string{}
-	add := func(format string, args ...any) {
+func highlights(r Recap, agg store.RecapAggregates) []Highlight {
+	out := []Highlight{}
+	add := func(kind string, args map[string]any) {
 		if len(out) < maxHighlights {
-			out = append(out, fmt.Sprintf(format, args...))
+			out = append(out, Highlight{Kind: kind, Args: args})
 		}
 	}
 
 	if r.BestDay.Day != "" && r.BestDay.Value > 0 {
-		add("Best day on %s: %s", dayLabel(r.BestDay.Day), core.FormatMoney(r.BestDay.Value, currency))
+		add("best_day", map[string]any{"day": r.BestDay.Day, "value": r.BestDay.Value})
 	}
 	// Trophies before countries: an achievement is the rarer event.
-	switch n := len(r.Achievements); {
-	case n == 1:
-		add("Unlocked %s", r.Achievements[0].Title)
-	case n > 1:
-		add("Unlocked %s and %d more achievement%s", r.Achievements[0].Title, n-1, plural(n-1))
+	if n := len(r.Achievements); n > 0 {
+		add("unlocked", map[string]any{
+			"key": r.Achievements[0].Key, "title": r.Achievements[0].Title, "more": n - 1,
+		})
 	}
 	if n := len(r.NewCountries); n > 0 {
 		first := r.NewCountries[0]
-		add("Settled %s %s on %s%s", core.FlagEmoji(first.Country), first.Country, dayLabel(first.Day),
-			moreCountries(n-1))
+		add("settled", map[string]any{"country": first.Country, "day": first.Day, "more": n - 1})
 	}
 	if n := r.DropsByRarity["legendary"]; n > 0 {
-		add("%d legendary drop%s", n, plural(n))
+		add("legendary_drops", map[string]any{"count": n})
 	} else if n := r.DropsByRarity["epic"]; n > 0 {
-		add("%d epic drop%s", n, plural(n))
+		add("epic_drops", map[string]any{"count": n})
 	}
 	if r.EraEnd != r.EraStart {
-		add("Reached the %s era", r.EraEnd)
+		add("era_reached", map[string]any{"era": r.EraEnd})
 	} else if r.LevelEnd > r.LevelStart {
-		add("Level %d → %d", r.LevelStart, r.LevelEnd)
+		add("level_up", map[string]any{"from": r.LevelStart, "to": r.LevelEnd})
 	}
 	if agg.MostCountries > 1 {
-		add("%d new countries on %s alone", agg.MostCountries, dayLabel(agg.MostCountriesDay))
+		add("most_countries", map[string]any{"count": agg.MostCountries, "day": agg.MostCountriesDay})
 	}
 	if r.QuestsCompleted > 0 {
-		add("%d quest%s completed", r.QuestsCompleted, plural(r.QuestsCompleted))
+		add("quests_completed", map[string]any{"count": r.QuestsCompleted})
 	}
 	if r.MysteriesSolved > 0 {
-		add("%d myster%s explained", r.MysteriesSolved, pluralY(r.MysteriesSolved))
+		add("mysteries_solved", map[string]any{"count": r.MysteriesSolved})
 	}
 	if r.ChestsOpened > 0 {
-		add("%d chest%s opened", r.ChestsOpened, plural(r.ChestsOpened))
+		add("chests_opened", map[string]any{"count": r.ChestsOpened})
 	}
 	if r.TopCountry.Key != "" && r.TopCountry.RevenueBase > 0 {
-		add("%s %s was your biggest market", core.FlagEmoji(r.TopCountry.Key), r.TopCountry.Key)
+		add("top_country", map[string]any{"country": r.TopCountry.Key})
 	}
 	return out
-}
-
-func moreCountries(more int) string {
-	if more <= 0 {
-		return ""
-	}
-	return fmt.Sprintf(" (and %d more countr%s)", more, pluralY(more))
-}
-
-func plural(n int) string {
-	if n == 1 {
-		return ""
-	}
-	return "s"
-}
-
-func pluralY(n int) string {
-	if n == 1 {
-		return "y"
-	}
-	return "ies"
 }
 
 // topRarity is the rarest rarity that actually dropped in the window, ignoring

@@ -292,6 +292,14 @@ func Decorate(b core.Boss, today string) core.Boss {
 	}
 	b.URL = detail.URL
 	b.Kind = detail.Kind
+	// A title Loot wrote itself is a sentence ("Crashes in v2.3.1") that the
+	// dashboard should write in its own language; one the crash reporter wrote
+	// is the reporter's words and travels as it is. Telling them apart is a
+	// matter of asking titleFor what it would have said.
+	b.VersionLabel = VersionLabel(b.Version)
+	if b.Title != titleFor("", b.Version, b.Kind) {
+		b.IssueTitle = b.Title
+	}
 	b.Series = detail.Series
 	if b.Series == nil {
 		b.Series = []core.BossPoint{}

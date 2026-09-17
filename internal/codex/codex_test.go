@@ -6,7 +6,6 @@ import (
 	"io"
 	"log/slog"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
@@ -596,27 +595,25 @@ func TestRecapAggregation(t *testing.T) {
 		t.Errorf("a month with money in it reported itself empty")
 	}
 
-	// Highlights are ordered: the best day first, then the settlements, and
-	// each is a fact rather than a score.
+	// Highlights are ordered — the best day first, then the trophies, then the
+	// settlements — and each is a set of facts rather than a sentence.
 	if len(recap.Highlights) == 0 {
 		t.Fatalf("no highlights written")
 	}
-	if !strings.HasPrefix(recap.Highlights[0], "Best day on Jul 14") {
-		t.Errorf("first highlight = %q, want the best day", recap.Highlights[0])
+	first := recap.Highlights[0]
+	if first.Kind != "best_day" || first.Args["day"] != "2026-07-14" || first.Args["value"] != 300.0 {
+		t.Errorf("first highlight = %+v, want the best day, 2026-07-14, 300", first)
 	}
-	joined := strings.Join(recap.Highlights, "\n")
-	if !strings.Contains(joined, "Settled") || !strings.Contains(joined, "JP") {
-		t.Errorf("highlights never mention the new settlement: %q", joined)
-	}
-	if !strings.Contains(joined, "1 legendary drop") {
-		t.Errorf("highlights never mention the legendary: %q", joined)
-	}
+	byKind := map[string]codex.Highlight{}
 	for _, h := range recap.Highlights {
-		for _, banned := range []string{"failed", "missed", "down from", "worse"} {
-			if strings.Contains(strings.ToLower(h), banned) {
-				t.Errorf("highlight %q reads as a verdict", h)
-			}
-		}
+		byKind[h.Kind] = h
+	}
+	settled, ok := byKind["settled"]
+	if !ok || settled.Args["country"] != "JP" {
+		t.Errorf("highlights never mention the new settlement: %+v", recap.Highlights)
+	}
+	if got, ok := byKind["legendary_drops"]; !ok || got.Args["count"] != 1 {
+		t.Errorf("highlights never mention the legendary: %+v", recap.Highlights)
 	}
 }
 

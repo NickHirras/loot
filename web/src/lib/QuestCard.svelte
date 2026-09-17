@@ -3,6 +3,7 @@
   import type { Quest } from './types'
   import { METRIC_ICON, currency, integer, percent } from './types'
   import { metricLabel } from './labels'
+  import { autoQuestTitle } from './prose'
   import { m } from '../paraglide/messages'
 
   let {
@@ -20,6 +21,14 @@
   function format(value: number): string {
     return quest.metric === 'revenue' ? currency(value, code, 0) : integer(value)
   }
+
+  /**
+   * A generated quest's title is written here rather than stored: it is fully
+   * determined by the metric, the window and the target, so the card can say
+   * it in the reader's language. A custom quest's title is your own words and
+   * is shown exactly as you typed them.
+   */
+  const title = $derived(autoQuestTitle(quest, code) ?? quest.title)
 
   const done = $derived(quest.status === 'completed')
   const ended = $derived(quest.status === 'expired')
@@ -56,7 +65,7 @@
 <article class="quest" class:done class:ended class:flashing>
   <div class="head">
     <span class="icon" aria-hidden="true">{METRIC_ICON[quest.metric] ?? '◆'}</span>
-    <h4>{quest.title}</h4>
+    <h4>{title}</h4>
     {#if quest.kind === 'custom'}
       <span class="tag">{m.quest_custom()}</span>
     {/if}
@@ -64,7 +73,7 @@
       <button
         class="remove"
         title={m.quest_remove_title()}
-        aria-label={m.quest_remove_aria({ title: quest.title })}
+        aria-label={m.quest_remove_aria({ title })}
         disabled={questsState.isBusy(quest.id)}
         onclick={() => questsState.remove(quest.id)}>×</button
       >

@@ -238,13 +238,13 @@ var Catalog = []Entry{
 		func(s *Snapshot) []store.DayValue { return s.LedgerSources }),
 
 	// ------------------------------------------------------- record days
-	count("record_1", core.TierBronze, "Best day ever", "record days",
+	count("record_1", core.TierBronze, "Best day ever", "record_days",
 		"A day that beat every day before it.", 1,
 		func(s *Snapshot) []store.DayValue { return s.Records }),
-	count("record_5", core.TierSilver, "Best day ever ×5", "record days",
+	count("record_5", core.TierSilver, "Best day ever ×5", "record_days",
 		"Five days that each beat everything before them.", 5,
 		func(s *Snapshot) []store.DayValue { return s.Records }),
-	count("record_25", core.TierGold, "Best day ever ×25", "record days",
+	count("record_25", core.TierGold, "Best day ever ×25", "record_days",
 		"Twenty-five record days.", 25,
 		func(s *Snapshot) []store.DayValue { return s.Records }),
 

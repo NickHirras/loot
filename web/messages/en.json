@@ -2,14 +2,337 @@
   "$schema": "https://inlang.com/schema/inlang-message-format",
   "ach_backfilled": "backfilled",
   "ach_backfilled_title": "Earned before Loot was watching; dated to the day it happened",
+  "ach_cartographer_desc": "A settlement on every inhabited continent.",
+  "ach_cartographer_title": "Cartographer",
+  "ach_cursed_but_unbowed_desc": "A cursed drop, and then something rare or better within the day. It turned around.",
+  "ach_cursed_but_unbowed_title": "Cursed but unbowed",
+  "ach_era_city_desc": "Reach the City era.",
+  "ach_era_city_title": "City",
+  "ach_era_empire_desc": "Reach the Empire era.",
+  "ach_era_empire_title": "Empire",
+  "ach_era_kingdom_desc": "Reach the Kingdom era.",
+  "ach_era_kingdom_title": "Kingdom",
+  "ach_era_town_desc": "Reach the Town era.",
+  "ach_era_town_title": "Town",
+  "ach_first_blood_desc": "Your first ever drop — the moment Loot had something to report.",
+  "ach_first_blood_title": "First blood",
+  "ach_first_sale_desc": "The first settled sale in a store's own financial report.",
+  "ach_first_sale_title": "First sale",
+  "ach_first_subscriber_desc": "Somebody decided to keep paying you.",
+  "ach_first_subscriber_title": "First subscriber",
+  "ach_hoarder_1_desc": "Open 10 daily chests.",
+  "ach_hoarder_1_title": "Hoarder",
+  "ach_hoarder_2_desc": "Open 50 daily chests.",
+  "ach_hoarder_2_title": "Great hoarder",
+  "ach_hoarder_3_desc": "Open 200 daily chests.",
+  "ach_hoarder_3_title": "Dragon hoarder",
+  "ach_installs_100k_desc": "100,000 lifetime installs.",
+  "ach_installs_100k_title": "Everywhere",
+  "ach_installs_10k_desc": "10,000 lifetime installs.",
+  "ach_installs_10k_title": "Going around",
+  "ach_installs_1k_desc": "1,000 lifetime installs.",
+  "ach_installs_1k_title": "Word of mouth",
+  "ach_legendary_hunter_desc": "Your first legendary drop.",
+  "ach_legendary_hunter_title": "Legendary hunter",
+  "ach_merchant_2_desc": "Ledger revenue from 2 different stores.",
+  "ach_merchant_2_title": "Two worlds",
+  "ach_merchant_3_desc": "Ledger revenue from 3 different stores.",
+  "ach_merchant_3_title": "Three worlds",
+  "ach_merchant_5_desc": "Ledger revenue from 5 different stores.",
+  "ach_merchant_5_title": "Merchant of many worlds",
+  "ach_mysteries_10_desc": "Explain 10 mysteries.",
+  "ach_mysteries_10_title": "Lab notebook",
+  "ach_mysteries_1_desc": "Explain a mystery.",
+  "ach_mysteries_1_title": "Detective",
   "ach_not_yet": "not yet",
+  "ach_polyglot_1_desc": "Take money in 5 different currencies.",
+  "ach_polyglot_1_title": "Polyglot",
+  "ach_polyglot_2_desc": "Take money in 10 different currencies.",
+  "ach_polyglot_2_title": "Money changer",
   "ach_progress": "{value} / {target}",
   "ach_progress_unit": "{value} / {target} {unit}",
+  "ach_quests_10_desc": "Complete 10 quests.",
+  "ach_quests_10_title": "Adventurer",
+  "ach_quests_1_desc": "Complete a quest.",
+  "ach_quests_1_title": "Questing",
+  "ach_quests_50_desc": "Complete 50 quests.",
+  "ach_quests_50_title": "Hero of the realm",
+  "ach_record_1_desc": "A day that beat every day before it.",
+  "ach_record_1_title": "Best day ever",
+  "ach_record_25_desc": "Twenty-five record days.",
+  "ach_record_25_title": "Best day ever ×25",
+  "ach_record_5_desc": "Five days that each beat everything before them.",
+  "ach_record_5_title": "Best day ever ×5",
+  "ach_revenue_100_desc": "$100 of lifetime revenue.",
+  "ach_revenue_100_title": "First hundred",
+  "ach_revenue_100k_desc": "$100,000 of lifetime revenue.",
+  "ach_revenue_100k_title": "Six figures",
+  "ach_revenue_10k_desc": "$10,000 of lifetime revenue.",
+  "ach_revenue_10k_title": "Five figures",
+  "ach_revenue_1k_desc": "$1,000 of lifetime revenue.",
+  "ach_revenue_1k_title": "Four figures",
+  "ach_settler_1_desc": "Customers in 5 countries.",
+  "ach_settler_1_title": "Settler I",
+  "ach_settler_2_desc": "Customers in 10 countries.",
+  "ach_settler_2_title": "Settler II",
+  "ach_settler_3_desc": "Customers in 25 countries.",
+  "ach_settler_3_title": "Settler III",
+  "ach_settler_4_desc": "Customers in 50 countries.",
+  "ach_settler_4_title": "Settler IV",
+  "ach_stars_1000_desc": "1,000 GitHub stars.",
+  "ach_stars_1000_title": "Galaxy",
+  "ach_stars_100_desc": "100 GitHub stars.",
+  "ach_stars_100_title": "Constellation",
+  "ach_stars_10_desc": "10 GitHub stars.",
+  "ach_stars_10_title": "Stargazer",
+  "ach_steady_30_desc": "Ledger revenue on 30 consecutive days.",
+  "ach_steady_30_title": "Steady as she goes",
+  "ach_steady_7_desc": "Ledger revenue on 7 consecutive days.",
+  "ach_steady_7_title": "Steady",
+  "ach_subscribers_1000_desc": "1,000 active subscribers.",
+  "ach_subscribers_1000_title": "A movement",
+  "ach_subscribers_100_desc": "100 active subscribers.",
+  "ach_subscribers_100_title": "A following",
+  "ach_subscribers_10_desc": "10 active subscribers.",
+  "ach_subscribers_10_title": "A congregation",
   "ach_tier_bronze": "bronze",
   "ach_tier_gold": "gold",
   "ach_tier_legendary": "legendary",
   "ach_tier_silver": "silver",
   "ach_tier_title": "{tier} · pays a {rarity} drop worth {xp} XP",
+  "ach_unit_chests": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "chest",
+        "countPlural=other": "chests"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_continents": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "continent",
+        "countPlural=other": "continents"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_countries": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "country",
+        "countPlural=other": "countries"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_currencies": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "currency",
+        "countPlural=other": "currencies"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_days": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "day",
+        "countPlural=other": "days"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_installs": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "install",
+        "countPlural=other": "installs"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_mysteries": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "mystery",
+        "countPlural=other": "mysteries"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_quests": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "quest",
+        "countPlural=other": "quests"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_record_days": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "record day",
+        "countPlural=other": "record days"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_revenue": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "revenue",
+        "countPlural=other": "revenue"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_stars": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "star",
+        "countPlural=other": "stars"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_stores": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "store",
+        "countPlural=other": "stores"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_subscribers": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "subscriber",
+        "countPlural=other": "subscribers"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_units": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "unit",
+        "countPlural=other": "units"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_xp": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "XP",
+        "countPlural=other": "XP"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_units_100_desc": "100 lifetime paid units.",
+  "ach_units_100_title": "A hundred sold",
+  "ach_units_100k_desc": "100,000 lifetime paid units.",
+  "ach_units_100k_title": "A hundred thousand sold",
+  "ach_units_10k_desc": "10,000 lifetime paid units.",
+  "ach_units_10k_title": "Ten thousand sold",
+  "ach_units_1k_desc": "1,000 lifetime paid units.",
+  "ach_units_1k_title": "A thousand sold",
   "app_enable_sounds": "Click to enable drop sounds",
   "app_enable_sounds_dismiss": "no thanks",
   "app_footer_mute_hint": "press {key} to mute",
@@ -49,6 +372,10 @@
   "boss_slain_xp": "slain in {days} · +{xp} XP",
   "boss_slay_yes": "Yes, slay it",
   "boss_slaying": "Landing the blow…",
+  "boss_title_anrs": "ANRs",
+  "boss_title_anrs_in": "ANRs in {version}",
+  "boss_title_crashes": "Crashes",
+  "boss_title_crashes_in": "Crashes in {version}",
   "boss_unit_crashes": "crashes",
   "boss_unit_users": "users",
   "breakdown_empty": "Nothing here yet.",
@@ -313,6 +640,7 @@
   "metric_subscribers": "subscribers",
   "metric_units": "units",
   "metric_xp": "XP",
+  "mystery_day": "{weekday} {date}",
   "mystery_dismiss": "Dismiss",
   "mystery_expected": "expected",
   "mystery_kind_dip": "dip",
@@ -324,8 +652,128 @@
   "mystery_note_aria": "Your explanation for: {title}",
   "mystery_note_placeholder": "What do you think happened?",
   "mystery_observed": "observed",
+  "mystery_phrase_appeared": "appeared out of nothing",
+  "mystery_phrase_changed": "changed",
+  "mystery_phrase_doubled": "doubled",
+  "mystery_phrase_dropped": "dropped {pct}%",
+  "mystery_phrase_held_still": "held still",
+  "mystery_phrase_jumped": "jumped {pct}%",
+  "mystery_phrase_quadrupled": "quadrupled",
+  "mystery_phrase_tripled": "tripled",
   "mystery_ratio": "ratio",
+  "mystery_series_cancellations": "cancellations",
+  "mystery_series_installs": "installs",
+  "mystery_series_refunds": "refunds",
+  "mystery_series_revenue": "revenue",
+  "mystery_series_units": "units sold",
   "mystery_solve": "Solve",
+  "mystery_title_dip": "{source} {series} {phrase} on {day}",
+  "mystery_title_new_country_cluster": [
+    {
+      "declarations": [
+        "input count",
+        "input countText",
+        "input day",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "{countText} new country settled on {day} — what happened?",
+        "countPlural=other": "{countText} new countries settled on {day} — what happened?"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "mystery_title_plain": "{source} {series} on {day}",
+  "mystery_title_record": "Record day: {value} {series} on {source}, {day}",
+  "mystery_title_refund_spike": "{count} refunds on {source} on {day} — usually {usual}",
+  "mystery_title_silence": "{source} has gone quiet since {day}",
+  "mystery_title_spike": "{source} {series} {phrase} on {day} — why?",
+  "mystery_why_measured": "{observed} against a {days}-day median of {expected} (z {z})",
+  "mystery_why_new_country_cluster": [
+    {
+      "declarations": [
+        "input count",
+        "input countText",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "{countText} country bought for the first time on the same day",
+        "countPlural=other": "{countText} countries bought for the first time on the same day"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "mystery_why_record": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "higher than any of the previous {count} day",
+        "countPlural=other": "higher than any of the previous {count} days"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "mystery_why_refund_spike": "{count} refunds against a usual {usual}",
+  "mystery_why_silence": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "{count} completed day with no rows at all, after reporting on {reported} of the previous 7",
+        "countPlural=other": "{count} completed days with no rows at all, after reporting on {reported} of the previous 7"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "mystery_why_silence_lag": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "{count} completed day with no rows at all, after reporting on {reported} of the previous 7 — and that is already allowing for this store's {lag} day settlement lag",
+        "countPlural=other": "{count} completed days with no rows at all, after reporting on {reported} of the previous 7 — and that is already allowing for this store's {lag} day settlement lag"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "quest_auto_installs_week": "Installs: beat last week · {target}",
+  "quest_auto_revenue_month": "Beat last month's revenue · {target}",
+  "quest_auto_revenue_week": "Beat last week's revenue · {target}",
+  "quest_auto_settlements_month": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "Settle {count} new country this month",
+        "countPlural=other": "Settle {count} new countries this month"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "quest_auto_stars_week": "Beat last week's stars · {target}",
+  "quest_auto_units_week": "Units: beat last week · {target}",
+  "quest_auto_xp_week": "Earn {target} XP this week",
   "quest_completed": "completed",
   "quest_completed_xp": "completed · +{xp} XP",
   "quest_custom": "custom",
@@ -345,6 +793,16 @@
     }
   ],
   "quest_ended": "ended · {pct}",
+  "quest_error_bad_window_json": "window must be \"week\", \"month\", or \\{\"start\":\"…\",\"end\":\"…\"\\}",
+  "quest_error_custom_only": "only custom quests can be deleted",
+  "quest_error_not_found": "no such quest",
+  "quest_error_quests_disabled": "quests are not enabled",
+  "quest_error_target_positive": "target must be greater than zero",
+  "quest_error_unknown_metric": "unknown metric \"{value}\"",
+  "quest_error_unknown_window": "unknown window \"{value}\" (use week, month or explicit days)",
+  "quest_error_window_end_format": "window end must be YYYY-MM-DD",
+  "quest_error_window_order": "window ends before it starts",
+  "quest_error_window_start_format": "window start must be YYYY-MM-DD",
   "quest_last_day": "last day",
   "quest_remove_aria": "Remove quest {title}",
   "quest_remove_title": "Remove this quest",
@@ -403,6 +861,137 @@
   "recap_first_with_revenue": "first {unit} with revenue",
   "recap_footer_era_changed": "{from} → {to} · level {levelFrom} → {levelTo}",
   "recap_footer_era_same": "{era} era · level {level}",
+  "recap_highlight_best_day": "Best day on {day}: {value}",
+  "recap_highlight_chests_opened": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "{count} chest opened",
+        "countPlural=other": "{count} chests opened"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "recap_highlight_epic_drops": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "{count} epic drop",
+        "countPlural=other": "{count} epic drops"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "recap_highlight_era_reached": "Reached the {era} era",
+  "recap_highlight_legendary_drops": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "{count} legendary drop",
+        "countPlural=other": "{count} legendary drops"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "recap_highlight_level_up": "Level {from} → {to}",
+  "recap_highlight_most_countries": [
+    {
+      "declarations": [
+        "input count",
+        "input day",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "{count} new country on {day} alone",
+        "countPlural=other": "{count} new countries on {day} alone"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "recap_highlight_mysteries_solved": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "{count} mystery explained",
+        "countPlural=other": "{count} mysteries explained"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "recap_highlight_quests_completed": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "{count} quest completed",
+        "countPlural=other": "{count} quests completed"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "recap_highlight_settled": "Settled {flag} {country} on {day}",
+  "recap_highlight_settled_more": [
+    {
+      "declarations": [
+        "input count",
+        "input flag",
+        "input country",
+        "input day",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "Settled {flag} {country} on {day} (and {count} more country)",
+        "countPlural=other": "Settled {flag} {country} on {day} (and {count} more countries)"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "recap_highlight_top_country": "{flag} {country} was your biggest market",
+  "recap_highlight_unlocked": "Unlocked {title}",
+  "recap_highlight_unlocked_more": [
+    {
+      "declarations": [
+        "input count",
+        "input title",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "Unlocked {title} and {count} more achievement",
+        "countPlural=other": "Unlocked {title} and {count} more achievements"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
   "recap_installs": "installs",
   "recap_new_settlements": "New settlements",
   "recap_partial": "· so far",
