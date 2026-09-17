@@ -1,6 +1,12 @@
 import { mount } from 'svelte'
 import App from './App.svelte'
+import { initLocale } from './lib/locale'
 import './app.css'
+
+// Before anything renders, and before any `Intl` formatter is built: the whole
+// app reads the locale synchronously, so it has to be decided first or the
+// first frame would be in English and the second in something else.
+initLocale()
 
 const target = document.getElementById('app')
 if (!target) throw new Error('#app not found')

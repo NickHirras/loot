@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/nickhirras/loot/internal/bosses"
@@ -46,6 +47,11 @@ type Server struct {
 	// Bosses is optional too: without it /api/bosses answers "peace in the
 	// realm" rather than 404.
 	Bosses *bosses.Service
+
+	// index is the app shell with the configured language stamped into it,
+	// built once by indexBytes(); see spa.go.
+	indexOnce sync.Once
+	index     []byte
 
 	// hearth memoizes the globe aggregate; see hearth.go.
 	hearth hearthCache
@@ -191,6 +197,11 @@ func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {
 		"active_quests":    activeQuests,
 		"bosses_alive":     aliveBosses,
 		"display_currency": s.displayCurrency(),
+		// The language the dashboard was configured with, or "" when each
+		// reader's browser decides. The frontend resolves its own locale and
+		// reads this from the app shell instead; it travels here so a client
+		// that never sees the shell (a script, a future native app) can ask.
+		"language": strings.TrimSpace(s.Cfg.Language),
 		// apps is every product this Loot could be scoped to, and app the one
 		// it currently is. Both are always present, empty scope included.
 		"apps": s.knownProducts(pairs),

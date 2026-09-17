@@ -1,5 +1,6 @@
 import { defineConfig, type Plugin } from 'vite'
 import { svelte } from '@sveltejs/vite-plugin-svelte'
+import { paraglideVitePlugin } from '@inlang/paraglide-js'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
@@ -38,7 +39,22 @@ function stampServiceWorker(): Plugin {
 const backend = process.env.LOOT_BACKEND ?? 'http://localhost:8080'
 
 export default defineConfig({
-  plugins: [svelte(), keepDist(), stampServiceWorker()],
+  plugins: [
+    // Compiles web/messages/*.json into src/paraglide/ before anything imports
+    // it. `globalVariable` is the whole strategy on purpose: locale resolution
+    // is main.ts's job (see src/lib/locale.ts), so Paraglide must not read a
+    // cookie, a URL or navigator.languages behind its back. `baseLocale` is
+    // only there so a message called before initLocale() answers in English
+    // instead of throwing.
+    paraglideVitePlugin({
+      project: './project.inlang',
+      outdir: './src/paraglide',
+      strategy: ['globalVariable', 'baseLocale'],
+    }),
+    svelte(),
+    keepDist(),
+    stampServiceWorker(),
+  ],
   build: {
     outDir: 'dist',
     emptyOutDir: true,

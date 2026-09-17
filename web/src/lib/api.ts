@@ -26,6 +26,7 @@ import type {
   VaultRange,
   VaultSummary,
 } from './types'
+import { currentLocale } from './locale'
 
 /**
  * The app scope, as a plain module variable rather than as reactive state.
@@ -60,16 +61,36 @@ function scopeQuery(): string {
   return currentScope ? `?app=${encodeURIComponent(currentScope)}` : ''
 }
 
+/**
+ * The one fetch in this file.
+ *
+ * Everything goes through here so that `Accept-Language` cannot drift: the
+ * server is told which language the page is in on every request, including the
+ * ones that only write. Nothing reads it back yet — the API still answers in
+ * English — but the header is what a later release will translate against, and
+ * a header added in one of three places is a header that is wrong in two.
+ */
+function request(path: string, init: RequestInit = {}): Promise<Response> {
+  return fetch(path, {
+    ...init,
+    headers: {
+      Accept: 'application/json',
+      'Accept-Language': currentLocale(),
+      ...init.headers,
+    },
+  })
+}
+
 async function getJSON<T>(path: string): Promise<T> {
-  const res = await fetch(path, { headers: { Accept: 'application/json' } })
+  const res = await request(path)
   if (!res.ok) throw new Error(`${path}: ${res.status} ${res.statusText}`)
   return (await res.json()) as T
 }
 
 async function postJSON(path: string, body: unknown): Promise<Response> {
-  const res = await fetch(path, {
+  const res = await request(path, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   })
   if (!res.ok) throw new Error(await errorText(res, path))
@@ -240,10 +261,7 @@ export async function createQuest(req: NewQuest): Promise<Quest> {
 
 /** Removes a custom quest. Generated ones expire on their own instead. */
 export async function deleteQuest(id: string): Promise<void> {
-  const res = await fetch(`/api/quests/${encodeURIComponent(id)}`, {
-    method: 'DELETE',
-    headers: { Accept: 'application/json' },
-  })
+  const res = await request(`/api/quests/${encodeURIComponent(id)}`, { method: 'DELETE' })
   if (!res.ok) throw new Error(await errorText(res, '/api/quests'))
 }
 

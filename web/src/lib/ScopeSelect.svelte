@@ -2,6 +2,8 @@
   import { fetchApps } from './api'
   import { scope } from './scope.svelte'
   import type { AppProduct } from './types'
+  import { integer } from './types'
+  import { m } from '../paraglide/messages'
 
   /**
    * The app scope selector: "All apps ▾", and a list of everything this Loot
@@ -70,7 +72,7 @@
     }}
     aria-haspopup="listbox"
     aria-expanded={scope.open}
-    title={scope.active ? `Showing ${scope.current} only — click to change` : 'Showing every app'}
+    title={scope.active ? m.scope_title_scoped({ app: scope.current }) : m.scope_title_all()}
   >
     <span class="name">{scope.label}</span>
     <span class="caret" aria-hidden="true">▾</span>
@@ -78,19 +80,19 @@
       <!-- Something landed for another app while you were looking at this
            one. It did not render and did not play a sound; this is the only
            trace it leaves, and picking a scope clears it. -->
-      <span class="elsewhere" title="{scope.elsewhere} drop(s) landed for other apps">
-        +{scope.elsewhere} elsewhere
+      <span class="elsewhere" title={m.scope_elsewhere_title({ count: scope.elsewhere })}>
+        {m.scope_elsewhere({ count: scope.elsewhere })}
       </span>
     {/if}
   </button>
 
   {#if scope.open}
-    <ul class="menu" role="listbox" aria-label="App scope">
+    <ul class="menu" role="listbox" aria-label={m.scope_menu_label()}>
       <li>
         <button class="option" class:current={!scope.active} onclick={() => scope.set('')} role="option"
           aria-selected={!scope.active}>
-          <span class="opt-name">All apps</span>
-          <span class="opt-meta">everything you ship</span>
+          <span class="opt-name">{m.scope_all_apps()}</span>
+          <span class="opt-meta">{m.scope_all_apps_meta()}</span>
         </button>
       </li>
       {#each mapped as product (product.name)}
@@ -104,7 +106,7 @@
           >
             <span class="opt-name">{product.name}</span>
             {#if product.events}
-              <span class="opt-meta">{product.events.toLocaleString()} events</span>
+              <span class="opt-meta">{m.scope_events({ count: integer(product.events) })}</span>
             {/if}
           </button>
         </li>
@@ -112,7 +114,7 @@
       {#if unmapped.length}
         <!-- Apps a source reported that no `apps:` entry claims. They are
              still selectable: the mapping is a convenience, not a gate. -->
-        <li class="divider"><span>unmapped</span></li>
+        <li class="divider"><span>{m.scope_unmapped()}</span></li>
         {#each unmapped as product (product.name)}
           <li>
             <button
@@ -124,7 +126,7 @@
             >
               <span class="opt-name mono">{product.name}</span>
               {#if product.events}
-                <span class="opt-meta">{product.events.toLocaleString()} events</span>
+                <span class="opt-meta">{m.scope_events({ count: integer(product.events) })}</span>
               {/if}
             </button>
           </li>

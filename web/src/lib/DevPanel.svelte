@@ -2,6 +2,8 @@
   import { fireFakeDrop } from './api'
   import type { FakeDropRequest } from './api'
   import { RARITIES } from './types'
+  import { rarityLabel } from './labels'
+  import { m } from '../paraglide/messages'
 
   let open = $state(false)
   let busy = $state('')
@@ -48,39 +50,39 @@
 
 <aside class="dev" class:open>
   <button class="toggle" onclick={() => (open = !open)} aria-expanded={open}>
-    <span class="wrench" aria-hidden="true">⚙</span> dev
+    <span class="wrench" aria-hidden="true">⚙</span> {m.dev_toggle()}
   </button>
 
   {#if open}
     <div class="panel">
-      <p class="hint">Fire a synthetic drop through the real pipeline.</p>
+      <p class="hint">{m.dev_hint()}</p>
 
       <div class="grid">
         {#each RARITIES as rarity (rarity)}
           <button class="fire rarity-{rarity}" onclick={() => fire(rarity)} disabled={busy === rarity}>
-            {rarity}
+            {rarityLabel(rarity)}
           </button>
         {/each}
       </div>
 
       <div class="scenarios">
         <button class="scenario" onclick={fakeChest} disabled={busy === 'chest'}>
-          📦 Fake chest (5 drops)
+          📦 {m.dev_fake_chest()}
         </button>
         <button class="scenario" onclick={fakeSalesDay} disabled={busy === 'sales_day'}>
-          💶 Fake sales day (EUR 250)
+          💶 {m.dev_fake_sales_day()}
         </button>
       </div>
 
       <div class="country">
         <input
           bind:value={country}
-          placeholder="country (optional)"
+          placeholder={m.dev_country_placeholder()}
           maxlength="2"
-          aria-label="Country code for the fake drop"
+          aria-label={m.dev_country_aria()}
         />
-        <button onclick={randomCountry} title="Pick a random country">🎲</button>
-        <button onclick={() => (country = '')} title="Clear the country">✕</button>
+        <button onclick={randomCountry} title={m.dev_random_country()}>🎲</button>
+        <button onclick={() => (country = '')} title={m.dev_clear_country()}>✕</button>
       </div>
 
       {#if error}

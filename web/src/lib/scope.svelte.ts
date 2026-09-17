@@ -1,4 +1,5 @@
 import { untrack } from 'svelte'
+import { m } from '../paraglide/messages'
 import { setScope } from './api'
 import { appOf, withApp } from './route.svelte'
 
@@ -73,7 +74,7 @@ class ScopeState {
 
   /** What the selector's button reads. */
   get label(): string {
-    return this.current || 'All apps'
+    return this.current || m.scope_all_apps()
   }
 
   /**

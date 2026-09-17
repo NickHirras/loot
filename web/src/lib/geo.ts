@@ -13,6 +13,7 @@ import type { Feature, FeatureCollection, Geometry, MultiLineString } from 'geoj
 import topology from 'world-atlas/countries-110m.json'
 import { feature, mesh } from 'topojson-client'
 import type { GeometryCollection, Topology } from 'topojson-specification'
+import { currentLocale } from './locale'
 
 /**
  * ISO 3166-1 alpha-2 to numeric, packed five characters per country
@@ -217,14 +218,28 @@ export function shapeOf(iso2: string): Feature<Geometry, CountryProperties> | nu
   return byNumeric.get(numeric) ?? null
 }
 
-const displayNames = (() => {
-  try {
-    return new Intl.DisplayNames(undefined, { type: 'region' })
-  } catch {
-    return null
-  }
-})()
+/**
+ * Region names, per locale. Built lazily rather than at import time, because
+ * this module is imported before main.ts has decided what language the page is
+ * in — and a `DisplayNames` built too early would name every country in
+ * English for the rest of the session.
+ */
+const displayNamesByLocale = new Map<string, Intl.DisplayNames | null>()
 
+function displayNames(locale: string): Intl.DisplayNames | null {
+  let names = displayNamesByLocale.get(locale)
+  if (names === undefined) {
+    try {
+      names = new Intl.DisplayNames(locale, { type: 'region' })
+    } catch {
+      names = null
+    }
+    displayNamesByLocale.set(locale, names)
+  }
+  return names
+}
+
+/** Keyed by locale *and* code: "DE" is Germany here and Deutschland there. */
 const nameCache = new Map<string, string>()
 
 /**
@@ -234,17 +249,19 @@ const nameCache = new Map<string, string>()
  */
 export function countryName(iso2: string): string {
   const code = iso2.toUpperCase()
-  const cached = nameCache.get(code)
+  const locale = currentLocale()
+  const key = `${locale}/${code}`
+  const cached = nameCache.get(key)
   if (cached) return cached
 
   let name = ''
   try {
-    const resolved = displayNames?.of(code)
+    const resolved = displayNames(locale)?.of(code)
     if (resolved && resolved !== code) name = resolved
   } catch {
     // An invalid code throws rather than returning undefined.
   }
   if (!name) name = shapeOf(code)?.properties?.name ?? code
-  nameCache.set(code, name)
+  nameCache.set(key, name)
   return name
 }

@@ -2,6 +2,8 @@
   import { tierColor } from './palette'
   import type { Achievement } from './types'
   import { TIER_RARITY, TIER_XP, currency, dayLabel, integer } from './types'
+  import { achievementTierLabel, rarityLabel } from './labels'
+  import { m } from '../paraglide/messages'
 
   let {
     achievement,
@@ -26,13 +28,16 @@
   }
 
   /** "18 / 25 countries" for a ladder; nothing for a one-off. */
-  const progressLine = $derived(
-    achievement.progress_target > 1
-      ? `${format(achievement.progress_value)} / ${format(achievement.progress_target)}${
-          achievement.unit ? ` ${achievement.unit}` : ''
-        }`
-      : '',
-  )
+  const progressLine = $derived.by(() => {
+    if (achievement.progress_target <= 1) return ''
+    const value = format(achievement.progress_value)
+    const target = format(achievement.progress_target)
+    // `unit` is the server's own noun ("countries", "chests") and still
+    // arrives in English; translating it is a later phase's job.
+    return achievement.unit
+      ? m.ach_progress_unit({ value, target, unit: achievement.unit })
+      : m.ach_progress({ value, target })
+  })
 
   const earned = $derived(
     achievement.unlocked_at ? dayLabel(achievement.unlocked_at.slice(0, 10), true) : '',
@@ -58,8 +63,15 @@
   <div class="head">
     <span class="medal" aria-hidden="true">{unlocked ? '★' : '☆'}</span>
     <h4>{achievement.title}</h4>
-    <span class="tier" title="{achievement.tier} · pays a {TIER_RARITY[achievement.tier]} drop worth {TIER_XP[achievement.tier]} XP">
-      {achievement.tier}
+    <span
+      class="tier"
+      title={m.ach_tier_title({
+        tier: achievementTierLabel(achievement.tier),
+        rarity: rarityLabel(TIER_RARITY[achievement.tier]),
+        xp: integer(TIER_XP[achievement.tier]),
+      })}
+    >
+      {achievementTierLabel(achievement.tier)}
     </span>
   </div>
 
@@ -67,7 +79,7 @@
     <p class="when">
       {earned}
       {#if backfilled}
-        <span class="backfill" title="Earned before Loot was watching; dated to the day it happened">backfilled</span>
+        <span class="backfill" title={m.ach_backfilled_title()}>{m.ach_backfilled()}</span>
       {/if}
     </p>
   {:else if progressLine}
@@ -76,7 +88,7 @@
     </div>
     <p class="when progress">{progressLine}</p>
   {:else}
-    <p class="when faint">not yet</p>
+    <p class="when faint">{m.ach_not_yet()}</p>
   {/if}
 
   <p class="desc">{achievement.description}</p>

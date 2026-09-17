@@ -478,6 +478,20 @@ Rates are the ECB daily reference rates, fetched from [frankfurter.app](https://
 ./bin/loot fx recompute    # re-convert every stored amount (stop the server first)
 ```
 
+### Language
+
+The dashboard picks a language for itself, and `language` says whether you get a say:
+
+```yaml
+language: "auto"   # or a BCP-47 tag: "de", "pt-BR", "zh-Hans"
+```
+
+`auto` (the default, and what an empty value means) lets each reader's browser decide, negotiated against the languages Loot ships: `en`, `de`, `es`, `fr`, `it`, `pt-BR`, `ja`, `ko`, `zh-Hans`, `ru`, `nl`. A tag names one of those instead, for everybody who opens this Loot. Either way `?lang=xx` on the URL wins — `http://localhost:8080/?lang=de` — and is remembered in that browser afterwards, which makes it the quick way to check a translation or to read your own dashboard in a different language from the household's.
+
+Numbers, currencies and dates follow the chosen language too, through `Intl`, so the same revenue figure reads `$1,234.00` or `1.234,00 $` without a second setting.
+
+**Only English ships today.** The other languages are wired up and empty: anything untranslated falls back to English, so nothing breaks and nothing is half-translated. The translations themselves arrive in a later release.
+
 ## The vault
 
 The dashboard's **Vault** tab draws this: a range picker (7d/30d/90d/365d, remembered), stat tiles with a change against the preceding window, revenue per day as an area chart stacked by source with units underneath, and breakdowns by source, app and country. `GET /api/vault/summary?range=7d|30d|90d|365d` is the money view behind it. Its cardinal rule is that **only ledger rows count as revenue**:

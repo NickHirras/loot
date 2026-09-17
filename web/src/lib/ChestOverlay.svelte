@@ -3,6 +3,9 @@
   import { loot } from './state.svelte'
   import type { ChestSummary, Rarity } from './types'
   import { RARITIES, flagEmoji, integer, money } from './types'
+  import { currentLocale } from './locale'
+  import { rarityLabel } from './labels'
+  import { m } from '../paraglide/messages'
 
   const phase = $derived(loot.chestPhase)
   const chests = $derived(loot.chests)
@@ -25,18 +28,18 @@
 
   /** "6 chests · Aug 12 – Aug 17", the label over a bulk haul. */
   function bulkLabel(days: string[]): string {
-    if (days.length === 0) return 'Every chest'
+    if (days.length === 0) return m.chest_bulk_every()
     const span =
       days.length === 1
         ? dayLabelLong(days[0])
         : `${dayLabelLong(days[0])} – ${dayLabelLong(days[days.length - 1])}`
-    return `${days.length} ${days.length === 1 ? 'chest' : 'chests'} · ${span}`
+    return m.chest_bulk_label({ count: days.length, span })
   }
 
   function dayLabelLong(day: string): string {
     const parsed = new Date(`${day}T00:00:00Z`)
     if (Number.isNaN(parsed.getTime())) return day
-    return parsed.toLocaleDateString(undefined, {
+    return parsed.toLocaleDateString(currentLocale(), {
       weekday: 'short',
       month: 'short',
       day: 'numeric',
@@ -49,7 +52,7 @@
   class="scrim"
   role="dialog"
   aria-modal="true"
-  aria-label="Daily chest"
+  aria-label={m.chest_title()}
   tabindex="-1"
   onclick={(e) => {
     if (e.target === e.currentTarget && !loot.chestBusy) loot.hideChest()
@@ -59,20 +62,18 @@
   }}
 >
   <div class="sheet" class:wide={phase === 'cascade' || phase === 'done'}>
-    <button class="close" onclick={() => loot.hideChest()} disabled={loot.chestBusy} aria-label="Close">✕</button>
+    <button class="close" onclick={() => loot.hideChest()} disabled={loot.chestBusy} aria-label={m.chest_close()}>✕</button>
 
     {#if phase === 'idle'}
       <header class="head">
         <ChestIcon size={40} glow={chests.length > 0} idle={chests.length > 0} />
         <div>
-          <h2>Daily chest</h2>
+          <h2>{m.chest_title()}</h2>
           <p class="sub">
             {#if chests.length}
-              {integer(loot.chestCount)}
-              {loot.chestCount === 1 ? 'drop' : 'drops'} waiting in {chests.length}
-              {chests.length === 1 ? 'chest' : 'chests'}.
+              {m.chest_waiting({ drops: loot.chestCount, chests: chests.length })}
             {:else}
-              Nothing waiting. A day of store sales lands here as one chest.
+              {m.chest_nothing_waiting()}
             {/if}
           </p>
         </div>
@@ -87,29 +88,32 @@
                 <span class="iso mono">{chest.date}</span>
               </div>
               <div class="counts">
-                <span class="count">{chest.count} {chest.count === 1 ? 'drop' : 'drops'}</span>
-                <span class="xp">+{integer(chest.xp)} XP</span>
+                <span class="count">{m.chest_row_drops({ count: chest.count })}</span>
+                <span class="xp">{m.chest_row_xp({ xp: integer(chest.xp) })}</span>
               </div>
               <ul class="dots">
                 {#each dots(chest) as dot (dot.rarity)}
-                  <li class="dot rarity-{dot.rarity}" title="{dot.count} {dot.rarity}">
+                  <li
+                    class="dot rarity-{dot.rarity}"
+                    title={m.chest_dot_title({ count: dot.count, rarity: rarityLabel(dot.rarity) })}
+                  >
                     <span class="pip"></span>{dot.count}
                   </li>
                 {/each}
               </ul>
-              <button class="open" onclick={() => loot.open(chest.date)} disabled={loot.chestBusy}>Open</button>
+              <button class="open" onclick={() => loot.open(chest.date)} disabled={loot.chestBusy}>{m.chest_open()}</button>
             </li>
           {/each}
         </ul>
 
         <button class="primary" onclick={() => loot.open()} disabled={loot.chestBusy}>
-          Open the oldest chest
+          {m.chest_open_oldest()}
         </button>
 
         {#if chests.length > 1}
           <button class="bulk" onclick={() => loot.openAll()} disabled={loot.chestBusy}>
-            Open all · {chests.length} chests
-            <span class="bulk-sub">{integer(loot.chestCount)} drops in one go</span>
+            {m.chest_open_all({ count: chests.length })}
+            <span class="bulk-sub">{m.chest_open_all_sub({ count: integer(loot.chestCount) })}</span>
           </button>
         {/if}
       {/if}
@@ -124,38 +128,38 @@
         </div>
         <p class="opening">
           {#if bulk}
-            Opening every chest…
+            {m.chest_opening_all()}
           {:else}
-            Opening {loot.chestDate || 'the chest'}…
+            {m.chest_opening({ what: loot.chestDate || m.chest_the_chest() })}
           {/if}
         </p>
       </div>
     {:else if bulk}
       <div class="stage">
         <div class="progress">
-          <span class="counter mono">{revealed.length} / {total} drops</span>
+          <span class="counter mono">{m.chest_progress_drops({ revealed: revealed.length, total })}</span>
           {#if phase === 'cascade'}
-            <button class="skip" onclick={() => loot.skipCascade()}>Skip</button>
+            <button class="skip" onclick={() => loot.skipCascade()}>{m.chest_skip()}</button>
           {/if}
         </div>
 
         {#if phase === 'done'}
           <div class="final">
             <p class="final-label">{bulkLabel(loot.chestDates)}</p>
-            <p class="final-xp">+{integer(loot.chestHaulXP)} XP</p>
+            <p class="final-xp">{m.chest_haul_xp({ xp: integer(loot.chestHaulXP) })}</p>
 
             <ul class="tally">
               {#each RARITIES as rarity (rarity)}
                 <li class="tally-item rarity-{rarity}" class:empty={!byRarity[rarity]}>
                   <span class="tally-count">{byRarity[rarity] ?? 0}</span>
-                  <span class="tally-name">{rarity}</span>
+                  <span class="tally-name">{rarityLabel(rarity)}</span>
                 </li>
               {/each}
             </ul>
 
             {#if best}
               <div class="best rarity-{best.rarity}">
-                <span class="badge">best · {best.rarity}</span>
+                <span class="badge">{m.chest_best({ rarity: rarityLabel(best.rarity) })}</span>
                 <span class="best-title">{best.title}</span>
               </div>
             {/if}
@@ -170,18 +174,18 @@
                   </li>
                 {/each}
                 {#if highlightCount > highlights.length}
-                  <li class="more">and {highlightCount - highlights.length} more below</li>
+                  <li class="more">{m.chest_more_below({ count: highlightCount - highlights.length })}</li>
                 {/if}
               </ul>
             {/if}
 
-            <button class="primary" onclick={() => loot.hideChest()}>Nice.</button>
+            <button class="primary" onclick={() => loot.hideChest()}>{m.chest_nice()}</button>
           </div>
         {/if}
 
         <ul class="grid">
           {#each revealed as drop (drop.id)}
-            <li class="cell rarity-{drop.rarity}" title="{drop.title} · +{drop.xp} XP">
+            <li class="cell rarity-{drop.rarity}" title={m.chest_cell_title({ title: drop.title, xp: drop.xp })}>
               <span class="pip"></span>
               <span class="cell-title">{drop.title}</span>
               <span class="cell-xp">+{drop.xp}</span>
@@ -192,20 +196,20 @@
     {:else}
       <div class="stage">
         <div class="progress">
-          <span class="counter mono">{revealed.length} / {total}</span>
+          <span class="counter mono">{m.chest_progress({ revealed: revealed.length, total })}</span>
           {#if phase === 'cascade'}
-            <button class="skip" onclick={() => loot.skipCascade()}>Skip</button>
+            <button class="skip" onclick={() => loot.skipCascade()}>{m.chest_skip()}</button>
           {/if}
         </div>
 
         {#if phase === 'cascade' && current}
           {#key current.id}
             <article class="big rarity-{current.rarity}">
-              <span class="badge">{current.rarity}</span>
+              <span class="badge">{rarityLabel(current.rarity)}</span>
               <h3>{current.title}</h3>
               {#if current.subtitle}<p class="sub">{current.subtitle}</p>{/if}
               <div class="meta">
-                <span class="xp-big">+{integer(current.xp)} XP</span>
+                <span class="xp-big">{m.chest_haul_xp({ xp: integer(current.xp) })}</span>
                 {#if money(current.amount, current.currency)}
                   <span class="chip money">{money(current.amount, current.currency)}</span>
                 {/if}
@@ -216,15 +220,15 @@
           {/key}
         {:else if phase === 'done'}
           <div class="final">
-            <p class="final-label">Chest of {loot.chestDate}</p>
-            <p class="final-xp">+{integer(loot.chestHaulXP)} XP</p>
+            <p class="final-label">{m.chest_of_date({ date: loot.chestDate })}</p>
+            <p class="final-xp">{m.chest_haul_xp({ xp: integer(loot.chestHaulXP) })}</p>
             {#if best}
               <div class="best rarity-{best.rarity}">
-                <span class="badge">best · {best.rarity}</span>
+                <span class="badge">{m.chest_best({ rarity: rarityLabel(best.rarity) })}</span>
                 <span class="best-title">{best.title}</span>
               </div>
             {/if}
-            <button class="primary" onclick={() => loot.hideChest()}>Nice.</button>
+            <button class="primary" onclick={() => loot.hideChest()}>{m.chest_nice()}</button>
           </div>
         {/if}
 

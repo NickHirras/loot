@@ -8,6 +8,8 @@
   import { vesselName } from './sea'
   import { loot } from './state.svelte'
   import { currency, flagEmoji, integer, timeAgo } from './types'
+  import { eraLabel, tierLabel } from './labels'
+  import { m } from '../paraglide/messages'
 
   // The page owns the polling: mounting starts it, leaving stops it. The
   // store already untracks its own setup; untracking here as well means a
@@ -61,25 +63,31 @@
     Ambient mode: the globe and nothing else. Everything on top of it is a
     label, not a control, apart from the two buttons in the corner.
   -->
-  <section class="stage" class:idle aria-label="The Hearth, ambient">
+  <section class="stage" class:idle aria-label={m.hearth_ambient_label()}>
     <Globe countries={settlements} fleet={data?.fleet ?? []} capital={data?.capital ?? ''} {code} ambient />
 
     <div class="overlay top">
       <div class="era-mini">
-        <span class="era-name">{data?.era?.name ?? 'Camp'}</span>
-        <span class="era-xp">{integer(hearth.totalXP)} XP</span>
+        <span class="era-name">{eraLabel(data?.era?.name ?? 'Camp')}</span>
+        <span class="era-xp">{m.hearth_xp({ xp: integer(hearth.totalXP) })}</span>
         {#if data?.era?.next_name}
-          <span class="era-next">{integer(hearth.toNextEra)} to {data.era.next_name}</span>
+          <span class="era-next">
+            {m.hearth_era_to_next_short({ xp: integer(hearth.toNextEra), era: eraLabel(data.era.next_name) })}
+          </span>
         {/if}
       </div>
       <div class="bar wide"><div class="fill" style="width: {progress}%"></div></div>
     </div>
 
     <div class="overlay corner">
-      <button class="ghost" onclick={() => loot.toggleMute()} title={loot.muted ? 'Unmute' : 'Mute'}>
+      <button
+        class="ghost"
+        onclick={() => loot.toggleMute()}
+        title={loot.muted ? m.hearth_ambient_unmute() : m.hearth_ambient_mute()}
+      >
         {loot.muted ? '🔇' : '🔊'}
       </button>
-      <button class="ghost" onclick={() => router.exitAmbient()} title="Leave ambient mode (Esc)">✕</button>
+      <button class="ghost" onclick={() => router.exitAmbient()} title={m.hearth_ambient_leave()}>✕</button>
     </div>
 
     <div class="overlay ticker">
@@ -91,26 +99,26 @@
           <span class="when">{timeAgo(drop.created_at)}</span>
         </span>
       {:else}
-        <span class="tick quiet">Waiting for the world to wake up…</span>
+        <span class="tick quiet">{m.hearth_ticker_empty()}</span>
       {/each}
     </div>
   </section>
 {:else}
-  <section class="hearth" aria-label="Hearth">
+  <section class="hearth" aria-label={m.hearth_title()}>
     <div class="bar-head">
       <div class="titles">
-        <h2>Hearth</h2>
+        <h2>{m.hearth_title()}</h2>
         {#if data?.capital}
-          <span class="capital">capital {flagEmoji(data.capital)} {capitalName}</span>
+          <span class="capital">{m.hearth_capital({ flag: flagEmoji(data.capital), name: capitalName })}</span>
         {/if}
       </div>
-      <button class="ambient-btn" onclick={() => router.enterAmbient()}>⤢ Ambient</button>
+      <button class="ambient-btn" onclick={() => router.enterAmbient()}>⤢ {m.hearth_ambient()}</button>
     </div>
 
     {#if hearth.error && !data}
       <p class="note error">{hearth.error}</p>
     {:else if !data}
-      <p class="note">Lighting the fire…</p>
+      <p class="note">{m.hearth_loading()}</p>
     {:else}
       <div class="layout">
         <div class="globe-card">
@@ -119,39 +127,39 @@
                hover, and telling someone to scroll on a canvas that will not
                is worse than saying nothing. -->
           <p class="hint">
-            <span class="pointer-hint">Drag to turn · scroll to zoom · double click to recentre</span>
-            <span class="touch-hint">Drag to turn · tap a marker · double tap to recentre</span>
+            <span class="pointer-hint">{m.hearth_hint_pointer()}</span>
+            <span class="touch-hint">{m.hearth_hint_touch()}</span>
           </p>
         </div>
 
         <aside class="panel">
           <div class="card era">
             <div class="era-line">
-              <span class="era-name">{data.era.name}</span>
-              <span class="era-xp">{integer(hearth.totalXP)} XP</span>
+              <span class="era-name">{eraLabel(data.era.name)}</span>
+              <span class="era-xp">{m.hearth_xp({ xp: integer(hearth.totalXP) })}</span>
             </div>
             <div class="bar"><div class="fill" style="width: {progress}%"></div></div>
             <p class="era-sub">
               {#if data.era.next_name}
-                {integer(hearth.toNextEra)} XP to {data.era.next_name}
+                {m.hearth_era_to_next({ xp: integer(hearth.toNextEra), era: eraLabel(data.era.next_name) })}
               {:else}
-                The top of the ladder. Nothing left to become.
+                {m.hearth_era_top()}
               {/if}
             </p>
           </div>
 
           <div class="card">
-            <h3>Civilization</h3>
+            <h3>{m.hearth_civilization()}</h3>
             <dl class="facts">
-              <div><dt>Settlements</dt><dd>{integer(settlements.length)}</dd></div>
-              <div><dt>Population</dt><dd>{integer(data.population)}</dd></div>
-              <div><dt>Revenue</dt><dd>{currency(data.revenue_base, code)}</dd></div>
+              <div><dt>{m.hearth_settlements()}</dt><dd>{integer(settlements.length)}</dd></div>
+              <div><dt>{m.hearth_population()}</dt><dd>{integer(data.population)}</dd></div>
+              <div><dt>{m.hearth_revenue()}</dt><dd>{currency(data.revenue_base, code)}</dd></div>
             </dl>
           </div>
 
           {#if fleet.length}
             <div class="card">
-              <h3>The fleet</h3>
+              <h3>{m.hearth_fleet()}</h3>
               <ul class="fleet">
                 {#each fleet as ship (ship.source)}
                   <li>
@@ -166,19 +174,19 @@
                   </li>
                 {/each}
               </ul>
-              <p class="fine">People whose store never says where they are. They sail.</p>
+              <p class="fine">{m.hearth_fleet_fine()}</p>
             </div>
           {/if}
 
           <div class="card grow">
-            <h3>Settlements</h3>
+            <h3>{m.hearth_settlements()}</h3>
             <ul class="settlements">
               {#each settlements as place (place.country)}
                 <li class:capital-row={place.country === data.capital}>
                   <span class="flag">{flagEmoji(place.country)}</span>
                   <span class="place">
                     <span class="place-name">{countryName(place.country)}</span>
-                    <span class="tier tier-{place.tier?.index ?? 0}">{place.tier?.name ?? 'outpost'}</span>
+                    <span class="tier tier-{place.tier?.index ?? 0}">{tierLabel(place.tier?.name ?? 'outpost')}</span>
                   </span>
                   <span class="numbers">
                     <span class="pop">{integer(place.population)}</span>
@@ -186,13 +194,13 @@
                   </span>
                 </li>
               {:else}
-                <li class="empty">No country has bought anything yet. The globe is dark.</li>
+                <li class="empty">{m.hearth_settlements_empty()}</li>
               {/each}
             </ul>
           </div>
 
           <div class="card">
-            <h3>Recent arrivals</h3>
+            <h3>{m.hearth_arrivals()}</h3>
             <ul class="arrivals">
               {#each (data.recent ?? []).slice(0, 12) as drop (drop.id)}
                 <li style="--r: {rarityColor(drop.rarity)}">
@@ -202,7 +210,7 @@
                   <span class="when">{timeAgo(drop.created_at)}</span>
                 </li>
               {:else}
-                <li class="empty">Nothing has landed with a country attached yet.</li>
+                <li class="empty">{m.hearth_arrivals_empty()}</li>
               {/each}
             </ul>
           </div>

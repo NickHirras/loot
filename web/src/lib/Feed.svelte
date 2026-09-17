@@ -1,6 +1,8 @@
 <script lang="ts">
   import DropCard from './DropCard.svelte'
   import { loot } from './state.svelte'
+  import { slots } from './markup'
+  import { m } from '../paraglide/messages'
 
   // Relative timestamps need a clock, not a rebuild. Keying the list on a tick
   // re-created every card once a minute: arrival animations replayed and the
@@ -26,20 +28,21 @@
     observer.observe(sentinel)
     return () => observer.disconnect()
   })
+
+  // Two <code> spans inside one sentence; see lib/markup.ts for why the
+  // sentence stays whole and the markup is a placeholder in it.
+  const emptyBody = $derived(slots((slot) => m.feed_empty_body({ hook: slot, dev: slot })))
 </script>
 
-<section class="feed" aria-label="Drop feed">
+<section class="feed" aria-label={m.feed_label()}>
   {#if loot.loading}
-    <p class="note">Opening the vault…</p>
+    <p class="note">{m.feed_loading()}</p>
   {:else if loot.error && loot.drops.length === 0}
     <p class="note error">{loot.error}</p>
   {:else if loot.drops.length === 0}
     <div class="empty">
-      <p class="big">No loot yet.</p>
-      <p>
-        Point a RevenueCat webhook at <code>/hooks/revenuecat</code>, add Flathub apps to your config, or run with
-        <code>dev.enabled</code> and fire a test drop.
-      </p>
+      <p class="big">{m.feed_empty_title()}</p>
+      <p>{emptyBody[0]}<code>/hooks/revenuecat</code>{emptyBody[1]}<code>dev.enabled</code>{emptyBody[2]}</p>
     </div>
   {:else}
     <ul class="list">
@@ -53,9 +56,9 @@
     <div class="sentinel" bind:this={sentinel}></div>
 
     {#if loot.loadingMore}
-      <p class="note">Digging deeper…</p>
+      <p class="note">{m.feed_loading_more()}</p>
     {:else if !loot.nextBefore && loot.drops.length > 20}
-      <p class="note">That is the whole hoard.</p>
+      <p class="note">{m.feed_end()}</p>
     {/if}
   {/if}
 </section>

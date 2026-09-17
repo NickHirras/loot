@@ -8,6 +8,8 @@
   import { loot } from './state.svelte'
   import type { Drop, HearthCountry, HearthVessel } from './types'
   import { currency, flagEmoji, integer } from './types'
+  import { tierLabel } from './labels'
+  import { m } from '../paraglide/messages'
 
   let {
     countries,
@@ -750,7 +752,11 @@
     }
 
     if (founding) {
-      pulses = push(pulses, { at: from, color: colour, start: now, duration: FOUND_MS, label: 'New settlement' }, MAX_PULSES)
+      pulses = push(
+        pulses,
+        { at: from, color: colour, start: now, duration: FOUND_MS, label: m.globe_new_settlement() },
+        MAX_PULSES,
+      )
     }
 
     // With no capital there is nowhere to send it, so the drop arrives at the
@@ -1006,7 +1012,7 @@
     onpointercancel={pointerUp}
     onpointerleave={() => (hovered = hoveredShip = null)}
     ondblclick={reset}
-    aria-label="A globe of every country you have sold in, and the fleet at sea"
+    aria-label={m.globe_aria_label()}
   ></canvas>
 
   {#if hovered}
@@ -1018,13 +1024,13 @@
       <div class="tip-head">
         <span class="flag">{flagEmoji(hovered.country.country)}</span>
         <span class="name">{hoveredName}</span>
-        <span class="tier">{hovered.country.tier?.name ?? 'outpost'}</span>
+        <span class="tier">{tierLabel(hovered.country.tier?.name ?? 'outpost')}</span>
       </div>
       <dl>
-        <div><dt>Population</dt><dd>{integer(hovered.country.population)}</dd></div>
-        <div><dt>Revenue</dt><dd>{currency(hovered.country.revenue_base, code)}</dd></div>
-        <div><dt>Drops</dt><dd>{integer(hovered.country.drops)}</dd></div>
-        <div><dt>First customer</dt><dd>{hovered.country.first_seen || '—'}</dd></div>
+        <div><dt>{m.globe_population()}</dt><dd>{integer(hovered.country.population)}</dd></div>
+        <div><dt>{m.globe_revenue()}</dt><dd>{currency(hovered.country.revenue_base, code)}</dd></div>
+        <div><dt>{m.globe_drops()}</dt><dd>{integer(hovered.country.drops)}</dd></div>
+        <div><dt>{m.globe_first_customer()}</dt><dd>{hovered.country.first_seen || '—'}</dd></div>
       </dl>
     </div>
   {/if}
@@ -1041,11 +1047,11 @@
       </div>
       <p class="why">{vesselWhy(hoveredShip.vessel.source)}</p>
       <dl>
-        <div><dt>Aboard</dt><dd>{integer(hoveredShip.vessel.population)}</dd></div>
+        <div><dt>{m.globe_aboard()}</dt><dd>{integer(hoveredShip.vessel.population)}</dd></div>
         {#if hoveredShip.vessel.revenue_base}
-          <div><dt>Revenue</dt><dd>{currency(hoveredShip.vessel.revenue_base, code)}</dd></div>
+          <div><dt>{m.globe_revenue()}</dt><dd>{currency(hoveredShip.vessel.revenue_base, code)}</dd></div>
         {/if}
-        <div><dt>Sailing since</dt><dd>{hoveredShip.vessel.first_seen || '—'}</dd></div>
+        <div><dt>{m.globe_sailing_since()}</dt><dd>{hoveredShip.vessel.first_seen || '—'}</dd></div>
       </dl>
     </div>
   {/if}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"io/fs"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -55,6 +56,21 @@ type harness struct {
 
 func newHarness(t *testing.T, dev bool) *harness {
 	t.Helper()
+
+	cfg := config.Default()
+	cfg.Dev.Enabled = dev
+
+	return newHarnessWith(t, cfg, fstest.MapFS{
+		"index.html":     &fstest.MapFile{Data: []byte("<!doctype html><title>Loot</title><div id=app></div>")},
+		"assets/app.js":  &fstest.MapFile{Data: []byte("console.log('loot')")},
+		"assets/app.css": &fstest.MapFile{Data: []byte("body{}")},
+	})
+}
+
+// newHarnessWith is newHarness with the configuration and the embedded frontend
+// spelled out, for the tests that are about one of those two things.
+func newHarnessWith(t *testing.T, cfg config.Config, static fs.FS) *harness {
+	t.Helper()
 	ctx := context.Background()
 
 	st, err := store.Open(ctx, filepath.Join(t.TempDir(), "loot.db"))
@@ -72,15 +88,6 @@ func newHarness(t *testing.T, dev bool) *harness {
 	p := pipeline.New(st, engine, b, quietLogger())
 	p.ChestEnabled = true
 	p.FX = fixedRates{"EUR": 0.8}
-
-	cfg := config.Default()
-	cfg.Dev.Enabled = dev
-
-	static := fstest.MapFS{
-		"index.html":     &fstest.MapFile{Data: []byte("<!doctype html><title>Loot</title><div id=app></div>")},
-		"assets/app.js":  &fstest.MapFile{Data: []byte("console.log('loot')")},
-		"assets/app.css": &fstest.MapFile{Data: []byte("body{}")},
-	}
 
 	sources := []core.Source{revenuecat.New("", quietLogger())}
 	s := server.New(cfg, st, b, p, sources, static, quietLogger())
@@ -203,6 +210,10 @@ func TestStatsEndpoint(t *testing.T) {
 	}
 	if body["display_currency"] != "USD" {
 		t.Fatalf("display_currency = %v", body["display_currency"])
+	}
+	// Always present, and "" on a Loot that lets each browser choose.
+	if body["language"] != "" {
+		t.Fatalf("language = %v, want the empty string", body["language"])
 	}
 	if body["total_xp"].(float64) <= 0 {
 		t.Fatalf("total_xp = %v", body["total_xp"])

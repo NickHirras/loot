@@ -8,6 +8,10 @@
     "resolveJsonModule": true,
     "allowJs": true,
     "checkJs": true,
+    // svelte-check only type-checks; without this, the generated
+    // src/paraglide/*.js files look like emit targets that would overwrite
+    // their own inputs.
+    "noEmit": true,
     "isolatedModules": true,
     "strict": true,
     "noUnusedLocals": true,

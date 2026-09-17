@@ -1,3 +1,4 @@
+import { m } from '../paraglide/messages'
 import {
   fetchChests,
   fetchDrops,
@@ -593,7 +594,7 @@ class LootState {
     // badge keeps its value and the truth is fetched instead of assumed.
     if (result.chests) this.#setChests(result.chests)
     if (result.count === 0 || result.drops.length === 0) {
-      this.chestError = 'That chest is already open.'
+      this.chestError = m.chest_already_open()
       this.chestPhase = 'idle'
       if (!result.chests) void this.#refreshChests()
       return
@@ -643,7 +644,7 @@ class LootState {
     if (result.chests) this.#setChests(result.chests)
     if (result.count === 0 || result.drops.length === 0) {
       this.#resetChest()
-      this.chestError = 'Those chests are already open.'
+      this.chestError = m.chest_all_already_open()
       if (!result.chests) void this.#refreshChests()
       return
     }

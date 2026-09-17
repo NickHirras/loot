@@ -7,6 +7,8 @@
   import type { BreakdownRow } from './types'
   import { VAULT_RANGES, currency, delta, flagEmoji, integer } from './types'
   import { vault } from './vault.svelte'
+  import { slots } from './markup'
+  import { m } from '../paraglide/messages'
 
   // The page owns the polling: mounting starts it, leaving stops it. The
   // store already untracks its own setup; untracking here as well means a
@@ -43,7 +45,7 @@
   const appRows: BreakdownRow[] = $derived(
     (summary?.by_app ?? []).map((a) => ({
       key: a.app || '(no app)',
-      label: a.app || '(no app)',
+      label: a.app || m.vault_no_app(),
       revenue_base: a.revenue_base,
       units: a.units,
       share: a.share,
@@ -53,7 +55,7 @@
   const countryRows: BreakdownRow[] = $derived(
     (summary?.by_country ?? []).map((c) => ({
       key: c.country || '(unknown)',
-      label: c.country === 'other' ? 'other countries' : c.country || 'unknown',
+      label: c.country === 'other' ? m.vault_other_countries() : c.country || m.vault_unknown_country(),
       prefix: c.country === 'other' ? '…' : flagEmoji(c.country),
       revenue_base: c.revenue_base,
       units: c.units,
@@ -63,16 +65,23 @@
 
   const subsAsOf = $derived(summary?.subscriptions?.as_of ?? '')
   const rangeLabel = $derived(summary ? `${summary.range.from} → ${summary.range.to}` : '')
+
+  // Three inline elements in one sentence, and two more in the small print
+  // below it; see lib/markup.ts for why each sentence stays whole.
+  const emptyBody = $derived(slots((slot) => m.vault_empty_body({ ledger: slot, stores: slot, file: slot })))
+  const emptyFine = $derived(
+    slots((slot) => m.vault_empty_fine({ sightings: slot, vault: slot, chest: slot })),
+  )
 </script>
 
-<section class="vault" aria-label="Vault">
+<section class="vault" aria-label={m.vault_title()}>
   <div class="bar">
     <div class="titles">
-      <h2>Vault</h2>
+      <h2>{m.vault_title()}</h2>
       {#if rangeLabel}<span class="range mono">{rangeLabel}</span>{/if}
     </div>
 
-    <div class="picker" role="group" aria-label="Time range">
+    <div class="picker" role="group" aria-label={m.vault_range_label()}>
       {#each VAULT_RANGES as range (range)}
         <button
           class="range-btn"
@@ -89,78 +98,85 @@
   {#if vault.error && !summary}
     <p class="note error">{vault.error}</p>
   {:else if !summary}
-    <p class="note">Counting the coins…</p>
+    <p class="note">{m.vault_loading()}</p>
   {:else}
     <div class="tiles">
       <StatTile
-        label="Revenue"
+        label={m.vault_tile_revenue()}
         value={currency(totals?.revenue_base ?? 0, code)}
         delta={delta(totals?.revenue_base ?? 0, prev?.revenue_base ?? 0)}
       />
       <StatTile
-        label="Units"
+        label={m.vault_tile_units()}
         value={integer(totals?.units ?? 0)}
         delta={delta(totals?.units ?? 0, prev?.units ?? 0)}
       />
       <StatTile
-        label="Refunds"
+        label={m.vault_tile_refunds()}
         value={integer(totals?.refunds ?? 0)}
         delta={delta(totals?.refunds ?? 0, prev?.refunds ?? 0)}
         invert
       />
       <StatTile
-        label="Active subs"
+        label={m.vault_tile_active_subs()}
         value={summary.subscriptions?.active === null || summary.subscriptions?.active === undefined
           ? '—'
           : integer(summary.subscriptions.active)}
-        note={subsAsOf ? `as of ${subsAsOf}` : 'no source reports subscriptions'}
+        note={subsAsOf ? m.vault_subs_as_of({ date: subsAsOf }) : m.vault_subs_none()}
       />
-      <StatTile label="Countries" value={integer(totals?.countries ?? 0)} note="seen in this window" />
+      <StatTile
+        label={m.vault_tile_countries()}
+        value={integer(totals?.countries ?? 0)}
+        note={m.vault_countries_note()}
+      />
       <StatTile
         tone="aside"
-        label="Sighted today (RevenueCat)"
+        label={m.vault_tile_sighted()}
         value={currency(summary.realtime?.revenuecat_amount_base_today ?? 0, code)}
-        note="{integer(summary.realtime?.revenuecat_purchases_today ?? 0)} purchases · estimate, not ledger revenue"
+        note={m.vault_sighted_note({ count: integer(summary.realtime?.revenuecat_purchases_today ?? 0) })}
       />
     </div>
 
     {#if isEmpty}
       <div class="empty">
-        <h3>No ledger money in this window.</h3>
+        <h3>{m.vault_empty_title()}</h3>
         <p>
-          Revenue only counts <strong>ledger rows</strong> — settled money from the stores' own financial reports. To
-          start filling the vault, configure
-          <a href="https://github.com/nickhirras/loot#app-store-connect-and-google-play-quest-2" target="_blank" rel="noreferrer">
-            App Store Connect and Google Play
-          </a>
-          in your <code>loot.yaml</code>, then let a day settle.
+          {emptyBody[0]}<strong>{m.vault_empty_ledger_rows()}</strong>{emptyBody[1]}<a
+            href="https://github.com/nickhirras/loot#app-store-connect-and-google-play-quest-2"
+            target="_blank"
+            rel="noreferrer">{m.vault_empty_stores()}</a
+          >{emptyBody[2]}<code>loot.yaml</code>{emptyBody[3]}
         </p>
         <p class="fine">
-          RevenueCat webhooks still land in the feed instantly, but their amounts are pre-tax, pre-store-cut
-          <em>sightings</em>: they show up in the tile above and are never added to revenue. See
-          <a href="https://github.com/nickhirras/loot#the-vault" target="_blank" rel="noreferrer">the vault</a> and
-          <a href="https://github.com/nickhirras/loot#the-daily-chest" target="_blank" rel="noreferrer">the daily chest</a>
-          for the whole rule.
+          {emptyFine[0]}<em>{m.vault_empty_fine_sightings()}</em>{emptyFine[1]}<a
+            href="https://github.com/nickhirras/loot#the-vault"
+            target="_blank"
+            rel="noreferrer">{m.vault_empty_fine_vault()}</a
+          >{emptyFine[2]}<a
+            href="https://github.com/nickhirras/loot#the-daily-chest"
+            target="_blank"
+            rel="noreferrer">{m.vault_empty_fine_chest()}</a
+          >{emptyFine[3]}
         </p>
       </div>
     {:else}
       <div class="card">
         <div class="card-head">
-          <h3>Revenue per day</h3>
-          <span class="hint">in {code} · units below</span>
+          <h3>{m.vault_chart_title()}</h3>
+          <span class="hint">{m.vault_chart_hint({ code })}</span>
         </div>
         <RevenueChart series={summary.series} sources={sources.length ? sources : ['revenue']} {code} />
       </div>
 
       <div class="breakdowns">
-        <Breakdown title="By source" rows={sourceRows} {code} color={(row) => seriesColor(row.key)} />
-        <Breakdown title="By app" rows={appRows} {code} color={() => SERIES_COLORS[0]} />
+        <Breakdown title={m.vault_by_source()} rows={sourceRows} {code} color={(row) => seriesColor(row.key)} />
+        <Breakdown title={m.vault_by_app()} rows={appRows} {code} color={() => SERIES_COLORS[0]} />
         <Breakdown
-          title="By country"
+          title={m.vault_by_country()}
           rows={countryRows}
           {code}
           color={() => SERIES_COLORS[2]}
-          empty="No country was attached to this window's money."
+          empty={m.vault_country_empty()}
         />
       </div>
     {/if}

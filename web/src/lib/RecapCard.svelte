@@ -3,6 +3,8 @@
   import { rarityColor, tierColor } from './palette'
   import type { Recap } from './types'
   import { currency, dayLabel, flagEmoji, integer, percent } from './types'
+  import { eraLabel } from './labels'
+  import { m } from '../paraglide/messages'
 
   let { recap }: { recap: Recap } = $props()
 
@@ -12,7 +14,7 @@
   const accent = $derived(rarityColor(recap.top_rarity || 'rare'))
 
   /** "month" or "year", so every sentence on the card reads in the right unit. */
-  const unit = $derived(recap.period.kind === 'season' ? 'year' : 'month')
+  const unit = $derived(recap.period.kind === 'season' ? m.recap_unit_year() : m.recap_unit_month())
 
   /**
    * The delta line, stated as a fact and nothing else: what it was, and which
@@ -22,11 +24,14 @@
   const revenueLine = $derived(
     !recap.revenue_delta.has_basis
       ? recap.revenue_base > 0
-        ? `first ${unit} with revenue`
+        ? m.recap_first_with_revenue({ unit })
         : ''
-      : `${recap.revenue_delta.direction === 'down' ? '−' : '+'}${percent(
-          Math.abs(recap.revenue_delta.pct),
-        )} · ${currency(recap.revenue_delta.previous, code, 0)} the ${unit} before`,
+      : m.recap_delta_line({
+          sign: recap.revenue_delta.direction === 'down' ? '−' : '+',
+          pct: percent(Math.abs(recap.revenue_delta.pct)),
+          previous: currency(recap.revenue_delta.previous, code, 0),
+          unit,
+        }),
   )
 
   const countries = $derived(recap.new_countries ?? [])
@@ -43,24 +48,40 @@
    */
   function summaryText(): string {
     const lines: string[] = []
-    lines.push(`◆ Loot — ${recap.period.label}${recap.period.partial ? ' (so far)' : ''}`)
+    const amount = currency(recap.revenue_base, code, 0)
+    lines.push(
+      recap.period.partial
+        ? m.recap_share_header_partial({ period: recap.period.label })
+        : m.recap_share_header({ period: recap.period.label }),
+    )
     lines.push('')
-    lines.push(`Revenue  ${currency(recap.revenue_base, code, 0)}${revenueLine ? `  (${revenueLine})` : ''}`)
-    lines.push(`Units    ${integer(recap.units)}${recap.refunds ? ` · ${integer(recap.refunds)} refunds` : ''}`)
-    if (recap.installs) lines.push(`Installs ${integer(recap.installs)}`)
-    lines.push(`Drops    ${integer(recap.drops)} · ${integer(recap.xp)} XP`)
-    if (recap.era_start !== recap.era_end) lines.push(`Era      ${recap.era_start} → ${recap.era_end}`)
-    else lines.push(`Level    ${recap.level_start}${recap.level_end > recap.level_start ? ` → ${recap.level_end}` : ''}`)
+    lines.push(
+      revenueLine ? m.recap_share_revenue_note({ amount, note: revenueLine }) : m.recap_share_revenue({ amount }),
+    )
+    lines.push(
+      recap.refunds
+        ? m.recap_share_units_refunds({ units: integer(recap.units), refunds: integer(recap.refunds) })
+        : m.recap_share_units({ units: integer(recap.units) }),
+    )
+    if (recap.installs) lines.push(m.recap_share_installs({ installs: integer(recap.installs) }))
+    lines.push(m.recap_share_drops({ drops: integer(recap.drops), xp: integer(recap.xp) }))
+    if (recap.era_start !== recap.era_end) {
+      lines.push(m.recap_share_era({ from: eraLabel(recap.era_start), to: eraLabel(recap.era_end) }))
+    } else if (recap.level_end > recap.level_start) {
+      lines.push(m.recap_share_level_up({ from: recap.level_start, to: recap.level_end }))
+    } else {
+      lines.push(m.recap_share_level({ level: recap.level_start }))
+    }
     if (countries.length) {
-      lines.push(`Settled  ${countries.map((c) => c.country).join(', ')}`)
+      lines.push(m.recap_share_settled({ countries: countries.map((c) => c.country).join(', ') }))
     }
     if (recap.highlights.length) {
       lines.push('')
-      for (const h of recap.highlights) lines.push(`• ${h}`)
+      for (const h of recap.highlights) lines.push(m.recap_share_bullet({ line: h }))
     }
     if (trophies.length) {
       lines.push('')
-      lines.push(`Achievements: ${trophies.map((t) => t.title).join(', ')}`)
+      lines.push(m.recap_share_achievements({ titles: trophies.map((t) => t.title).join(', ') }))
     }
     return lines.join('\n')
   }
@@ -109,7 +130,7 @@
       copied2s()
       return
     }
-    copyError = 'This browser would not let Loot use the clipboard.'
+    copyError = m.recap_copy_error()
   }
 </script>
 
@@ -118,25 +139,22 @@
     <div class="titles">
       <h3>{recap.period.label}</h3>
       <span class="sub">
-        the {unit} in loot
-        {#if recap.period.partial}· so far{/if}
+        {m.recap_sub({ unit })}
+        {#if recap.period.partial}{m.recap_partial()}{/if}
       </span>
     </div>
-    <button class="copy" onclick={copy} title="Copy this recap as plain text">
-      {copied ? 'Copied' : 'Copy summary'}
+    <button class="copy" onclick={copy} title={m.recap_copy_title()}>
+      {copied ? m.recap_copied() : m.recap_copy()}
     </button>
   </header>
 
   {#if recap.empty}
-    <p class="empty">
-      Nothing landed in {recap.period.label}. Loot has no opinion about that — it is simply a {unit} with no
-      numbers in it. Pick another from the list above.
-    </p>
+    <p class="empty">{m.recap_empty({ period: recap.period.label, unit })}</p>
   {:else}
     <div class="headline">
       <div class="big">
         <span class="amount">{currency(recap.revenue_base, code, 0)}</span>
-        <span class="label">revenue</span>
+        <span class="label">{m.recap_revenue()}</span>
       </div>
       {#if revenueLine}
         <span class="delta dir-{recap.revenue_delta.direction}">{revenueLine}</span>
@@ -148,15 +166,15 @@
     {/if}
 
     <ul class="figures">
-      <li><span class="v">{integer(recap.units)}</span><span class="k">units</span></li>
+      <li><span class="v">{integer(recap.units)}</span><span class="k">{m.recap_units()}</span></li>
       {#if recap.installs > 0}
-        <li><span class="v">{integer(recap.installs)}</span><span class="k">installs</span></li>
+        <li><span class="v">{integer(recap.installs)}</span><span class="k">{m.recap_installs()}</span></li>
       {/if}
-      <li><span class="v">{integer(recap.drops)}</span><span class="k">drops</span></li>
-      <li><span class="v">{integer(recap.xp)}</span><span class="k">XP</span></li>
-      <li><span class="v">{integer(recap.chests_opened)}</span><span class="k">chests</span></li>
+      <li><span class="v">{integer(recap.drops)}</span><span class="k">{m.recap_drops()}</span></li>
+      <li><span class="v">{integer(recap.xp)}</span><span class="k">{m.recap_xp()}</span></li>
+      <li><span class="v">{integer(recap.chests_opened)}</span><span class="k">{m.recap_chests()}</span></li>
       {#if recap.refunds > 0}
-        <li><span class="v">{integer(recap.refunds)}</span><span class="k">refunds</span></li>
+        <li><span class="v">{integer(recap.refunds)}</span><span class="k">{m.recap_refunds()}</span></li>
       {/if}
     </ul>
 
@@ -170,10 +188,12 @@
 
     {#if countries.length > 0}
       <div class="row">
-        <span class="row-label">New settlements</span>
+        <span class="row-label">{m.recap_new_settlements()}</span>
         <div class="flags">
           {#each countries as c (c.country)}
-            <span class="flag" title="{c.country} · {dayLabel(c.day)}">{flagEmoji(c.country)}</span>
+            <span class="flag" title={m.recap_country_title({ country: c.country, day: dayLabel(c.day) })}>
+              {flagEmoji(c.country)}
+            </span>
           {/each}
         </div>
       </div>
@@ -181,7 +201,7 @@
 
     {#if trophies.length > 0}
       <div class="row">
-        <span class="row-label">Achievements</span>
+        <span class="row-label">{m.recap_achievements()}</span>
         <div class="trophies">
           {#each trophies as t (t.key)}
             <span class="trophy" style="--tier: {tierColor(t.tier)}" title={t.description}>★ {t.title}</span>
@@ -193,8 +213,13 @@
     <footer>
       <span>
         {recap.era_start === recap.era_end
-          ? `${recap.era_end} era · level ${recap.level_end}`
-          : `${recap.era_start} → ${recap.era_end} · level ${recap.level_start} → ${recap.level_end}`}
+          ? m.recap_footer_era_same({ era: eraLabel(recap.era_end), level: recap.level_end })
+          : m.recap_footer_era_changed({
+              from: eraLabel(recap.era_start),
+              to: eraLabel(recap.era_end),
+              levelFrom: recap.level_start,
+              levelTo: recap.level_end,
+            })}
       </span>
       <span class="tops">
         {#if recap.top_app.key}{recap.top_app.key}{/if}

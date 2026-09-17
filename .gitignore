@@ -17,6 +17,8 @@ bin/
 web/node_modules/
 web/dist/*
 !web/dist/.gitkeep
+# Compiled message functions; generated from web/messages by paraglide-js.
+web/src/paraglide/
 
 # Go
 *.test

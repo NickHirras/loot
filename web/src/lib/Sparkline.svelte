@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { MysteryPoint } from './types'
   import { currency, dayLabel, integer } from './types'
+  import { m } from '../paraglide/messages'
 
   let {
     points,
@@ -48,10 +49,12 @@
 
   const label = $derived(
     points.length === 0
-      ? 'no history'
-      : `${points.length} days to ${dayLabel(points[points.length - 1].day)}, ending at ${format(
-          points[points.length - 1].value,
-        )}`,
+      ? m.spark_no_history()
+      : m.spark_label({
+          days: points.length,
+          day: dayLabel(points[points.length - 1].day),
+          value: format(points[points.length - 1].value),
+        }),
   )
 </script>
 
@@ -69,7 +72,7 @@
   </svg>
   <figcaption>
     <span>{points.length ? dayLabel(points[0].day) : ''}</span>
-    {#if baseline > 0}<span class="usual">usual {format(baseline)}</span>{/if}
+    {#if baseline > 0}<span class="usual">{m.spark_usual({ value: format(baseline) })}</span>{/if}
     <span>{points.length ? dayLabel(points[points.length - 1].day) : ''}</span>
   </figcaption>
 </figure>

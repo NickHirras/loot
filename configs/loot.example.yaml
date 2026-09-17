@@ -31,6 +31,11 @@ rules_path: ""
 # and currency its source reported; Loot stores a converted copy alongside it.
 display_currency: "USD"
 
+# The language the dashboard is served in, as a BCP-47 tag: "de", "pt-BR",
+# "zh-Hans". Leave it commented out (or set "auto") and each reader's browser
+# decides. Only English ships today; the rest arrive in a later release.
+# language: "auto"
+
 # Where you are, as an ISO 3166-1 alpha-2 code. The Hearth's globe flies every
 # live drop home to this country's capital. Leave empty and Loot uses your
 # biggest settlement instead, which is right for most people.

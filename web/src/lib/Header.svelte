@@ -4,7 +4,9 @@
   import ScopeSelect from './ScopeSelect.svelte'
   import { scope } from './scope.svelte'
   import { loot } from './state.svelte'
-  import { RARITIES } from './types'
+  import { RARITIES, integer } from './types'
+  import { rarityLabel, tabLabel } from './labels'
+  import { m } from '../paraglide/messages'
 
   const xp = $derived(loot.stats?.total_xp ?? 0)
   const totalDrops = $derived(loot.stats?.total_drops ?? 0)
@@ -19,9 +21,9 @@
   )
 
   function statusLabel(source: { last_error: string; last_poll_at: string | null; mode: string }): string {
-    if (source.last_error) return 'error'
-    if (source.mode === 'webhook') return 'listening'
-    return source.last_poll_at ? 'ok' : 'waiting'
+    if (source.last_error) return m.header_status_error()
+    if (source.mode === 'webhook') return m.header_status_listening()
+    return source.last_poll_at ? m.header_status_ok() : m.header_status_waiting()
   }
 
   /**
@@ -42,13 +44,18 @@
            the name: enough that a screenshot is unambiguous, not so much that
            the header becomes about it. -->
       {#if scope.active}
-        <span class="scoped-to" title="Every panel is scoped to {scope.current}">{scope.current}</span>
+        <span class="scoped-to" title={m.header_scoped_to_title({ app: scope.current })}>{scope.current}</span>
       {/if}
-      <span class="conn" class:live={loot.connected} title={loot.connected ? 'Live' : 'Reconnecting…'}>
-        <span class="dot"></span><span class="conn-label">{loot.connected ? 'live' : 'offline'}</span>
+      <span
+        class="conn"
+        class:live={loot.connected}
+        title={loot.connected ? m.header_live_title() : m.header_reconnecting_title()}
+      >
+        <span class="dot"></span>
+        <span class="conn-label">{loot.connected ? m.header_live() : m.header_offline()}</span>
       </span>
       {#if loot.demo}
-        <span class="demo" title="Synthetic data — see the README to connect real stores">demo</span>
+        <span class="demo" title={m.header_demo_title()}>{m.header_demo()}</span>
       {/if}
     </div>
 
@@ -56,7 +63,7 @@
          selector; the component itself stays unaware of where it sits. -->
     <div class="scope-slot"><ScopeSelect /></div>
 
-    <nav class="tabs" aria-label="Sections">
+    <nav class="tabs" aria-label={m.header_nav_label()}>
       {#each TABS as tab (tab.id)}
         <a
           class="tab"
@@ -64,17 +71,19 @@
           href={scope.link(tab.hash)}
           aria-current={router.tab === tab.id ? 'page' : undefined}
         >
-          {tab.label}
+          {tabLabel(tab.id)}
           <!-- The one badge in the header that is not about money: how many
                days are still unexplained. It is a count, never a warning. -->
           {#if tab.id === 'quests' && loot.openMysteries > 0}
-            <span class="tab-badge" title="{loot.openMysteries} open mysteries">{loot.openMysteries}</span>
+            <span class="tab-badge" title={m.header_open_mysteries_title({ count: loot.openMysteries })}>
+              {loot.openMysteries}
+            </span>
           {/if}
           <!-- And the one badge in Loot that is allowed to be red. A boss is a
                crash you are in the middle of fixing: the only thing here where
                looking twice a day genuinely helps. -->
           {#if tab.id === 'quests' && loot.aliveBosses > 0}
-            <span class="tab-badge danger" title="{loot.aliveBosses} boss fight(s) in progress">
+            <span class="tab-badge danger" title={m.header_boss_fights_title({ count: loot.aliveBosses })}>
               {loot.aliveBosses}
             </span>
           {/if}
@@ -87,8 +96,8 @@
         <button
           class="chest-badge"
           onclick={() => loot.showChest()}
-          title="{loot.chestCount} drops waiting in {loot.chests.length || 1} chest(s)"
-          aria-label="Open the daily chest: {loot.chestCount} drops waiting"
+          title={m.header_chest_title({ drops: loot.chestCount, chests: loot.chests.length || 1 })}
+          aria-label={m.header_chest_aria({ count: loot.chestCount })}
         >
           <ChestIcon size={20} idle glow />
           <span class="chest-count">{loot.chestCount}</span>
@@ -98,10 +107,10 @@
         class="mute"
         onclick={() => loot.toggleMute()}
         aria-pressed={loot.muted}
-        title={loot.muted ? 'Unmute drop sounds' : 'Mute drop sounds'}
+        title={loot.muted ? m.header_unmute() : m.header_mute()}
       >
         {loot.muted ? '🔇' : '🔊'}
-        <span class="mute-label">{loot.muted ? 'Muted' : 'Sound'}</span>
+        <span class="mute-label">{loot.muted ? m.header_muted() : m.header_sound()}</span>
       </button>
     </div>
   </div>
@@ -109,22 +118,25 @@
   <div class="stats">
     <div class="xp-block">
       <div class="xp-top">
-        <span class="level">LVL {level}</span>
-        <span class="xp-total">{xp.toLocaleString()} XP</span>
+        <span class="level">{m.header_level({ level })}</span>
+        <span class="xp-total">{m.header_xp_total({ xp: integer(xp) })}</span>
       </div>
       <div class="xp-bar" role="progressbar" aria-valuenow={Math.round(progress)} aria-valuemin="0" aria-valuemax="100">
         <div class="xp-fill" style="width: {progress}%"></div>
       </div>
       <div class="xp-sub">
-        {totalDrops.toLocaleString()} drops · {countries} {countries === 1 ? 'country' : 'countries'}
+        {m.header_xp_sub({ drops: integer(totalDrops), countries })}
       </div>
     </div>
 
     <ul class="rarities">
       {#each RARITIES as rarity (rarity)}
-        <li class="rarity rarity-{rarity}" title="{loot.byRarity[rarity] ?? 0} {rarity} drops">
+        <li
+          class="rarity rarity-{rarity}"
+          title={m.header_rarity_title({ count: loot.byRarity[rarity] ?? 0, rarity: rarityLabel(rarity) })}
+        >
           <span class="count">{loot.byRarity[rarity] ?? 0}</span>
-          <span class="name">{rarity}</span>
+          <span class="name">{rarityLabel(rarity)}</span>
         </li>
       {/each}
     </ul>
@@ -138,11 +150,12 @@
       >
         <span class="s-dot" class:err={brokenSources > 0}></span>
         {#if loot.sources.length === 0}
-          no sources
+          {m.header_no_sources()}
         {:else}
-          {loot.sources.length}
-          {loot.sources.length === 1 ? 'source' : 'sources'}
-          {#if brokenSources > 0}<span class="s-broken">{brokenSources} in error</span>{/if}
+          {m.header_sources_count({ count: loot.sources.length })}
+          {#if brokenSources > 0}
+            <span class="s-broken">{m.header_sources_in_error({ count: brokenSources })}</span>
+          {/if}
         {/if}
         <span class="chev" class:up={sourcesOpen} aria-hidden="true">▾</span>
       </button>
@@ -152,11 +165,11 @@
           <li class="source" class:err={!!source.last_error} title={source.last_error || statusLabel(source)}>
             <span class="s-dot"></span>
             <span class="s-name mono">{source.name}</span>
-            <span class="s-meta">{source.mode === 'poll' ? source.poll_interval : 'webhook'}</span>
-            <span class="s-events">{source.events.toLocaleString()}</span>
+            <span class="s-meta">{source.mode === 'poll' ? source.poll_interval : m.header_source_webhook()}</span>
+            <span class="s-events">{integer(source.events)}</span>
           </li>
         {:else}
-          <li class="source empty">no sources configured</li>
+          <li class="source empty">{m.header_no_sources_configured()}</li>
         {/each}
       </ul>
     </div>
