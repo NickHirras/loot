@@ -455,10 +455,10 @@ type CustomRequest struct {
 // generated ones: their dedupe key is their own id.
 func (s *Service) Create(ctx context.Context, req CustomRequest) (core.Quest, error) {
 	if !req.Metric.Valid() {
-		return core.Quest{}, fmt.Errorf("unknown metric %q", req.Metric)
+		return core.Quest{}, errorf(CodeUnknownMetric, string(req.Metric), "unknown metric %q", req.Metric)
 	}
 	if req.Target <= 0 {
-		return core.Quest{}, fmt.Errorf("target must be greater than zero")
+		return core.Quest{}, errorf(CodeTargetPositive, "", "target must be greater than zero")
 	}
 
 	start, end, err := resolveWindow(s.now(), req)
@@ -521,19 +521,20 @@ func resolveWindow(now time.Time, req CustomRequest) (string, string, error) {
 	case "custom", "range", "days":
 		// fall through to the explicit days below
 	default:
-		return "", "", fmt.Errorf("unknown window %q (use week, month or explicit days)", req.Window)
+		return "", "", errorf(CodeUnknownWindow, req.Window,
+			"unknown window %q (use week, month or explicit days)", req.Window)
 	}
 
 	start, err := time.Parse(core.DayLayout, strings.TrimSpace(req.Start))
 	if err != nil {
-		return "", "", fmt.Errorf("window start must be YYYY-MM-DD")
+		return "", "", errorf(CodeWindowStartFormat, "", "window start must be YYYY-MM-DD")
 	}
 	end, err := time.Parse(core.DayLayout, strings.TrimSpace(req.End))
 	if err != nil {
-		return "", "", fmt.Errorf("window end must be YYYY-MM-DD")
+		return "", "", errorf(CodeWindowEndFormat, "", "window end must be YYYY-MM-DD")
 	}
 	if end.Before(start) {
-		return "", "", fmt.Errorf("window ends before it starts")
+		return "", "", errorf(CodeWindowOrder, "", "window ends before it starts")
 	}
 	return start.Format(core.DayLayout), end.Format(core.DayLayout), nil
 }
@@ -546,7 +547,7 @@ func (s *Service) Delete(ctx context.Context, id string) error {
 		return err
 	}
 	if q.Kind != core.QuestCustom {
-		return fmt.Errorf("only custom quests can be deleted")
+		return errorf(CodeCustomOnly, "", "only custom quests can be deleted")
 	}
 	if err := s.Store.DeleteQuest(ctx, id); err != nil {
 		return err

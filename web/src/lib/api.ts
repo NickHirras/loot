@@ -26,6 +26,7 @@ import type {
   VaultRange,
   VaultSummary,
 } from './types'
+import { questErrorLabel } from './labels'
 import { currentLocale } from './locale'
 
 /**
@@ -101,11 +102,17 @@ async function postJSON(path: string, body: unknown): Promise<Response> {
  * The API answers a rejected request with `{"error": "…"}` and a reason worth
  * showing — "target must be greater than zero" is more use in a form than
  * "400 Bad Request".
+ *
+ * A refusal that Loot itself raised also carries a stable `code` (and, for the
+ * two whose sentence quotes the offending input, a `value`), which is what
+ * gets shown: the `error` string is English, and the code is the same refusal
+ * in whatever language this dashboard speaks. Anything without a code — a
+ * malformed body, a proxy in the way — falls back to the server's own words.
  */
 async function errorText(res: Response, path: string): Promise<string> {
   try {
-    const body = (await res.json()) as { error?: string }
-    if (body?.error) return body.error
+    const body = (await res.json()) as { error?: string; code?: string; value?: string }
+    if (body?.error) return questErrorLabel(body.code ?? '', body.error, body.value ?? '')
   } catch {
     // Not JSON, or no body at all: fall back to the status line.
   }

@@ -169,3 +169,195 @@ export function tabLabel(tab: Tab | string): string {
       return tab
   }
 }
+
+/**
+ * Every achievement title and description, by key.
+ *
+ * Paraglide compiles one function per message, so there is no `m[key]` to
+ * index: a table like this one is what turns a key that only exists at runtime
+ * back into a message. It is the price of a missing message being a build
+ * error rather than a blank card, which is the trade phase 1 made.
+ *
+ * The API still sends the English title and description, and they are what a
+ * key missing from this table falls back to — a newer server with a trophy
+ * this build has never heard of shows it in English rather than not at all.
+ */
+const ACH_TITLES: Record<string, () => string> = {
+  cartographer: () => m.ach_cartographer_title(),
+  cursed_but_unbowed: () => m.ach_cursed_but_unbowed_title(),
+  era_city: () => m.ach_era_city_title(),
+  era_empire: () => m.ach_era_empire_title(),
+  era_kingdom: () => m.ach_era_kingdom_title(),
+  era_town: () => m.ach_era_town_title(),
+  first_blood: () => m.ach_first_blood_title(),
+  first_sale: () => m.ach_first_sale_title(),
+  first_subscriber: () => m.ach_first_subscriber_title(),
+  hoarder_1: () => m.ach_hoarder_1_title(),
+  hoarder_2: () => m.ach_hoarder_2_title(),
+  hoarder_3: () => m.ach_hoarder_3_title(),
+  installs_100k: () => m.ach_installs_100k_title(),
+  installs_10k: () => m.ach_installs_10k_title(),
+  installs_1k: () => m.ach_installs_1k_title(),
+  legendary_hunter: () => m.ach_legendary_hunter_title(),
+  merchant_2: () => m.ach_merchant_2_title(),
+  merchant_3: () => m.ach_merchant_3_title(),
+  merchant_5: () => m.ach_merchant_5_title(),
+  mysteries_10: () => m.ach_mysteries_10_title(),
+  mysteries_1: () => m.ach_mysteries_1_title(),
+  polyglot_1: () => m.ach_polyglot_1_title(),
+  polyglot_2: () => m.ach_polyglot_2_title(),
+  quests_10: () => m.ach_quests_10_title(),
+  quests_1: () => m.ach_quests_1_title(),
+  quests_50: () => m.ach_quests_50_title(),
+  record_1: () => m.ach_record_1_title(),
+  record_25: () => m.ach_record_25_title(),
+  record_5: () => m.ach_record_5_title(),
+  revenue_100: () => m.ach_revenue_100_title(),
+  revenue_100k: () => m.ach_revenue_100k_title(),
+  revenue_10k: () => m.ach_revenue_10k_title(),
+  revenue_1k: () => m.ach_revenue_1k_title(),
+  settler_1: () => m.ach_settler_1_title(),
+  settler_2: () => m.ach_settler_2_title(),
+  settler_3: () => m.ach_settler_3_title(),
+  settler_4: () => m.ach_settler_4_title(),
+  stars_1000: () => m.ach_stars_1000_title(),
+  stars_100: () => m.ach_stars_100_title(),
+  stars_10: () => m.ach_stars_10_title(),
+  steady_30: () => m.ach_steady_30_title(),
+  steady_7: () => m.ach_steady_7_title(),
+  subscribers_1000: () => m.ach_subscribers_1000_title(),
+  subscribers_100: () => m.ach_subscribers_100_title(),
+  subscribers_10: () => m.ach_subscribers_10_title(),
+  units_100: () => m.ach_units_100_title(),
+  units_100k: () => m.ach_units_100k_title(),
+  units_10k: () => m.ach_units_10k_title(),
+  units_1k: () => m.ach_units_1k_title(),
+}
+
+const ACH_DESCS: Record<string, () => string> = {
+  cartographer: () => m.ach_cartographer_desc(),
+  cursed_but_unbowed: () => m.ach_cursed_but_unbowed_desc(),
+  era_city: () => m.ach_era_city_desc(),
+  era_empire: () => m.ach_era_empire_desc(),
+  era_kingdom: () => m.ach_era_kingdom_desc(),
+  era_town: () => m.ach_era_town_desc(),
+  first_blood: () => m.ach_first_blood_desc(),
+  first_sale: () => m.ach_first_sale_desc(),
+  first_subscriber: () => m.ach_first_subscriber_desc(),
+  hoarder_1: () => m.ach_hoarder_1_desc(),
+  hoarder_2: () => m.ach_hoarder_2_desc(),
+  hoarder_3: () => m.ach_hoarder_3_desc(),
+  installs_100k: () => m.ach_installs_100k_desc(),
+  installs_10k: () => m.ach_installs_10k_desc(),
+  installs_1k: () => m.ach_installs_1k_desc(),
+  legendary_hunter: () => m.ach_legendary_hunter_desc(),
+  merchant_2: () => m.ach_merchant_2_desc(),
+  merchant_3: () => m.ach_merchant_3_desc(),
+  merchant_5: () => m.ach_merchant_5_desc(),
+  mysteries_10: () => m.ach_mysteries_10_desc(),
+  mysteries_1: () => m.ach_mysteries_1_desc(),
+  polyglot_1: () => m.ach_polyglot_1_desc(),
+  polyglot_2: () => m.ach_polyglot_2_desc(),
+  quests_10: () => m.ach_quests_10_desc(),
+  quests_1: () => m.ach_quests_1_desc(),
+  quests_50: () => m.ach_quests_50_desc(),
+  record_1: () => m.ach_record_1_desc(),
+  record_25: () => m.ach_record_25_desc(),
+  record_5: () => m.ach_record_5_desc(),
+  revenue_100: () => m.ach_revenue_100_desc(),
+  revenue_100k: () => m.ach_revenue_100k_desc(),
+  revenue_10k: () => m.ach_revenue_10k_desc(),
+  revenue_1k: () => m.ach_revenue_1k_desc(),
+  settler_1: () => m.ach_settler_1_desc(),
+  settler_2: () => m.ach_settler_2_desc(),
+  settler_3: () => m.ach_settler_3_desc(),
+  settler_4: () => m.ach_settler_4_desc(),
+  stars_1000: () => m.ach_stars_1000_desc(),
+  stars_100: () => m.ach_stars_100_desc(),
+  stars_10: () => m.ach_stars_10_desc(),
+  steady_30: () => m.ach_steady_30_desc(),
+  steady_7: () => m.ach_steady_7_desc(),
+  subscribers_1000: () => m.ach_subscribers_1000_desc(),
+  subscribers_100: () => m.ach_subscribers_100_desc(),
+  subscribers_10: () => m.ach_subscribers_10_desc(),
+  units_100: () => m.ach_units_100_desc(),
+  units_100k: () => m.ach_units_100k_desc(),
+  units_10k: () => m.ach_units_10k_desc(),
+  units_1k: () => m.ach_units_1k_desc(),
+}
+
+/** A trophy's name: "Settler III". */
+export function achievementTitle(key: string, fallback: string): string {
+  return ACH_TITLES[key]?.() ?? fallback
+}
+
+/** The one line under it: what it took. */
+export function achievementDescription(key: string, fallback: string): string {
+  return ACH_DESCS[key]?.() ?? fallback
+}
+
+/**
+ * The noun a progress line reads in: "18 / 25 countries".
+ *
+ * `count` is what the noun has to agree with, and it is deliberately the
+ * *target* rather than the current value: English says "1 / 5 countries", not
+ * "1 / 5 country". Money units ("revenue") are here too — the numbers beside
+ * them are formatted as money, but the noun is still a word.
+ */
+const ACH_UNITS: Record<string, (count: number) => string> = {
+  countries: (count: number) => m.ach_unit_countries({ count }),
+  continents: (count: number) => m.ach_unit_continents({ count }),
+  chests: (count: number) => m.ach_unit_chests({ count }),
+  currencies: (count: number) => m.ach_unit_currencies({ count }),
+  days: (count: number) => m.ach_unit_days({ count }),
+  revenue: (count: number) => m.ach_unit_revenue({ count }),
+  units: (count: number) => m.ach_unit_units({ count }),
+  installs: (count: number) => m.ach_unit_installs({ count }),
+  subscribers: (count: number) => m.ach_unit_subscribers({ count }),
+  quests: (count: number) => m.ach_unit_quests({ count }),
+  mysteries: (count: number) => m.ach_unit_mysteries({ count }),
+  stars: (count: number) => m.ach_unit_stars({ count }),
+  stores: (count: number) => m.ach_unit_stores({ count }),
+  record_days: (count: number) => m.ach_unit_record_days({ count }),
+  "XP": (count: number) => m.ach_unit_xp({ count }),
+}
+
+/** `record_days` → "record days", and an unknown unit as itself. */
+export function unitLabel(unit: string, count: number): string {
+  return ACH_UNITS[unit]?.(count) ?? unit
+}
+
+/**
+ * A refused quest request, in the reader's language.
+ *
+ * The API answers with a sentence *and* a stable code (see internal/quests).
+ * The code is what can be translated; the sentence is the fallback, for a
+ * refusal this build has no message for and for the ones that carry no code at
+ * all. `value` is the offending input, for the two refusals that quote one.
+ */
+export function questErrorLabel(code: string, fallback: string, value = ""): string {
+  switch (code) {
+    case 'unknown_metric':
+      return m.quest_error_unknown_metric({ value })
+    case 'target_positive':
+      return m.quest_error_target_positive()
+    case 'unknown_window':
+      return m.quest_error_unknown_window({ value })
+    case 'window_start_format':
+      return m.quest_error_window_start_format()
+    case 'window_end_format':
+      return m.quest_error_window_end_format()
+    case 'window_order':
+      return m.quest_error_window_order()
+    case 'custom_only':
+      return m.quest_error_custom_only()
+    case 'quests_disabled':
+      return m.quest_error_quests_disabled()
+    case 'not_found':
+      return m.quest_error_not_found()
+    case 'bad_window_json':
+      return m.quest_error_bad_window_json()
+    default:
+      return fallback
+  }
+}

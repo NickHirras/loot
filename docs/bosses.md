@@ -130,7 +130,9 @@ All of this is in `internal/rules/default.yaml` under *Bosses*, so a custom rule
       "app": "Lumen Notes",
       "name": "Torbrak the Off-By-One Gargoyle",
       "title": "NullPointerException in SyncWorker.onRun",
+      "issue_title": "NullPointerException in SyncWorker.onRun",  // "" when Loot wrote the title
       "version": "4.2.0",
+      "version_label": "v4.2.0",     // how a title says the version
       "issue_id": "",
       "hp_max": 312,
       "hp": 123,

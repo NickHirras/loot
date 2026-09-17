@@ -20,6 +20,32 @@ import (
 // should ever read a megabyte.
 const maxBody = 1 << 16
 
+// The two refusals the handlers raise themselves, rather than relaying from
+// the quests package.
+var (
+	questsDisabled = &quests.Error{Code: quests.CodeQuestsDisabled, Message: "quests are not enabled"}
+	questNotFound  = &quests.Error{Code: quests.CodeNotFound, Message: "no such quest"}
+)
+
+// writeQuestError answers a refused quest request.
+//
+// The English sentence is always there, because a curl and a log line both
+// want words. A refusal that carries a code sends that too — and the offending
+// input when its sentence quotes one — so a dashboard can write the refusal in
+// its own language instead of relaying ours. An error with no code (a
+// malformed body, say) is still answered, with `error` alone.
+func writeQuestError(w http.ResponseWriter, status int, err error) {
+	body := map[string]any{"error": err.Error()}
+	var coded *quests.Error
+	if errors.As(err, &coded) {
+		body["code"] = coded.Code
+		if coded.Value != "" {
+			body["value"] = coded.Value
+		}
+	}
+	writeJSON(w, status, body)
+}
+
 // handleQuests answers the board: active quests with fresh progress, and the
 // last few that finished or quietly ended.
 func (s *Server) handleQuests(w http.ResponseWriter, r *http.Request) {
@@ -57,7 +83,10 @@ func (qw *questWindow) UnmarshalJSON(data []byte) error {
 		End   string `json:"end"`
 	}
 	if err := json.Unmarshal(data, &explicit); err != nil {
-		return errors.New(`window must be "week", "month", or {"start":"…","end":"…"}`)
+		return &quests.Error{
+			Code:    quests.CodeBadWindowJSON,
+			Message: `window must be "week", "month", or {"start":"…","end":"…"}`,
+		}
 	}
 	qw.Name = "custom"
 	qw.Start = explicit.Start
@@ -79,14 +108,14 @@ type createQuestRequest struct {
 // hatch from the generator's opinions: any metric, any target, any window.
 func (s *Server) handleQuestCreate(w http.ResponseWriter, r *http.Request) {
 	if s.Quests == nil {
-		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "quests are not enabled"})
+		writeQuestError(w, http.StatusServiceUnavailable, questsDisabled)
 		return
 	}
 
 	var req createQuestRequest
 	if r.Body != nil {
 		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxBody)).Decode(&req); err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
+			writeQuestError(w, http.StatusBadRequest, err)
 			return
 		}
 	}
@@ -111,7 +140,7 @@ func (s *Server) handleQuestCreate(w http.ResponseWriter, r *http.Request) {
 		Title:  req.Title,
 	})
 	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
+		writeQuestError(w, http.StatusBadRequest, err)
 		return
 	}
 	writeJSON(w, http.StatusCreated, map[string]any{"quest": quest})
@@ -121,15 +150,15 @@ func (s *Server) handleQuestCreate(w http.ResponseWriter, r *http.Request) {
 // deleting it would only bring it back at midnight.
 func (s *Server) handleQuestDelete(w http.ResponseWriter, r *http.Request) {
 	if s.Quests == nil {
-		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "quests are not enabled"})
+		writeQuestError(w, http.StatusServiceUnavailable, questsDisabled)
 		return
 	}
 	err := s.Quests.Delete(r.Context(), r.PathValue("id"))
 	switch {
 	case errors.Is(err, store.ErrQuestNotFound):
-		writeJSON(w, http.StatusNotFound, map[string]any{"error": "no such quest"})
+		writeQuestError(w, http.StatusNotFound, questNotFound)
 	case err != nil:
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
+		writeQuestError(w, http.StatusBadRequest, err)
 	default:
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 	}

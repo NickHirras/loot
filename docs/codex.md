@@ -130,7 +130,7 @@ Beside them sits the lifetime column: revenue, units, refunds, installs, drops, 
 
 ## Season recap
 
-`GET /api/recap` writes up one **month** or one **season** (a calendar year) as the thing you would screenshot: a big revenue number with a neutral delta, a sparkline with the best day flagged, a row of new flags, a row of trophies, and an ordered list of already-written highlights.
+`GET /api/recap` writes up one **month** or one **season** (a calendar year) as the thing you would screenshot: a big revenue number with a neutral delta, a sparkline with the best day flagged, a row of new flags, a row of trophies, and an ordered list of highlights.
 
 The default is the **last complete month**. A recap of a month still in progress is a half-told story, and the default should be the one worth sharing; ask for the current month explicitly and it comes back with `partial: true` so the card can say "so far".
 
@@ -242,12 +242,14 @@ Neither parameter means the last complete month. A malformed one is a `400` with
     "chests_opened": 31, "quests_completed": 0, "mysteries_solved": 0,
     "achievements_unlocked": [ { "key": "cartographer", "…": "…" } ],
 
-    "highlights": [ "Best day on Jul 10: $663", "…" ],
+    "highlights": [ { "kind": "best_day", "args": { "day": "2026-07-10", "value": 663.15 } }, { "…": "…" } ],
     "series": [ { "day": "2026-07-01", "value": 494.99 } ]
   },
   "periods": [ { "kind": "month", "key": "2026-08", "…": "…" }, { "kind": "season", "key": "2026", "…": "…" } ]
 }
 ```
+
+`highlights` are the poster's caption as facts rather than as sentences: a `kind` (`best_day`, `unlocked`, `settled`, `legendary_drops`, `epic_drops`, `era_reached`, `level_up`, `most_countries`, `quests_completed`, `mysteries_solved`, `chests_opened`, `top_country`) and the `args` that line is made of, with days as `YYYY-MM-DD` and money as a raw number in `display_currency`. The dashboard writes the sentence in its own language; a client that does not know a kind skips it.
 
 `series` is zero-filled, one point per day, so the sparkline never has holes. `top_rarity` ignores `cursed` — a poster does not take its colour from a cancellation. `periods` is the picker's own options, so the page needs one request rather than two.
 

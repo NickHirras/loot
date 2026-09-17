@@ -325,7 +325,13 @@ func (d *Detector) mystery(kind string, metric store.SeriesMetric, key store.Ser
 		series = append(series, core.MysteryPoint{Day: p.day, Value: p.value})
 	}
 
-	observed := points[i].value
+	// Round once, here, and write the same numbers into the mystery, into its
+	// detail and into the prose. The API sends two-decimal figures, and the
+	// dashboard rewrites the "why" line from them: rounding the prose off the
+	// raw values instead would put "$1,234" beside an `observed` of 1234.5.
+	observed := roundN(points[i].value, 2)
+	med = roundN(med, 2)
+	z = roundN(z, 2)
 	ratio := 0.0
 	if med != 0 {
 		ratio = roundN(observed/med, 3)
@@ -336,12 +342,13 @@ func (d *Detector) mystery(kind string, metric store.SeriesMetric, key store.Ser
 	}
 
 	detail := core.MysteryDetail{
-		Series:    series,
-		Baseline:  roundN(med, 2),
-		Deviation: roundN(spread, 2),
-		Ratio:     ratio,
-		Unit:      unit,
-		Why:       d.why(kind, metric, observed, med, z),
+		Series:       series,
+		Baseline:     med,
+		Deviation:    roundN(spread, 2),
+		Ratio:        ratio,
+		Unit:         unit,
+		Why:          d.why(kind, metric, observed, med, z),
+		BaselineDays: d.baseline(),
 	}
 	raw, err := json.Marshal(detail)
 	if err != nil {
@@ -356,10 +363,10 @@ func (d *Detector) mystery(kind string, metric store.SeriesMetric, key store.Ser
 		App:       key.App,
 		Metric:    string(metric),
 		Day:       points[i].day,
-		Observed:  roundN(observed, 2),
-		Expected:  roundN(med, 2),
-		Z:         roundN(z, 2),
-		Title:     d.title(kind, metric, key, points[i], med),
+		Observed:  observed,
+		Expected:  med,
+		Z:         z,
+		Title:     d.title(kind, metric, key, observed, points[i].day, med),
 		Detail:    raw,
 		Status:    core.MysteryOpen,
 		CreatedAt: d.now(),
@@ -391,9 +398,10 @@ func (d *Detector) scanSettlements(ctx context.Context, from, to, detectFrom str
 			series = series[len(series)-seriesPoints:]
 		}
 		detail, err := json.Marshal(core.MysteryDetail{
-			Series: series,
-			Unit:   "count",
-			Why:    fmt.Sprintf("%s countries bought for the first time on the same day", core.FormatCount(p.value)),
+			Series:    series,
+			Unit:      "count",
+			Why:       fmt.Sprintf("%s countries bought for the first time on the same day", core.FormatCount(p.value)),
+			Countries: int(p.value),
 		})
 		if err != nil {
 			return out, fmt.Errorf("cluster detail: %w", err)
@@ -562,15 +570,19 @@ func (d *Detector) scanSilence(ctx context.Context, from, to string) ([]core.Mys
 			day := core.DayOf(end.AddDate(0, 0, -i))
 			series = append(series, core.MysteryPoint{Day: day, Value: float64(days[day])})
 		}
+		lag := settlementLagDays[source]
 		why := fmt.Sprintf("%d completed days with no rows at all, after reporting on %d of the previous 7",
 			missing, reported)
-		if lag := settlementLagDays[source]; lag > 0 {
+		if lag > 0 {
 			why += fmt.Sprintf(" — and that is already allowing for this store's %d day settlement lag", lag)
 		}
 		detail, err := json.Marshal(core.MysteryDetail{
-			Series: series,
-			Unit:   "count",
-			Why:    why,
+			Series:       series,
+			Unit:         "count",
+			Why:          why,
+			MissingDays:  missing,
+			ReportedDays: reported,
+			LagDays:      lag,
 		})
 		if err != nil {
 			return out, fmt.Errorf("silence detail: %w", err)
@@ -629,22 +641,24 @@ func mysteryKey(kind, source, app, metric, day string) string {
 
 // title writes the headline. It is phrased as a question wherever a question
 // is what it really is.
-func (d *Detector) title(kind string, metric store.SeriesMetric, key store.SeriesKey, p point, med float64) string {
+func (d *Detector) title(kind string, metric store.SeriesMetric, key store.SeriesKey,
+	observed float64, flagged string, med float64,
+) string {
 	source := SourceLabel(key.Source)
 	label := seriesLabel(metric)
-	day := humanDay(p.day)
+	day := humanDay(flagged)
 
 	switch kind {
 	case core.MysterySpike:
-		return fmt.Sprintf("%s %s %s on %s — why?", source, label, phrase(p.value, med), day)
+		return fmt.Sprintf("%s %s %s on %s — why?", source, label, phrase(observed, med), day)
 	case core.MysteryDip:
-		return fmt.Sprintf("%s %s %s on %s", source, label, phrase(p.value, med), day)
+		return fmt.Sprintf("%s %s %s on %s", source, label, phrase(observed, med), day)
 	case core.MysteryRefundSpike:
 		return fmt.Sprintf("%s refunds on %s on %s — usually %s",
-			core.FormatCount(p.value), source, day, core.FormatCount(med))
+			core.FormatCount(observed), source, day, core.FormatCount(med))
 	case core.MysteryRecord:
 		return fmt.Sprintf("Record day: %s %s on %s, %s",
-			d.formatValue(metric, p.value), label, source, day)
+			d.formatValue(metric, observed), label, source, day)
 	}
 	return fmt.Sprintf("%s %s on %s", source, label, day)
 }

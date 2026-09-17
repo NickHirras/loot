@@ -30,15 +30,6 @@ func parseDay(day string) (time.Time, bool) {
 	return t, true
 }
 
-// dayLabel renders a day the way a highlight reads it: "Aug 14".
-func dayLabel(day string) string {
-	t, ok := parseDay(day)
-	if !ok {
-		return day
-	}
-	return t.Format("Jan 2")
-}
-
 // roundMoney rounds to cents, matching what the store returns.
 func roundMoney(v float64) float64 { return math.Round(v*100) / 100 }
 

@@ -4,6 +4,7 @@
   import type { Mystery } from './types'
   import { currency, dayLabel, integer } from './types'
   import { mysteryKindLabel } from './labels'
+  import { mysteryTitle, mysteryWhy } from './prose'
   import { m } from '../paraglide/messages'
 
   let {
@@ -26,12 +27,18 @@
 
   const busy = $derived(questsState.isBusy(mystery.id))
   const label = $derived(mysteryKindLabel(mystery.kind))
+
+  // The headline and the "why" line are written here, out of the mystery's own
+  // facts. A mystery raised before those facts were recorded has only the
+  // English line the detector stored, so that is what its card shows.
+  const title = $derived(mysteryTitle(mystery, code))
+  const why = $derived(mysteryWhy(mystery, code) ?? detail?.why ?? '')
 </script>
 
 <article class="mystery kind-{mystery.kind}">
   <div class="head">
     <span class="badge">{label}</span>
-    <h4>{mystery.title}</h4>
+    <h4>{title}</h4>
   </div>
 
   <div class="chips">
@@ -67,8 +74,8 @@
     {/if}
   </dl>
 
-  {#if detail?.why}
-    <p class="why">{detail.why}</p>
+  {#if why}
+    <p class="why">{why}</p>
   {/if}
 
   <form
@@ -82,7 +89,7 @@
       type="text"
       placeholder={m.mystery_note_placeholder()}
       bind:value={note}
-      aria-label={m.mystery_note_aria({ title: mystery.title })}
+      aria-label={m.mystery_note_aria({ title })}
       disabled={busy}
     />
     <button type="submit" class="solve" disabled={busy}>{m.mystery_solve()}</button>

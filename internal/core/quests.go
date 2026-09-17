@@ -277,8 +277,30 @@ type MysteryDetail struct {
 	Ratio float64 `json:"ratio"`
 	// Unit is "money" or "count", so the UI knows how to format the numbers.
 	Unit string `json:"unit"`
-	// Note is a one-line explanation of what tripped the detector.
+	// Why is a one-line explanation of what tripped the detector, written in
+	// English when the mystery was raised.
+	//
+	// It is a fallback, not the source of truth: the dashboard writes the same
+	// line itself, in its own language, out of the structured fields below. A
+	// mystery raised before those fields existed has only this, so a card that
+	// cannot build the sentence prints the stored one.
 	Why string `json:"why,omitempty"`
+
+	// The facts the sentence is built from. Each is 0 when the kind that needs
+	// it did not raise this mystery — or when the row predates the field.
+
+	// BaselineDays is how many trailing days the baseline was measured over.
+	// The record kind reads it ("higher than any of the previous 28 days").
+	BaselineDays int `json:"baseline_days,omitempty"`
+	// MissingDays is how many completed days a silent source has missed, and
+	// ReportedDays how many of the seven days before that it did report on.
+	MissingDays  int `json:"missing_days,omitempty"`
+	ReportedDays int `json:"reported_days,omitempty"`
+	// LagDays is the store's own settlement lag, already allowed for in
+	// MissingDays; 0 for a source that reports the same day.
+	LagDays int `json:"lag_days,omitempty"`
+	// Countries is how many were founded on the flagged day, for a cluster.
+	Countries int `json:"countries,omitempty"`
 }
 
 // Mystery is one flagged day: something the numbers did that the numbers

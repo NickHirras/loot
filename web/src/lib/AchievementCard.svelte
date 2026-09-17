@@ -2,7 +2,13 @@
   import { tierColor } from './palette'
   import type { Achievement } from './types'
   import { TIER_RARITY, TIER_XP, currency, dayLabel, integer } from './types'
-  import { achievementTierLabel, rarityLabel } from './labels'
+  import {
+    achievementDescription,
+    achievementTierLabel,
+    achievementTitle,
+    rarityLabel,
+    unitLabel,
+  } from './labels'
   import { m } from '../paraglide/messages'
 
   let {
@@ -27,15 +33,22 @@
     return achievement.money ? currency(value, code, 0) : integer(value)
   }
 
+  const title = $derived(achievementTitle(achievement.key, achievement.title))
+  const description = $derived(achievementDescription(achievement.key, achievement.description))
+
   /** "18 / 25 countries" for a ladder; nothing for a one-off. */
   const progressLine = $derived.by(() => {
     if (achievement.progress_target <= 1) return ''
     const value = format(achievement.progress_value)
     const target = format(achievement.progress_target)
-    // `unit` is the server's own noun ("countries", "chests") and still
-    // arrives in English; translating it is a later phase's job.
+    // The noun agrees with the *target*, not with how far along you are:
+    // English says "1 / 5 countries", never "1 / 5 country".
     return achievement.unit
-      ? m.ach_progress_unit({ value, target, unit: achievement.unit })
+      ? m.ach_progress_unit({
+          value,
+          target,
+          unit: unitLabel(achievement.unit, achievement.progress_target),
+        })
       : m.ach_progress({ value, target })
   })
 
@@ -62,7 +75,7 @@
 >
   <div class="head">
     <span class="medal" aria-hidden="true">{unlocked ? '★' : '☆'}</span>
-    <h4>{achievement.title}</h4>
+    <h4>{title}</h4>
     <span
       class="tier"
       title={m.ach_tier_title({
@@ -91,7 +104,7 @@
     <p class="when faint">{m.ach_not_yet()}</p>
   {/if}
 
-  <p class="desc">{achievement.description}</p>
+  <p class="desc">{description}</p>
 </div>
 
 <style>

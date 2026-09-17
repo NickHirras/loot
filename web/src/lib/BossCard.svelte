@@ -4,6 +4,7 @@
   import type { Boss } from './types'
   import { dayLabel, integer, percent } from './types'
   import { bossUnitLabel } from './labels'
+  import { bossTitle } from './prose'
   import { m } from '../paraglide/messages'
 
   let {
@@ -45,6 +46,13 @@
   )
 
   const unit = $derived(bossUnitLabel(boss.unit || 'crashes'))
+
+  /**
+   * The line under the name: the crash reporter's own title where there is
+   * one, and otherwise the sentence Loot writes about a version — which the
+   * card writes for itself, in the reader's language.
+   */
+  const title = $derived(bossTitle(boss))
 </script>
 
 <article class="boss" class:alive class:slain class:faded class:flashing class:enraged={boss.enraged && alive}>
@@ -58,7 +66,7 @@
     {/if}
   </div>
 
-  <p class="title">{boss.title}</p>
+  <p class="title">{title}</p>
 
   <div class="chips">
     {#if boss.app}<span class="chip">{boss.app}</span>{/if}

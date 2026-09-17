@@ -185,7 +185,8 @@ And a mystery:
     "deviation": 79,                  // median absolute deviation
     "ratio": 3.457,                   // observed / expected
     "unit": "count",                  // or "money"
-    "why": "1,782 against a 28-day median of 516 (z 10.8)"
+    "why": "1,782 against a 28-day median of 516 (z 10.8)",
+    "baseline_days": 28               // plus the facts the card rewrites `why` from
   },
   "status": "open",                   // open | solved | dismissed
   "note": "",

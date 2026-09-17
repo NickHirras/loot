@@ -3,12 +3,15 @@
   import { rarityColor, tierColor } from './palette'
   import type { Recap } from './types'
   import { currency, dayLabel, flagEmoji, integer, percent } from './types'
-  import { eraLabel } from './labels'
+  import { achievementDescription, achievementTitle, eraLabel } from './labels'
+  import { highlightLine, periodLabel } from './prose'
   import { m } from '../paraglide/messages'
 
   let { recap }: { recap: Recap } = $props()
 
   const code = $derived(recap.display_currency || 'USD')
+  /** The window's own name — "January 2026" — written here, not by the API. */
+  const period = $derived(periodLabel(recap.period))
   // The poster takes its colour from the best thing that happened in the
   // month. A quiet month is blue, a month with a legendary in it is gold.
   const accent = $derived(rarityColor(recap.top_rarity || 'rare'))
@@ -38,6 +41,17 @@
   const trophies = $derived(recap.achievements_unlocked ?? [])
   const series = $derived(recap.series ?? [])
 
+  /**
+   * The caption. The API sends each line as a kind and its facts; the sentence
+   * is written here. A kind this build has never heard of renders as nothing
+   * rather than as a gap in the list.
+   */
+  const captions = $derived(
+    (recap.highlights ?? [])
+      .map((h) => highlightLine(h, code, achievementTitle))
+      .filter((line) => line !== ''),
+  )
+
   let copied = $state(false)
   let copyError = $state('')
 
@@ -51,8 +65,8 @@
     const amount = currency(recap.revenue_base, code, 0)
     lines.push(
       recap.period.partial
-        ? m.recap_share_header_partial({ period: recap.period.label })
-        : m.recap_share_header({ period: recap.period.label }),
+        ? m.recap_share_header_partial({ period })
+        : m.recap_share_header({ period }),
     )
     lines.push('')
     lines.push(
@@ -75,13 +89,17 @@
     if (countries.length) {
       lines.push(m.recap_share_settled({ countries: countries.map((c) => c.country).join(', ') }))
     }
-    if (recap.highlights.length) {
+    if (captions.length) {
       lines.push('')
-      for (const h of recap.highlights) lines.push(m.recap_share_bullet({ line: h }))
+      for (const line of captions) lines.push(m.recap_share_bullet({ line }))
     }
     if (trophies.length) {
       lines.push('')
-      lines.push(m.recap_share_achievements({ titles: trophies.map((t) => t.title).join(', ') }))
+      lines.push(
+        m.recap_share_achievements({
+          titles: trophies.map((t) => achievementTitle(t.key, t.title)).join(', '),
+        }),
+      )
     }
     return lines.join('\n')
   }
@@ -137,7 +155,7 @@
 <article class="poster" style="--accent: {accent}">
   <header>
     <div class="titles">
-      <h3>{recap.period.label}</h3>
+      <h3>{period}</h3>
       <span class="sub">
         {m.recap_sub({ unit })}
         {#if recap.period.partial}{m.recap_partial()}{/if}
@@ -149,7 +167,7 @@
   </header>
 
   {#if recap.empty}
-    <p class="empty">{m.recap_empty({ period: recap.period.label, unit })}</p>
+    <p class="empty">{m.recap_empty({ period, unit })}</p>
   {:else}
     <div class="headline">
       <div class="big">
@@ -178,9 +196,9 @@
       {/if}
     </ul>
 
-    {#if recap.highlights.length > 0}
+    {#if captions.length > 0}
       <ul class="highlights">
-        {#each recap.highlights as line, i (line + i)}
+        {#each captions as line, i (line + i)}
           <li>{line}</li>
         {/each}
       </ul>
@@ -204,7 +222,9 @@
         <span class="row-label">{m.recap_achievements()}</span>
         <div class="trophies">
           {#each trophies as t (t.key)}
-            <span class="trophy" style="--tier: {tierColor(t.tier)}" title={t.description}>★ {t.title}</span>
+            <span class="trophy" style="--tier: {tierColor(t.tier)}" title={achievementDescription(t.key, t.description)}
+              >★ {achievementTitle(t.key, t.title)}</span
+            >
           {/each}
         </div>
       </div>
