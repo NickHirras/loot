@@ -1,0 +1,96 @@
+name: Translate
+
+# English is the only hand-maintained catalog. When it moves, this regenerates
+# every other language with Claude and opens a pull request with the result.
+#
+# It runs on `push` to main and on demand, never on a pull request: a workflow
+# triggered by a fork's PR must not be able to spend the API key.
+on:
+  push:
+    branches: [main]
+    paths:
+      - web/messages/en.json
+      - internal/rules/default.yaml
+      - web/project.inlang/settings.json
+      - tools/translate/**
+  workflow_dispatch:
+    inputs:
+      force:
+        description: Retranslate every key, ignoring the lock file
+        type: boolean
+        default: false
+      languages:
+        description: Comma-separated locales to translate (blank = all of them)
+        type: string
+        required: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+# Two runs would translate the same keys twice and race for the same branch.
+# Never cancel one in flight: it has already paid for its tokens.
+concurrency:
+  group: translate
+  cancel-in-progress: false
+
+jobs:
+  translate:
+    name: generate translations
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: tools/translate/go.mod
+          cache-dependency-path: tools/translate/go.sum
+
+      - name: Translate
+        id: translate
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          # The dispatch inputs arrive through the environment rather than
+          # being interpolated into the command, so neither can become shell.
+          FORCE: ${{ inputs.force }}
+          LANGUAGES: ${{ inputs.languages }}
+        run: |
+          if [ -z "$ANTHROPIC_API_KEY" ]; then
+            echo "::error::ANTHROPIC_API_KEY is not set for this repository."
+            exit 1
+          fi
+          args=()
+          if [ "$FORCE" = "true" ]; then args+=(-force); fi
+          if [ -n "$LANGUAGES" ]; then args+=(-languages "$LANGUAGES"); fi
+          go -C tools/translate run . "${args[@]}" -summary "$RUNNER_TEMP/summary.md"
+
+      # Nothing to open a pull request about: every translation was already up
+      # to date with the English source.
+      - name: Nothing changed
+        if: steps.translate.outputs.changed != 'true'
+        run: echo "Every translation is already current with the English source."
+
+      # A pull request opened with GITHUB_TOKEN does not trigger workflows, so
+      # CI would never run on it and the -check step that validates these very
+      # files would be skipped. Set TRANSLATE_PR_TOKEN to a fine-grained
+      # personal access token scoped to this repository with Contents:
+      # read/write and Pull requests: read/write, and the PR arrives with CI
+      # green or red like any other.
+      - name: Open a pull request
+        if: steps.translate.outputs.changed == 'true'
+        uses: peter-evans/create-pull-request@v8
+        with:
+          token: ${{ secrets.TRANSLATE_PR_TOKEN || secrets.GITHUB_TOKEN }}
+          branch: translations/update
+          delete-branch: true
+          commit-message: "i18n: update generated translations"
+          title: "i18n: update generated translations"
+          body-path: ${{ runner.temp }}/summary.md
+          # GitHub creates a label that does not exist yet when it is added
+          # this way; drop this line if your organisation restricts that.
+          labels: translations
+          add-paths: |
+            web/messages/*.json
+            internal/rules/locales/*.yaml
+            i18n.lock.json

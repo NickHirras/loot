@@ -25,7 +25,12 @@ jobs:
         uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
-          cache-dependency-path: go.sum
+          # Both modules: the product binary, and the translation tool, which
+          # has its own module so that the Anthropic SDK is not a dependency
+          # of loot itself.
+          cache-dependency-path: |
+            go.sum
+            tools/translate/go.sum
 
       - name: Set up Node
         uses: actions/setup-node@v7
@@ -51,7 +56,7 @@ jobs:
 
       - name: gofmt
         run: |
-          unformatted="$(gofmt -l cmd internal web/embed.go)"
+          unformatted="$(gofmt -l cmd internal web/embed.go tools)"
           if [ -n "$unformatted" ]; then
             echo "::error::gofmt would reformat these files; run 'make fmt'"
             echo "$unformatted"
@@ -63,6 +68,16 @@ jobs:
 
       - name: go test
         run: go test ./... -count=1
+
+      # The translations are generated from the English source, so CI's job is
+      # to prove the generated files still agree with it: no dropped
+      # {placeholder}, no rewritten {{…}} expression, no plural message missing
+      # the categories its language actually uses. This never calls the API.
+      - name: Validate the translations
+        run: go -C tools/translate run . -check
+
+      - name: Test the translation tool
+        run: go -C tools/translate test ./... -count=1
 
       - name: Build the binary
         run: go build -trimpath -o /tmp/loot ./cmd/loot

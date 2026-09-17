@@ -498,7 +498,36 @@ Three things follow from that, all of them deliberate:
 - **History stays as it was written.** Drops minted before this version did not record their rule, so there is nothing to re-render them from; they keep the language they were written in forever. New drops from the same rules do translate.
 - **A fixed `language` is written, not just displayed.** With `language: "de"` the drops themselves are stored in German, so `loot tail` and anything reading the websocket say what the dashboard says.
 
-**Only English ships today.** The other languages are wired up and empty: anything untranslated falls back to English, so nothing breaks and nothing is half-translated. The translations themselves arrive in a later release; the German rule overlay in `internal/rules/locales/` is the first of them, and is deliberately partial.
+Anything untranslated falls back to English, key by key, so a language that is thin is thin rather than broken and a half-filled catalog never shows a blank label.
+
+### Translations
+
+**English is the only language anybody writes.** There are exactly two hand-maintained files:
+
+| hand-maintained file | what it holds |
+|---|---|
+| `web/messages/en.json` | every string in the dashboard |
+| `internal/rules/default.yaml` | the drop headlines, as Go templates |
+
+Every other language is generated from those two by Claude, through [`tools/translate`](tools/translate/README.md) and the `Translate` workflow. When English changes on `main`, the workflow retranslates **only the keys whose English actually moved**, validates each one, and opens a pull request titled `i18n: update generated translations` with a table of what it did. No key is ever paid for twice, and a run that changes nothing opens no pull request.
+
+```bash
+make translate-plan     # what a run would do, without calling the API
+make translate          # do it (needs ANTHROPIC_API_KEY)
+```
+
+**To fix a wrong translation, just fix it.** Edit the string in `web/messages/de.json`, or the entry in `internal/rules/locales/default.de.yaml`, and commit. Your version stays exactly as you wrote it until the *English* it translates changes — the tool compares a hash of the English source recorded in `i18n.lock.json`, and never looks at the translation itself. To fix a word everywhere rather than one string, pin it in `tools/translate/glossary.yaml`: Loot's own vocabulary lives there (drop, chest, vault, hearth, codex, settlement, quest, mystery, boss, era, the rarity names, XP, level, streak, record), each with a slot per language that ships empty and is honoured once filled.
+
+**To add a language**, add its BCP-47 tag to `web/project.inlang/settings.json` — that list is the single source of truth for both catalogs — and run the `Translate` workflow from the Actions tab with **Run workflow**. It takes an optional `languages` box, so you can translate just the new one, and a `force` checkbox that retranslates everything from scratch.
+
+Two repository secrets:
+
+- **`ANTHROPIC_API_KEY`** — required. Nothing translates without it.
+- **`TRANSLATE_PR_TOKEN`** — recommended. A pull request opened with the default `GITHUB_TOKEN` does not trigger workflows, so CI would never run on the translations. A fine-grained personal access token scoped to this repository (Contents: read/write, Pull requests: read/write) fixes that. Without it the workflow still works; you just have to push the branch again to get CI.
+
+**CI validates the translations on every pull request** with `go -C tools/translate run . -check`, which never calls the API. It fails on a dropped or invented `{placeholder}`, a rewritten `{{…}}` expression, a plural message whose arms are not the categories its language actually uses (Russian needs four, Japanese one), a translation more than four times the length of its English, or an overlay naming a rule that does not exist.
+
+**Cost.** A full first run — about 554 messages and 96 rule templates into ten languages — is a few dollars, once. After that a run costs whatever the day's English edits cost, which is usually cents: the system prompt and glossary are one cached prefix shared by every batch, and untouched keys are never sent at all.
 
 ## The vault
 

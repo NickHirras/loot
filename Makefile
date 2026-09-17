@@ -63,16 +63,27 @@ tail: ## Stream drops into this terminal
 .PHONY: test
 test: ## Run the Go tests
 	go test ./...
+	go -C tools/translate test ./...
 
 .PHONY: check
-check: ## Vet the Go code and type-check the frontend
+check: ## Vet the Go code, validate the translations, type-check the frontend
 	go vet ./...
-	gofmt -l cmd internal web/embed.go
+	gofmt -l cmd internal web/embed.go tools
+	go -C tools/translate vet ./...
+	go -C tools/translate run . -check
 	cd web && $(NPM) run check
 
 .PHONY: fmt
 fmt: ## Format the Go code
-	gofmt -w cmd internal web/embed.go
+	gofmt -w cmd internal web/embed.go tools
+
+.PHONY: translate
+translate: ## Regenerate the translations (needs ANTHROPIC_API_KEY)
+	go -C tools/translate run .
+
+.PHONY: translate-plan
+translate-plan: ## Show what a translation run would do, without calling the API
+	go -C tools/translate run . -dry-run
 
 .PHONY: ci
 ci: check test build ## Everything CI should run
