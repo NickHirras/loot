@@ -1,0 +1,106 @@
+# Loot default rules — German.
+#
+# An overlay: the translatable half of default.yaml and nothing else. Each
+# entry names a rule from default.yaml and gives its title and subtitle in this
+# language; rarity, XP and matching are decisions rather than words and live in
+# default.yaml alone.
+#
+# Every `{{…}}` expression is identical to the English template, because it
+# renders against the same event. Reordering them around the German sentence is
+# fine and often necessary; changing what one says is not.
+#
+# An entry applies only while the rule it names still has default.yaml's own
+# wording. Copy default.yaml, rewrite a title, and that title stays yours in
+# every language — see internal/rules/locales.go.
+#
+# This file is hand-written and deliberately partial: it covers the drops a new
+# Loot sees first. The rest stay English until the translation pass fills them
+# in.
+
+rules:
+  - name: revenuecat-churn
+    then:
+      title: "Abonnent verloren"
+      subtitle: "{{.Kind}}{{if .App}} · {{.App}}{{end}}"
+
+  - name: revenuecat-winback
+    then:
+      title: "Ein Abonnent kehrt zurück"
+      subtitle: "{{.App}}"
+
+  - name: revenuecat-annual
+    then:
+      title: "Neues Jahresabo"
+      subtitle: "{{.AmountFmt}}{{if .App}} · {{.App}}{{end}}"
+
+  - name: revenuecat-high-value
+    then:
+      title: "Neuer Abonnent"
+      subtitle: "{{.AmountFmt}}{{if .App}} · {{.App}}{{end}}"
+
+  - name: revenuecat-purchase
+    then:
+      title: "Neuer Abonnent"
+      subtitle: "{{.AmountFmt}}{{if .App}} · {{.App}}{{end}}"
+
+  - name: revenuecat-renewal
+    then:
+      title: "Verlängerung"
+      subtitle: "{{.AmountFmt}}{{if .App}} · {{.App}}{{end}}"
+
+  # "Verkauf/Verkäufe" and "Download/Downloads" decline the same way the
+  # English plurals do, so the {{if ne …}} guards keep their shape.
+  - name: sales-day-record
+    then:
+      title: "Bester Tag aller Zeiten auf {{.SourceName}}"
+      subtitle: '{{if gt .Quantity 0}}{{.QuantityFmt}} {{if ne .Quantity 1}}Verkäufe{{else}}Verkauf{{end}} · {{.AmountFmt}}{{else if .Payload.downloads}}{{.Payload.downloads}} Download{{if ne (printf "%v" .Payload.downloads) "1"}}s{{end}}{{else}}ein ruhiger Tag{{end}}{{if .App}} · {{.App}}{{end}}'
+
+  - name: sales-day-big
+    then:
+      title: '{{if gt .Quantity 0}}{{.QuantityFmt}} {{if ne .Quantity 1}}Verkäufe{{else}}Verkauf{{end}} · {{.AmountFmt}}{{else if .Payload.downloads}}{{.Payload.downloads}} Download{{if ne (printf "%v" .Payload.downloads) "1"}}s{{end}}{{else}}ein ruhiger Tag{{end}}'
+      subtitle: "ein großer Tag{{if .App}} für {{.App}}{{end}} auf {{.SourceName}}"
+
+  - name: sales-day
+    then:
+      title: '{{if gt .Quantity 0}}{{.QuantityFmt}} {{if ne .Quantity 1}}Verkäufe{{else}}Verkauf{{end}} · {{.AmountFmt}}{{else if .Payload.downloads}}{{.Payload.downloads}} Download{{if ne (printf "%v" .Payload.downloads) "1"}}s{{end}}{{else}}ein ruhiger Tag{{end}}'
+      subtitle: "{{if .App}}{{.App}} · {{end}}{{.SourceName}}"
+
+  - name: installs-day-record
+    then:
+      title: "Bester Installationstag auf {{.SourceName}}"
+      subtitle: "{{.QuantityFmt}} Installationen{{if .App}} · {{.App}}{{end}}"
+
+  - name: installs-day
+    then:
+      title: "{{.QuantityFmt}} Installationen auf {{.SourceName}}"
+      subtitle: "{{.App}}"
+
+  - name: settlement
+    then:
+      title: "Neue Siedlung: {{.Flag}} {{.Country}}"
+      subtitle: "erster Kunde über {{.Payload.via}}"
+
+  - name: achievement-legendary
+    then:
+      title: "Errungenschaft: {{.Payload.title}}"
+      subtitle: "{{.Payload.description}}"
+
+  - name: achievement-gold
+    then:
+      title: "Errungenschaft: {{.Payload.title}}"
+      subtitle: "{{.Payload.description}}"
+
+  - name: achievement-silver
+    then:
+      title: "Errungenschaft: {{.Payload.title}}"
+      subtitle: "{{.Payload.description}}"
+
+  - name: achievement
+    then:
+      title: "Errungenschaft: {{.Payload.title}}"
+      subtitle: "{{.Payload.description}}"
+
+fallback:
+  then:
+    title: "{{.Source}} · {{.Kind}}"
+    subtitle: "{{.App}}"

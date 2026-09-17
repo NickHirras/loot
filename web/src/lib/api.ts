@@ -221,10 +221,18 @@ export async function fireFakeDrop(req: FakeDropRequest): Promise<void> {
   await postJSON('/api/dev/fake', req)
 }
 
-/** The websocket URL for this page, honouring https and any base path. */
+/**
+ * The websocket URL for this page, honouring https and any base path.
+ *
+ * The language rides on the query string because a websocket handshake is the
+ * one request the app cannot put a header on. Without it a live drop would
+ * arrive in the language the *server* was configured with while the feed
+ * beside it was fetched in the reader's, which is visible the moment a drop
+ * lands: the same sentence, twice, in two languages.
+ */
 export function websocketURL(): string {
   const proto = location.protocol === 'https:' ? 'wss:' : 'ws:'
-  return `${proto}//${location.host}/ws`
+  return `${proto}//${location.host}/ws?lang=${encodeURIComponent(currentLocale())}`
 }
 
 /**

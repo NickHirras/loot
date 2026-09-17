@@ -173,10 +173,12 @@ func (s *Store) InsertDrop(ctx context.Context, d core.Drop) error {
 		revealed = d.RevealedAt.UTC().UnixMilli()
 	}
 	_, err := s.q.ExecContext(ctx, `
-        INSERT INTO drops (id, event_id, rarity, title, subtitle, xp, created_at, chest_date, revealed_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        INSERT INTO drops (id, event_id, rarity, title, subtitle, xp, created_at, chest_date, revealed_at,
+                           rule, floor_rule, lang)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		d.ID, d.EventID, string(d.Rarity), d.Title, d.Subtitle, d.XP,
-		d.CreatedAt.UTC().UnixMilli(), d.ChestDate, revealed)
+		d.CreatedAt.UTC().UnixMilli(), d.ChestDate, revealed,
+		d.Rule, d.FloorRule, d.Lang)
 	if err != nil {
 		return fmt.Errorf("insert drop: %w", err)
 	}
@@ -317,20 +319,27 @@ type DropView struct {
 	App    string `json:"app"`
 	// Product is the canonical app this drop belongs to, or "" for a
 	// realm-wide one. The UI filters live drops on it.
-	Product    string          `json:"product"`
-	Country    string          `json:"country"`
-	Amount     float64         `json:"amount"`
-	AmountBase float64         `json:"amount_base"`
-	Currency   string          `json:"currency"`
-	Quantity   int             `json:"quantity"`
-	Day        string          `json:"day"`
-	OccurredAt time.Time       `json:"occurred_at"`
-	Payload    json.RawMessage `json:"payload,omitempty"`
+	Product    string    `json:"product"`
+	Country    string    `json:"country"`
+	Amount     float64   `json:"amount"`
+	AmountBase float64   `json:"amount_base"`
+	Currency   string    `json:"currency"`
+	Quantity   int       `json:"quantity"`
+	Day        string    `json:"day"`
+	OccurredAt time.Time `json:"occurred_at"`
+	// Payload is the originating event's raw source payload, which is what a
+	// title template's {{.Payload.…}} expressions read. It is deliberately not
+	// serialized: a feed page is a hundred drops, and a hundred App Store rows
+	// or RevenueCat webhook bodies would be several times the size of the page
+	// they decorate, for a field no client has ever read. It is selected so
+	// that a drop can be re-rendered in another language on the way out; the
+	// wire format is unchanged.
+	Payload json.RawMessage `json:"-"`
 }
 
 // Event reconstructs the originating event from the joined columns, which is
-// what the bus needs when replaying a revealed chest drop. Payload is not
-// selected by the feed queries, so it is absent here.
+// what the bus needs when replaying a revealed chest drop and what re-renders
+// a title in the reader's language.
 func (v DropView) Event() core.Event {
 	return core.Event{
 		ID:         v.EventID,
@@ -345,14 +354,15 @@ func (v DropView) Event() core.Event {
 		AmountBase: v.AmountBase,
 		Currency:   v.Currency,
 		Quantity:   v.Quantity,
+		Payload:    v.Payload,
 	}
 }
 
 const dropSelect = `
 SELECT d.id, d.event_id, d.rarity, d.title, d.subtitle, d.xp, d.created_at,
-       d.chest_date, d.revealed_at,
+       d.chest_date, d.revealed_at, d.rule, d.floor_rule, d.lang,
        e.source, e.kind, e.app, e.product, e.country, e.amount, e.amount_base, e.currency,
-       e.quantity, e.day, e.occurred_at
+       e.quantity, e.day, e.occurred_at, e.payload
 FROM drops d
 JOIN events e ON e.id = d.event_id`
 
@@ -445,12 +455,16 @@ func scanDrops(rows *sql.Rows, capacity int) ([]DropView, error) {
 			createdAt  int64
 			revealedAt sql.NullInt64
 			occurredAt int64
+			payload    []byte
 		)
 		if err := rows.Scan(&v.ID, &v.EventID, &rarity, &v.Title, &v.Subtitle, &v.XP, &createdAt,
-			&v.ChestDate, &revealedAt,
+			&v.ChestDate, &revealedAt, &v.Rule, &v.FloorRule, &v.Lang,
 			&v.Source, &v.Kind, &v.App, &v.Product, &v.Country, &v.Amount, &v.AmountBase, &v.Currency,
-			&v.Quantity, &v.Day, &occurredAt); err != nil {
+			&v.Quantity, &v.Day, &occurredAt, &payload); err != nil {
 			return nil, fmt.Errorf("scan drop: %w", err)
+		}
+		if len(payload) > 0 {
+			v.Payload = append(json.RawMessage(nil), payload...)
 		}
 		v.Rarity = core.Rarity(rarity)
 		v.CreatedAt = time.UnixMilli(createdAt).UTC()

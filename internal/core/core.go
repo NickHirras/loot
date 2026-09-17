@@ -144,6 +144,20 @@ type Drop struct {
 	// waiting. A drop is hidden from the feed while ChestDate != "" and
 	// RevealedAt is nil.
 	RevealedAt *time.Time `json:"revealed_at,omitempty"`
+	// Rule is the name of the rules-file entry that wrote Title and Subtitle,
+	// "fallback" when the fallback did, or "" when neither could be
+	// identified — which is also what every drop minted before Loot recorded
+	// this reads back as. It is what lets a reader be shown the same sentence
+	// in another language: the text is re-rendered from the rule rather than
+	// translated after the fact, and a drop with no rule is simply left alone.
+	Rule string `json:"rule,omitempty"`
+	// FloorRule is the name of the floor rule that relabelled the drop after
+	// the winning rule ran, or "" when none did.
+	FloorRule string `json:"floor_rule,omitempty"`
+	// Lang is the language Title and Subtitle were written in ("en" unless a
+	// fixed `language` was configured at ingest), or "" for a drop from before
+	// Loot recorded it.
+	Lang string `json:"lang,omitempty"`
 }
 
 // ChestSummary describes one unopened daily chest. It is what the chest API

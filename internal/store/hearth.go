@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"sort"
 	"strings"
@@ -150,6 +151,30 @@ type HearthDrop struct {
 	Subtitle  string      `json:"subtitle"`
 	Kind      string      `json:"kind"`
 	CreatedAt time.Time   `json:"created_at"`
+
+	// Rule, FloorRule, Lang and Event are what lets the ticker be re-rendered
+	// in the reader's language on the way out (see rules.Engine.Localize).
+	// None of them are serialized: the ticker's wire format is still a title,
+	// a subtitle and a country.
+	Rule      string     `json:"-"`
+	FloorRule string     `json:"-"`
+	Lang      string     `json:"-"`
+	Event     core.Event `json:"-"`
+}
+
+// Drop is the part of this row the rules engine needs to re-render it.
+func (d HearthDrop) Drop() core.Drop {
+	return core.Drop{
+		ID:        d.ID,
+		EventID:   d.Event.ID,
+		Rarity:    d.Rarity,
+		Title:     d.Title,
+		Subtitle:  d.Subtitle,
+		CreatedAt: d.CreatedAt,
+		Rule:      d.Rule,
+		FloorRule: d.FloorRule,
+		Lang:      d.Lang,
+	}
 }
 
 // Hearth is the whole of GET /api/hearth.
@@ -527,7 +552,10 @@ func (s *Store) hearthDropCounts(ctx context.Context) (map[string]int, error) {
 func (s *Store) hearthRecent(ctx context.Context) ([]HearthDrop, error) {
 	loose, looseArgs := s.scopeLoose("e")
 	rows, err := s.q.QueryContext(ctx, `
-        SELECT d.id, d.rarity, d.title, d.subtitle, d.created_at, e.country, e.kind
+        SELECT d.id, d.rarity, d.title, d.subtitle, d.created_at, e.country, e.kind,
+               d.rule, d.floor_rule, d.lang,
+               e.id, e.source, e.app, e.product, e.day, e.occurred_at,
+               e.amount, e.amount_base, e.currency, e.quantity, e.payload
         FROM drops d JOIN events e ON e.id = d.event_id
         WHERE NOT `+unrevealed+` AND e.country <> ''`+loose+`
         ORDER BY d.id DESC
@@ -540,15 +568,26 @@ func (s *Store) hearthRecent(ctx context.Context) ([]HearthDrop, error) {
 	out := make([]HearthDrop, 0, maxHearthRecent)
 	for rows.Next() {
 		var (
-			d         HearthDrop
-			rarity    string
-			createdAt int64
+			d          HearthDrop
+			rarity     string
+			createdAt  int64
+			occurredAt int64
+			payload    []byte
 		)
-		if err := rows.Scan(&d.ID, &rarity, &d.Title, &d.Subtitle, &createdAt, &d.Country, &d.Kind); err != nil {
+		if err := rows.Scan(&d.ID, &rarity, &d.Title, &d.Subtitle, &createdAt, &d.Country, &d.Kind,
+			&d.Rule, &d.FloorRule, &d.Lang,
+			&d.Event.ID, &d.Event.Source, &d.Event.App, &d.Event.Product, &d.Event.Day, &occurredAt,
+			&d.Event.Amount, &d.Event.AmountBase, &d.Event.Currency, &d.Event.Quantity, &payload); err != nil {
 			return nil, fmt.Errorf("scan hearth recent: %w", err)
 		}
 		d.Rarity = core.Rarity(rarity)
 		d.CreatedAt = time.UnixMilli(createdAt).UTC()
+		d.Event.Kind = d.Kind
+		d.Event.Country = d.Country
+		d.Event.OccurredAt = time.UnixMilli(occurredAt).UTC()
+		if len(payload) > 0 {
+			d.Event.Payload = append(json.RawMessage(nil), payload...)
+		}
 		out = append(out, d)
 	}
 	if err := rows.Err(); err != nil {

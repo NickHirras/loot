@@ -65,8 +65,13 @@ func (c *hearthCache) put(scope string, h store.Hearth) {
 // trade than serializing every reader behind the first one.
 func (s *Server) handleHearth(w http.ResponseWriter, r *http.Request) {
 	scope := scopeOf(r)
+	lang := s.requestLang(r)
+	// The memo is per scope, not per language: the aggregate is the same
+	// numbers whoever is reading, and only the arrivals ticker is prose. It is
+	// translated on the way out of the cache rather than into it, so one
+	// German reader cannot leave a German ticker behind for everyone else.
 	if hearth, ok := s.hearth.cached(scope); ok {
-		writeJSON(w, http.StatusOK, hearth)
+		writeJSON(w, http.StatusOK, s.localizeHearth(r, lang, hearth))
 		return
 	}
 
@@ -79,5 +84,5 @@ func (s *Server) handleHearth(w http.ResponseWriter, r *http.Request) {
 	}
 	s.hearth.put(scope, hearth)
 
-	writeJSON(w, http.StatusOK, hearth)
+	writeJSON(w, http.StatusOK, s.localizeHearth(r, lang, hearth))
 }

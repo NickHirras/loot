@@ -24,3 +24,17 @@ func DistFS() fs.FS {
 	}
 	return sub
 }
+
+// The message catalog, embedded as its source JSON rather than as the compiled
+// Paraglide output: the dashboard reads the compiled functions, but the server
+// needs to answer "what is this key in German?" for a key it only learns at
+// runtime — an achievement's own key — and a flat JSON file is the only form
+// that can be indexed. See internal/i18n. These files are checked in, so
+// unlike dist/ this embed never needs a build to have run.
+//
+//go:embed messages/*.json
+var messagesFS embed.FS
+
+// MessagesFS returns the Paraglide message catalogs, one messages/<lang>.json
+// per language.
+func MessagesFS() fs.FS { return messagesFS }

@@ -251,4 +251,26 @@ CREATE INDEX events_product_day_idx        ON events(product, day);
 CREATE INDEX events_product_source_day_idx ON events(product, source, day);
 `,
 	},
+	{
+		// What produced a drop's sentence, so it can be produced again in
+		// another language.
+		//
+		// `rule` and `floor_rule` name the rules-file entries that wrote the
+		// title and subtitle; `lang` is the language they were written in.
+		// Together they are enough for a reader in German to be shown the
+		// German rendering of the same rule at read time, without ever
+		// rewriting the stored row — the English text stays exactly as it was
+		// minted, and is what any reader who asks for no language gets.
+		//
+		// Existing rows keep the default '': a drop from before this
+		// migration cannot be re-rendered (nothing recorded which rule it came
+		// from) and is shown in the language it was written in forever, which
+		// is the honest answer rather than a guess.
+		Name: "0007_drop_rule",
+		SQL: `
+ALTER TABLE drops ADD COLUMN rule       TEXT NOT NULL DEFAULT '';
+ALTER TABLE drops ADD COLUMN floor_rule TEXT NOT NULL DEFAULT '';
+ALTER TABLE drops ADD COLUMN lang       TEXT NOT NULL DEFAULT '';
+`,
+	},
 }

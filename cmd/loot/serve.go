@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -141,6 +142,16 @@ func runServe(args []string) error {
 		return err
 	}
 	engine.SetDisplayCurrency(cfg.DisplayCurrency)
+	// A fixed `language` is a statement about the whole dashboard, so new
+	// drops are written in it: `loot tail` and the websocket then say the same
+	// sentence the page does without negotiating anything. "auto" (or empty)
+	// leaves drops in English and translates them per reader instead.
+	if lang := strings.TrimSpace(cfg.Language); lang != "" && !strings.EqualFold(lang, "auto") {
+		engine.SetLanguage(lang)
+		if engine.HasOverlay(lang) {
+			log.Info("drops will be written in", "language", lang)
+		}
+	}
 	if cfg.RulesPath != "" {
 		log.Info("rules loaded", "path", cfg.RulesPath)
 	}
@@ -422,6 +433,7 @@ func runServe(args []string) error {
 	srv.Mysteries = mysterySvc
 	srv.Codex = codexSvc
 	srv.Bosses = bossSvc
+	srv.Rules = engine
 	// A spawn or a kill invalidates the board's memo for the same reason an
 	// unlock invalidates the wall's: the nudge and the stale answer would
 	// otherwise race, and the page would redraw a boss that is already dead.

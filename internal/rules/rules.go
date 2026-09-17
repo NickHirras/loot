@@ -18,6 +18,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/nickhirras/loot/internal/core"
+	"github.com/nickhirras/loot/internal/i18n"
 )
 
 // Lookup is the slice of the store the rules engine needs for rules that
@@ -83,6 +84,11 @@ type Engine struct {
 	templates map[string]*template.Template
 	// displayCurrency is what {{.AmountBaseFmt}} is denominated in.
 	displayCurrency string
+	// overlays are the per-language renderings of the default rules, keyed by
+	// BCP-47 tag; see locales.go.
+	overlays map[string]*compiledOverlay
+	// lang is the language new drops are written in, or "" for English.
+	lang string
 
 	needsCountryFirst bool
 	needsRecordHigh   bool
@@ -149,6 +155,13 @@ func New(cfg Config, lookup Lookup) (*Engine, error) {
 	return e, nil
 }
 
+// fallbackRule is the name Classify records for a drop the `fallback` block
+// produced, and the key its templates are compiled under. It cannot collide
+// with a real rule: `name: fallback` in the rules list would be a rule that
+// says it is the fallback, and rendering it as one is the only sensible
+// reading anyway.
+const fallbackRule = "fallback"
+
 // SetDisplayCurrency tells the engine which currency {{.AmountBase}} is in, so
 // {{.AmountBaseFmt}} can label it. Defaults to USD.
 func (e *Engine) SetDisplayCurrency(cur string) {
@@ -181,7 +194,16 @@ func Load(path string, lookup Lookup) (*Engine, error) {
 	if err != nil {
 		return nil, err
 	}
-	return New(cfg, lookup)
+	e, err := New(cfg, lookup)
+	if err != nil {
+		return nil, err
+	}
+	// Every engine can translate, including one built from a rules file of
+	// your own: an overlay entry only applies to a rule whose words are still
+	// the defaults' (see locales.go), so a customised file simply translates
+	// less of itself.
+	e.LoadOverlays()
+	return e, nil
 }
 
 // tmplData is what title/subtitle templates are rendered against.
@@ -235,8 +257,14 @@ func (e *Engine) Classify(ctx context.Context, ev core.Event) (core.Drop, error)
 		}
 	}
 
-	var then Then
-	ruleName := "fallback"
+	var (
+		then Then
+		// ruleName is both the template key and what the drop records as its
+		// provenance, so that it can be re-rendered in another language later.
+		// A drop from neither a rule nor a configured fallback records "",
+		// which reads as "do not touch this one".
+		ruleName = fallbackRule
+	)
 	if matched {
 		then = chosen.Then
 		ruleName = chosen.Name
@@ -244,6 +272,7 @@ func (e *Engine) Classify(ctx context.Context, ev core.Event) (core.Drop, error)
 		then = *e.cfg.Fallback
 	} else {
 		then = Then{Rarity: core.Common, Title: "{{.Source}} · {{.Kind}}"}
+		ruleName = ""
 	}
 
 	title := e.render(ruleName, "title", then.Title, data)
@@ -252,6 +281,7 @@ func (e *Engine) Classify(ctx context.Context, ev core.Event) (core.Drop, error)
 	xp := xpFor(then, rarity)
 
 	// Floor pass: raise, never lower.
+	floorName := ""
 	for i := range e.cfg.Rules {
 		r := &e.cfg.Rules[i]
 		if !r.Floor {
@@ -275,6 +305,7 @@ func (e *Engine) Classify(ctx context.Context, ev core.Event) (core.Drop, error)
 			title = floorTitle
 		}
 		subtitle = floorSub
+		floorName = r.Name
 		rarity = r.Then.Rarity
 		if fxp := xpFor(r.Then, rarity); fxp > xp {
 			xp = fxp
@@ -285,7 +316,7 @@ func (e *Engine) Classify(ctx context.Context, ev core.Event) (core.Drop, error)
 		title = strings.TrimSpace(ev.Source + " " + ev.Kind)
 	}
 
-	return core.Drop{
+	d := core.Drop{
 		ID:        core.NewID(),
 		EventID:   ev.ID,
 		Rarity:    rarity,
@@ -293,7 +324,21 @@ func (e *Engine) Classify(ctx context.Context, ev core.Event) (core.Drop, error)
 		Subtitle:  subtitle,
 		XP:        xp,
 		CreatedAt: time.Now().UTC(),
-	}, nil
+		Rule:      ruleName,
+		FloorRule: floorName,
+		Lang:      i18n.BaseLang,
+	}
+
+	// A Loot configured for one fixed language writes its drops in it, so that
+	// the two readers who never negotiate anything — `loot tail` and whatever
+	// is listening on the websocket — hear the same sentence the dashboard
+	// shows. Everything else stores English and is translated on the way out.
+	if e.lang != "" && e.lang != i18n.BaseLang {
+		if t, s, ok := e.Localize(ctx, d, ev, facts.payload, e.lang); ok {
+			d.Title, d.Subtitle, d.Lang = t, s, e.lang
+		}
+	}
+	return d, nil
 }
 
 func xpFor(t Then, r core.Rarity) int {

@@ -167,6 +167,11 @@ func (s *Server) handleChestOpen(w http.ResponseWriter, r *http.Request) {
 	if drops == nil {
 		drops = []store.DropView{}
 	}
+	// The cascade the opener watches is in the opener's language. The same
+	// drops also go out on the bus, where each connection localizes them for
+	// itself — see handleWS.
+	s.localizeDrops(r, s.requestLang(r), drops)
+
 	writeJSON(w, http.StatusOK, map[string]any{
 		"opened":       opened,
 		"opened_dates": dates,
