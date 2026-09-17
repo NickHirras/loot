@@ -1,7 +1,9 @@
 <script lang="ts">
   import { questsState } from './quests.svelte'
   import type { Quest } from './types'
-  import { METRIC_ICON, METRIC_LABEL, currency, integer, percent } from './types'
+  import { METRIC_ICON, currency, integer, percent } from './types'
+  import { metricLabel } from './labels'
+  import { m } from '../paraglide/messages'
 
   let {
     quest,
@@ -25,14 +27,14 @@
   /** Ended quests read as a plain fact — "ended · 62%" — never as a failure. */
   const statusLine = $derived(
     done
-      ? `completed${quest.xp ? ` · +${integer(quest.xp)} XP` : ''}`
+      ? quest.xp
+        ? m.quest_completed_xp({ xp: integer(quest.xp) })
+        : m.quest_completed()
       : ended
-        ? `ended · ${percent(quest.pct)}`
+        ? m.quest_ended({ pct: percent(quest.pct) })
         : quest.days_left <= 0
-          ? 'last day'
-          : quest.days_left === 1
-            ? '1 day left'
-            : `${quest.days_left} days left`,
+          ? m.quest_last_day()
+          : m.quest_days_left({ count: quest.days_left }),
   )
 
   /** A window of four weeks or more is a month's quest, exactly as the server
@@ -42,7 +44,13 @@
       (Date.parse(`${quest.window_end}T00:00:00Z`) - Date.parse(`${quest.window_start}T00:00:00Z`)) / 86_400_000,
     ) + 1,
   )
-  const windowLabel = $derived(windowDays >= 28 ? 'this month' : windowDays === 7 ? 'this week' : `${windowDays} days`)
+  const windowLabel = $derived(
+    windowDays >= 28
+      ? m.quest_window_month()
+      : windowDays === 7
+        ? m.quest_window_week()
+        : m.quest_window_days({ count: windowDays }),
+  )
 </script>
 
 <article class="quest" class:done class:ended class:flashing>
@@ -50,13 +58,13 @@
     <span class="icon" aria-hidden="true">{METRIC_ICON[quest.metric] ?? '◆'}</span>
     <h4>{quest.title}</h4>
     {#if quest.kind === 'custom'}
-      <span class="tag">custom</span>
+      <span class="tag">{m.quest_custom()}</span>
     {/if}
     {#if quest.kind === 'custom' && quest.status === 'active'}
       <button
         class="remove"
-        title="Remove this quest"
-        aria-label="Remove quest {quest.title}"
+        title={m.quest_remove_title()}
+        aria-label={m.quest_remove_aria({ title: quest.title })}
         disabled={questsState.isBusy(quest.id)}
         onclick={() => questsState.remove(quest.id)}>×</button
       >
@@ -71,7 +79,7 @@
     <span class="figures">
       <strong>{format(quest.value)}</strong>
       <span class="of">/ {format(quest.target)}</span>
-      <span class="metric">{METRIC_LABEL[quest.metric] ?? quest.metric}</span>
+      <span class="metric">{metricLabel(quest.metric)}</span>
     </span>
     <span class="status">{statusLine}</span>
   </div>

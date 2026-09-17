@@ -10,6 +10,8 @@
   import { router } from './lib/route.svelte'
   import { scope } from './lib/scope.svelte'
   import { loot } from './lib/state.svelte'
+  import { slots } from './lib/markup'
+  import { m } from './paraglide/messages'
 
   $effect(() => {
     void loot.start()
@@ -37,6 +39,10 @@
   // monitor. The sound banner still shows, because a muted ambient globe is
   // half the experience and one click fixes it.
   const bare = $derived(router.ambient)
+
+  // "press <kbd>m</kbd> to mute" is one sentence to a translator; the <kbd> is
+  // a placeholder in it, so the key can move to wherever the sentence puts it.
+  const muteHint = $derived(slots((key) => m.app_footer_mute_hint({ key })))
 </script>
 
 <svelte:window
@@ -48,8 +54,10 @@
 {#if needsUnlock}
   <button class="unlock" onclick={() => loot.enableAudio()}>
     <span class="speaker" aria-hidden="true">🔈</span>
-    Click to enable drop sounds
-    <span class="dismiss" onclick={(e) => { e.stopPropagation(); loot.toggleMute() }} role="none">no thanks</span>
+    {m.app_enable_sounds()}
+    <span class="dismiss" onclick={(e) => { e.stopPropagation(); loot.toggleMute() }} role="none"
+      >{m.app_enable_sounds_dismiss()}</span
+    >
   </button>
 {/if}
 
@@ -79,8 +87,8 @@
 
 {#if !bare}
   <footer>
-    <span>Loot · self-hosted loot tracking for indie devs</span>
-    <span class="hint">press <kbd>m</kbd> to mute</span>
+    <span>{m.app_footer_tagline()}</span>
+    <span class="hint">{muteHint[0]}<kbd>m</kbd>{muteHint[1]}</span>
   </footer>
 {/if}
 

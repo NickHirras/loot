@@ -6,6 +6,8 @@
   import type { CodexFilter } from './codex.svelte'
   import { rarityColor } from './palette'
   import { currency, dayLabel, integer, monthLabel } from './types'
+  import { eraLabel } from './labels'
+  import { m } from '../paraglide/messages'
 
   // The page owns the polling: mounting starts it, leaving stops it. The store
   // already untracks its own setup; untracking here as well means a future
@@ -17,10 +19,10 @@
   const records = $derived(board?.records)
   const totals = $derived(board?.totals)
 
-  const FILTERS: { id: CodexFilter; label: string }[] = [
-    { id: 'all', label: 'All' },
-    { id: 'unlocked', label: 'Unlocked' },
-    { id: 'locked', label: 'To win' },
+  const FILTERS: { id: CodexFilter; label: () => string }[] = [
+    { id: 'all', label: () => m.codex_filter_all() },
+    { id: 'unlocked', label: () => m.codex_filter_unlocked() },
+    { id: 'locked', label: () => m.codex_filter_locked() },
   ]
 
   const achievements = $derived(
@@ -43,56 +45,75 @@
 
     if (records.best_revenue_day.value > 0) {
       rows.push({
-        label: 'Best revenue day',
+        label: m.codex_record_best_revenue_day(),
         value: currency(records.best_revenue_day.value, code, 0),
         note: day(records.best_revenue_day.day),
       })
     }
     for (const s of records.best_revenue_day_by_source ?? []) {
-      rows.push({ label: `Best day · ${s.source}`, value: currency(s.value, code, 0), note: day(s.day) })
+      rows.push({
+        label: m.codex_record_best_day_source({ source: s.source }),
+        value: currency(s.value, code, 0),
+        note: day(s.day),
+      })
     }
     if (records.best_units_day.value > 0) {
-      rows.push({ label: 'Best units day', value: integer(records.best_units_day.value), note: day(records.best_units_day.day) })
+      rows.push({
+        label: m.codex_record_best_units_day(),
+        value: integer(records.best_units_day.value),
+        note: day(records.best_units_day.day),
+      })
     }
     if (records.best_install_day.value > 0) {
       rows.push({
-        label: 'Best install day',
+        label: m.codex_record_best_install_day(),
         value: integer(records.best_install_day.value),
         note: day(records.best_install_day.day),
       })
     }
     if (records.most_drops_day.value > 0) {
-      rows.push({ label: 'Most drops in a day', value: integer(records.most_drops_day.value), note: day(records.most_drops_day.day) })
+      rows.push({
+        label: m.codex_record_most_drops_day(),
+        value: integer(records.most_drops_day.value),
+        note: day(records.most_drops_day.day),
+      })
     }
     if (records.most_xp_day.value > 0) {
-      rows.push({ label: 'Most XP in a day', value: integer(records.most_xp_day.value), note: day(records.most_xp_day.day) })
+      rows.push({
+        label: m.codex_record_most_xp_day(),
+        value: integer(records.most_xp_day.value),
+        note: day(records.most_xp_day.day),
+      })
     }
     if (records.most_countries_day.value > 0) {
       rows.push({
-        label: 'Most countries settled in a day',
+        label: m.codex_record_most_countries_day(),
         value: integer(records.most_countries_day.value),
         note: day(records.most_countries_day.day),
       })
     }
     if (records.biggest_drop) {
       rows.push({
-        label: 'Biggest single drop',
-        value: `${integer(records.biggest_drop.xp)} XP`,
-        note: `${records.biggest_drop.title} · ${day(records.biggest_drop.day)}`,
+        label: m.codex_record_biggest_drop(),
+        value: m.codex_xp({ xp: integer(records.biggest_drop.xp) }),
+        note: m.codex_record_biggest_drop_note({
+          title: records.biggest_drop.title,
+          day: day(records.biggest_drop.day),
+        }),
       })
     }
     if (records.longest_revenue_run.days > 0) {
       rows.push({
-        label: 'Longest run of earning days',
-        value: `${integer(records.longest_revenue_run.days)} days`,
-        note: `ended ${day(records.longest_revenue_run.ended_on)}`,
+        label: m.codex_record_longest_run(),
+        value: m.codex_days({ count: integer(records.longest_revenue_run.days) }),
+        note: m.codex_record_longest_run_note({ day: day(records.longest_revenue_run.ended_on) }),
       })
     }
     if (records.first_event_day) {
       rows.push({
-        label: 'First ever event',
+        label: m.codex_record_first_event(),
         value: day(records.first_event_day),
-        note: `${integer(records.days_since_first_event)} days of history`,
+        note: m.codex_record_first_event_note({ count: integer(records.days_since_first_event) }),
       })
     }
     return rows
@@ -101,23 +122,27 @@
   const totalRows: Row[] = $derived.by(() => {
     if (!totals) return []
     const rows: Row[] = [
-      { label: 'Lifetime revenue', value: currency(totals.revenue_base, code, 0) },
-      { label: 'Units sold', value: integer(totals.units), note: totals.refunds ? `${integer(totals.refunds)} refunded` : undefined },
-      { label: 'Installs', value: integer(totals.installs) },
-      { label: 'Drops', value: integer(totals.drops) },
-      { label: 'XP', value: integer(totals.xp), note: `${totals.era.name} era` },
-      { label: 'Chests opened', value: integer(totals.chests_opened) },
+      { label: m.codex_total_lifetime_revenue(), value: currency(totals.revenue_base, code, 0) },
       {
-        label: 'Countries settled',
-        value: integer(totals.countries),
-        note: `${integer(totals.continents)} of 6 continents`,
+        label: m.codex_total_units_sold(),
+        value: integer(totals.units),
+        note: totals.refunds ? m.codex_total_refunded({ count: integer(totals.refunds) }) : undefined,
       },
-      { label: 'Currencies taken', value: integer(totals.currencies) },
-      { label: 'Record days', value: integer(totals.record_days) },
-      { label: 'Quests completed', value: integer(totals.quests_completed) },
-      { label: 'Mysteries explained', value: integer(totals.mysteries_solved) },
+      { label: m.codex_total_installs(), value: integer(totals.installs) },
+      { label: m.codex_total_drops(), value: integer(totals.drops) },
+      { label: m.codex_total_xp(), value: integer(totals.xp), note: m.codex_total_era({ era: eraLabel(totals.era.name) }) },
+      { label: m.codex_total_chests_opened(), value: integer(totals.chests_opened) },
+      {
+        label: m.codex_total_countries_settled(),
+        value: integer(totals.countries),
+        note: m.codex_total_continents({ count: integer(totals.continents) }),
+      },
+      { label: m.codex_total_currencies(), value: integer(totals.currencies) },
+      { label: m.codex_total_record_days(), value: integer(totals.record_days) },
+      { label: m.codex_total_quests_completed(), value: integer(totals.quests_completed) },
+      { label: m.codex_total_mysteries(), value: integer(totals.mysteries_solved) },
     ]
-    if (totals.stars > 0) rows.push({ label: 'GitHub stars', value: integer(totals.stars) })
+    if (totals.stars > 0) rows.push({ label: m.codex_total_github_stars(), value: integer(totals.stars) })
     return rows
   })
 
@@ -125,14 +150,14 @@
   const accent = $derived(rarityColor(recap?.top_rarity || 'rare'))
 </script>
 
-<section class="codex" aria-label="Codex" style="--accent-poster: {accent}">
+<section class="codex" aria-label={m.codex_title()} style="--accent-poster: {accent}">
   <div class="bar">
     <div class="titles">
-      <h2>Codex</h2>
-      <span class="sub">everything that has ever happened · trophies are permanent</span>
+      <h2>{m.codex_title()}</h2>
+      <span class="sub">{m.codex_sub()}</span>
     </div>
     {#if board}
-      <span class="counter" title="{board.unlocked} of {board.total} achievements unlocked">
+      <span class="counter" title={m.codex_counter_title({ unlocked: board.unlocked, total: board.total })}>
         <strong>{board.unlocked}</strong> / {board.total}
       </span>
     {/if}
@@ -141,11 +166,11 @@
   {#if codexState.error && !board}
     <p class="note error">{codexState.error}</p>
   {:else if codexState.loading && !board}
-    <p class="note">Opening the codex…</p>
+    <p class="note">{m.codex_loading()}</p>
   {:else}
     <h3 class="section">
-      Trophy wall
-      <span class="chips" role="group" aria-label="Filter achievements">
+      {m.codex_trophy_wall()}
+      <span class="chips" role="group" aria-label={m.codex_filter_label()}>
         {#each FILTERS as f (f.id)}
           <button
             class="chip"
@@ -153,19 +178,15 @@
             aria-pressed={codexState.filter === f.id}
             onclick={() => codexState.setFilter(f.id)}
           >
-            {f.label}
+            {f.label()}
           </button>
         {/each}
       </span>
     </h3>
-    <p class="lede">
-      Achievements only ever unlock. Nothing here decays, expires or can be taken away — a run that ended still
-      happened. Each unlock pays a real drop: uncommon for bronze, rare for silver, epic for gold, legendary for
-      legendary.
-    </p>
+    <p class="lede">{m.codex_trophy_lede()}</p>
 
     {#if achievements.length === 0}
-      <p class="empty">Nothing to show with this filter.</p>
+      <p class="empty">{m.codex_filter_empty()}</p>
     {:else}
       <div class="grid">
         {#each achievements as achievement (achievement.key)}
@@ -174,11 +195,8 @@
       </div>
     {/if}
 
-    <h3 class="section">Records</h3>
-    <p class="lede">
-      Computed fresh every time, never stored — so a restated report improves a record instead of leaving a stale one
-      behind, and a record can only ever go up.
-    </p>
+    <h3 class="section">{m.codex_records()}</h3>
+    <p class="lede">{m.codex_records_lede()}</p>
     <div class="columns">
       <ul class="rows">
         {#each recordRows as row (row.label)}
@@ -188,7 +206,7 @@
             {#if row.note}<span class="r-note">{row.note}</span>{/if}
           </li>
         {:else}
-          <li class="r-empty">No records yet — they arrive with the first day that beats the one before it.</li>
+          <li class="r-empty">{m.codex_records_empty()}</li>
         {/each}
       </ul>
       <ul class="rows">
@@ -202,8 +220,8 @@
       </ul>
     </div>
 
-    <h3 class="section">Season recap</h3>
-    <div class="picker" role="group" aria-label="Recap period">
+    <h3 class="section">{m.codex_season_recap()}</h3>
+    <div class="picker" role="group" aria-label={m.codex_recap_period_label()}>
       {#each codexState.periods as period (period.key)}
         <button
           class="period"
@@ -212,7 +230,7 @@
           aria-pressed={codexState.period === period.key}
           onclick={() => codexState.setPeriod(period.key)}
         >
-          {period.kind === 'season' ? 'This year' : monthLabel(period)}
+          {period.kind === 'season' ? m.codex_this_year() : monthLabel(period)}
         </button>
       {/each}
     </div>
@@ -220,7 +238,7 @@
     {#if codexState.recapError}
       <p class="note error">{codexState.recapError}</p>
     {:else if !recap}
-      <p class="note">Writing it up…</p>
+      <p class="note">{m.codex_recap_loading()}</p>
     {:else}
       <div class="poster-wrap" class:dim={codexState.recapLoading}>
         <RecapCard {recap} />

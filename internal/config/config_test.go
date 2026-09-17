@@ -163,6 +163,9 @@ func TestQuest2Defaults(t *testing.T) {
 	if cfg.DisplayCurrency != "USD" {
 		t.Errorf("display_currency = %q, want USD", cfg.DisplayCurrency)
 	}
+	if cfg.Language != "" {
+		t.Errorf("language = %q, want empty (let the browser choose)", cfg.Language)
+	}
 	if !cfg.FXEnabled() {
 		t.Error("fx should be enabled by default")
 	}
@@ -461,5 +464,23 @@ func TestCrashSourceEnv(t *testing.T) {
 	}
 	if !cfg.Sources.Crash.Enabled || cfg.Sources.Crash.Secret != "hunter2" {
 		t.Errorf("crash = %+v", cfg.Sources.Crash)
+	}
+}
+
+func TestLanguageIsTrimmedNotValidated(t *testing.T) {
+	path := writeConfig(t, "language: \"  pt-BR  \"\n")
+	cfg, err := config.Load(path, true)
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if cfg.Language != "pt-BR" {
+		t.Errorf("language = %q, want pt-BR", cfg.Language)
+	}
+
+	// A tag Loot ships no translation for is not an error: the dashboard falls
+	// back to English, which is a better answer than refusing to start.
+	path = writeConfig(t, "language: \"kl-GL\"\n")
+	if _, err := config.Load(path, true); err != nil {
+		t.Errorf("an unknown language tag must not be rejected: %v", err)
 	}
 }

@@ -1,3 +1,6 @@
+import { m } from '../paraglide/messages'
+import { currentLocale } from './locale'
+
 /** Rarity ladder, mirroring internal/core. */
 export const RARITIES = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'cursed'] as const
 
@@ -78,6 +81,12 @@ export interface Stats {
   /** How many bosses are still standing; drives the red Quests tab badge. */
   bosses_alive: number
   display_currency: string
+  /**
+   * The BCP-47 tag this Loot was configured with, or "" when the reader's own
+   * browser decides. The dashboard resolves its own locale (see locale.ts) and
+   * does not need this yet; it is here so a later release can.
+   */
+  language: string
   /** Every product this Loot can be scoped to, configured ones first. */
   apps: string[]
   /** The product this response was scoped to; "" for all apps. */
@@ -159,26 +168,34 @@ export function flagEmoji(iso2: string): string {
   )
 }
 
-/** Compact relative time, e.g. "just now", "4m", "3h", "2d". */
+/**
+ * Compact relative time, e.g. "just now", "4m", "3h", "2d".
+ *
+ * Deliberately *not* `Intl.RelativeTimeFormat`: even its narrow style says
+ * "4 min. ago" where this has to fit in the corner of a feed card, in a
+ * one-line ticker and at the end of a notebook entry. So the unit suffixes are
+ * messages instead — a translator can make them "4分" or "4 мин" and give each
+ * one plural variants, and the English stays two characters wide.
+ */
 export function timeAgo(iso: string, now = Date.now()): string {
   const then = new Date(iso).getTime()
   if (Number.isNaN(then)) return ''
 
   const seconds = Math.floor((now - then) / 1000)
-  if (seconds < 10) return 'just now'
-  if (seconds < 60) return `${seconds}s`
+  if (seconds < 10) return m.time_just_now()
+  if (seconds < 60) return m.time_seconds({ count: seconds })
   const minutes = Math.floor(seconds / 60)
-  if (minutes < 60) return `${minutes}m`
+  if (minutes < 60) return m.time_minutes({ count: minutes })
   const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `${hours}h`
-  return `${Math.floor(hours / 24)}d`
+  if (hours < 24) return m.time_hours({ count: hours })
+  return m.time_days({ count: Math.floor(hours / 24) })
 }
 
 /** Formats an amount with its currency, or "" when there is no money involved. */
 export function money(amount: number, currency: string): string {
   if (!amount) return ''
   try {
-    return new Intl.NumberFormat(undefined, {
+    return new Intl.NumberFormat(currentLocale(), {
       style: 'currency',
       currency: currency || 'USD',
       maximumFractionDigits: 2,
@@ -255,23 +272,29 @@ export interface VaultSummary {
 }
 
 // ----------------------------------------------------------------- formatting
+//
+// Every formatter below is built lazily and cached against the active locale.
+// Lazily, because a module-level `new Intl.NumberFormat` would be constructed
+// while this file is being imported — which is before main.ts has decided what
+// language the page is in, and would pin every number on the page to English.
 
-/** Currency formatter, cached per currency: Intl objects are not cheap. */
+/** Currency formatter, cached per locale and currency: Intl is not cheap. */
 const currencyFormatters = new Map<string, Intl.NumberFormat>()
 
 function currencyFormatter(currency: string, fractionDigits: number): Intl.NumberFormat {
-  const key = `${currency}/${fractionDigits}`
+  const locale = currentLocale()
+  const key = `${locale}/${currency}/${fractionDigits}`
   let fmt = currencyFormatters.get(key)
   if (!fmt) {
     try {
-      fmt = new Intl.NumberFormat(undefined, {
+      fmt = new Intl.NumberFormat(locale, {
         style: 'currency',
         currency: currency || 'USD',
         minimumFractionDigits: fractionDigits,
         maximumFractionDigits: fractionDigits,
       })
     } catch {
-      fmt = new Intl.NumberFormat(undefined, {
+      fmt = new Intl.NumberFormat(locale, {
         minimumFractionDigits: fractionDigits,
         maximumFractionDigits: fractionDigits,
       })
@@ -291,20 +314,37 @@ export function currencyCompact(amount: number, code: string): string {
   return currency(amount, code, Math.abs(amount) >= 1000 ? 0 : 2)
 }
 
-const integerFormat = new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 })
+const integerFormats = new Map<string, Intl.NumberFormat>()
 
-export function integer(value: number): string {
-  return integerFormat.format(value ?? 0)
+function integerFormat(): Intl.NumberFormat {
+  const locale = currentLocale()
+  let fmt = integerFormats.get(locale)
+  if (!fmt) {
+    fmt = new Intl.NumberFormat(locale, { maximumFractionDigits: 0 })
+    integerFormats.set(locale, fmt)
+  }
+  return fmt
 }
 
-const percentFormat = new Intl.NumberFormat(undefined, {
-  style: 'percent',
-  maximumFractionDigits: 1,
-})
+export function integer(value: number): string {
+  return integerFormat().format(value ?? 0)
+}
+
+const percentFormats = new Map<string, Intl.NumberFormat>()
+
+function percentFormat(): Intl.NumberFormat {
+  const locale = currentLocale()
+  let fmt = percentFormats.get(locale)
+  if (!fmt) {
+    fmt = new Intl.NumberFormat(locale, { style: 'percent', maximumFractionDigits: 1 })
+    percentFormats.set(locale, fmt)
+  }
+  return fmt
+}
 
 /** Formats a 0..1 share as a percentage. */
 export function percent(share: number): string {
-  return percentFormat.format(share ?? 0)
+  return percentFormat().format(share ?? 0)
 }
 
 /** The direction of a period-over-period change; `flat` covers 0 and "no basis". */
@@ -323,13 +363,13 @@ export interface Delta {
 export function delta(current: number, previous: number): Delta {
   if (!previous) {
     if (!current) return { direction: 'flat', label: '' }
-    return { direction: 'flat', label: 'new' }
+    return { direction: 'flat', label: m.delta_new() }
   }
   const change = (current - previous) / Math.abs(previous)
-  if (Math.abs(change) < 0.0005) return { direction: 'flat', label: '0%' }
+  if (Math.abs(change) < 0.0005) return { direction: 'flat', label: percentFormat().format(0) }
   return {
     direction: change > 0 ? 'up' : 'down',
-    label: `${change > 0 ? '+' : ''}${percentFormat.format(change)}`,
+    label: `${change > 0 ? '+' : ''}${percentFormat().format(change)}`,
   }
 }
 
@@ -337,7 +377,7 @@ export function delta(current: number, previous: number): Delta {
 export function dayLabel(day: string, withYear = false): string {
   const parsed = new Date(`${day}T00:00:00Z`)
   if (Number.isNaN(parsed.getTime())) return day
-  return parsed.toLocaleDateString(undefined, {
+  return parsed.toLocaleDateString(currentLocale(), {
     month: 'short',
     day: 'numeric',
     year: withYear ? 'numeric' : undefined,
@@ -470,18 +510,10 @@ export const METRICS = [
 
 export type Metric = (typeof METRICS)[number]
 
-/** How a metric reads in a sentence, and the glyph that stands for it. */
-export const METRIC_LABEL: Record<Metric, string> = {
-  revenue: 'revenue',
-  units: 'units',
-  installs: 'installs',
-  subscribers: 'subscribers',
-  drops: 'drops',
-  settlements: 'new countries',
-  stars: 'stars',
-  xp: 'XP',
-}
-
+/**
+ * The glyph that stands for a metric. How it *reads* is `metricLabel()` in
+ * labels.ts, because that half is a sentence and this half is not.
+ */
 export const METRIC_ICON: Record<Metric, string> = {
   revenue: '◈',
   units: '▦',
@@ -590,16 +622,6 @@ export interface Mystery {
 export interface Casebook {
   open: Mystery[]
   resolved: Mystery[]
-}
-
-/** How a mystery kind reads on its card. */
-export const MYSTERY_KIND_LABEL: Record<MysteryKind, string> = {
-  spike: 'spike',
-  dip: 'dip',
-  refund_spike: 'refunds',
-  record: 'record',
-  new_country_cluster: 'new countries',
-  silence: 'silence',
 }
 
 // --------------------------------------------------------------- codex types
@@ -824,7 +846,7 @@ export function monthLabel(period: RecapPeriod): string {
   if (period.kind === 'season') return period.key
   const parsed = new Date(`${period.from}T00:00:00Z`)
   if (Number.isNaN(parsed.getTime())) return period.label
-  return parsed.toLocaleDateString(undefined, { month: 'short', year: 'numeric', timeZone: 'UTC' })
+  return parsed.toLocaleDateString(currentLocale(), { month: 'short', year: 'numeric', timeZone: 'UTC' })
 }
 
 // ---------------------------------------------------------------- boss types

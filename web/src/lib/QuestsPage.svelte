@@ -7,8 +7,11 @@
   import { questsState } from './quests.svelte'
   import { loot } from './state.svelte'
   import type { Metric, NewQuest } from './types'
-  import { METRICS, METRIC_LABEL, dayLabel, timeAgo } from './types'
+  import { METRICS, dayLabel, timeAgo } from './types'
   import { vault } from './vault.svelte'
+  import { metricLabel } from './labels'
+  import { slots } from './markup'
+  import { m } from '../paraglide/messages'
 
   // The page owns the polling: mounting starts it, leaving stops it. The
   // store already untracks its own setup; untracking here as well means a
@@ -49,7 +52,7 @@
   async function submit(event: SubmitEvent): Promise<void> {
     event.preventDefault()
     if (!target || target <= 0) {
-      formError = 'Give it a target above zero.'
+      formError = m.quests_form_target_error()
       return
     }
     saving = true
@@ -71,47 +74,51 @@
       saving = false
     }
   }
+
+  // Sentences with a <code> or a <strong> in them; see lib/markup.ts.
+  const bossEmpty = $derived(slots((slot) => m.quests_boss_empty({ hook: slot, docs: slot })))
+  const activeEmpty = $derived(slots((slot) => m.quests_active_empty({ newQuest: slot })))
 </script>
 
-<section class="quests" aria-label="Quests">
+<section class="quests" aria-label={m.quests_title()}>
   <div class="bar">
     <div class="titles">
-      <h2>Quests</h2>
-      <span class="sub">goals from your own history · nothing here can be failed</span>
+      <h2>{m.quests_title()}</h2>
+      <span class="sub">{m.quests_sub()}</span>
     </div>
     <button class="new" onclick={() => (showForm ? (showForm = false) : openForm())} aria-expanded={showForm}>
-      {showForm ? 'Cancel' : '+ New quest'}
+      {showForm ? m.quests_cancel() : m.quests_new()}
     </button>
   </div>
 
   {#if showForm}
     <form class="form" onsubmit={submit}>
       <label>
-        <span>Metric</span>
+        <span>{m.quests_form_metric()}</span>
         <select bind:value={metric}>
-          {#each METRICS as m (m)}
-            <option value={m}>{METRIC_LABEL[m]}</option>
+          {#each METRICS as option (option)}
+            <option value={option}>{metricLabel(option)}</option>
           {/each}
         </select>
       </label>
 
       <label>
-        <span>Target</span>
+        <span>{m.quests_form_target()}</span>
         <input type="number" min="0" step="any" bind:value={target} placeholder="1000" required />
       </label>
 
       <label>
-        <span>Window</span>
+        <span>{m.quests_form_window()}</span>
         <select bind:value={questWindow}>
-          <option value="week">this week</option>
-          <option value="month">this month</option>
+          <option value="week">{m.quests_window_week()}</option>
+          <option value="month">{m.quests_window_month()}</option>
         </select>
       </label>
 
       <label>
-        <span>App</span>
+        <span>{m.quests_form_app()}</span>
         <select bind:value={app}>
-          <option value="">every app</option>
+          <option value="">{m.quests_every_app()}</option>
           {#each apps as a (a)}
             <option value={a}>{a}</option>
           {/each}
@@ -119,9 +126,9 @@
       </label>
 
       <label>
-        <span>Source</span>
+        <span>{m.quests_form_source()}</span>
         <select bind:value={source}>
-          <option value="">every source</option>
+          <option value="">{m.quests_every_source()}</option>
           {#each sources as s (s)}
             <option value={s}>{s}</option>
           {/each}
@@ -129,13 +136,13 @@
       </label>
 
       <label class="wide">
-        <span>Title <em>optional</em></span>
-        <input type="text" bind:value={title} placeholder="Beat last week's revenue" />
+        <span>{m.quests_form_title()} <em>{m.quests_form_optional()}</em></span>
+        <input type="text" bind:value={title} placeholder={m.quests_form_title_placeholder()} />
       </label>
 
       <div class="actions">
         {#if formError}<span class="form-error">{formError}</span>{/if}
-        <button type="submit" class="save" disabled={saving}>{saving ? 'Setting…' : 'Set quest'}</button>
+        <button type="submit" class="save" disabled={saving}>{saving ? m.quests_saving() : m.quests_save()}</button>
       </div>
     </form>
   {/if}
@@ -149,14 +156,10 @@
        looking at it twice a day genuinely helps. -->
   {#if bosses.alive.length > 0 || bosses.recent.length > 0}
     <h3 class="section">
-      Boss fights
+      {m.quests_boss_fights()}
       {#if bosses.alive.length > 0}<span class="count danger">{bosses.alive.length}</span>{/if}
     </h3>
-    <p class="lede">
-      A crash cluster that broke away from its own baseline, given a name and a health bar. HP is what it did on the
-      most recent completed day, so shipping a fix drains the bar and the kill pays an epic drop. Nothing here can be
-      failed — a boss that is still standing is just still standing.
-    </p>
+    <p class="lede">{m.quests_boss_lede()}</p>
     {#if bosses.alive.length > 0}
       <div class="grid wide-grid">
         {#each bosses.alive as boss (boss.id)}
@@ -165,7 +168,7 @@
       </div>
     {/if}
     {#if bosses.recent.length > 0}
-      <h3 class="section sub-section">Won, and lost sight of</h3>
+      <h3 class="section sub-section">{m.quests_boss_recent()}</h3>
       <div class="grid wide-grid">
         {#each bosses.recent as boss (boss.id)}
           <BossCard {boss} flashing={bossesState.flashing.includes(boss.id)} />
@@ -173,23 +176,16 @@
       </div>
     {/if}
   {:else if !bossesState.loading}
-    <h3 class="section">Boss fights</h3>
-    <p class="empty">
-      No bosses. Peace in the realm. Point a crash source at Loot — Android vitals, Sentry, or anything that can POST
-      to <code>/hooks/crash</code> — and the next crash spike becomes a monster with a health bar you can drain. See
-      <code>docs/bosses.md</code>.
-    </p>
+    <h3 class="section">{m.quests_boss_fights()}</h3>
+    <p class="empty">{bossEmpty[0]}<code>/hooks/crash</code>{bossEmpty[1]}<code>docs/bosses.md</code>{bossEmpty[2]}</p>
   {/if}
 
   {#if questsState.loading}
-    <p class="note">Reading the board…</p>
+    <p class="note">{m.quests_loading()}</p>
   {:else}
-    <h3 class="section">Active</h3>
+    <h3 class="section">{m.quests_active()}</h3>
     {#if board.active.length === 0}
-      <p class="empty">
-        Nothing running. Loot writes a week's quests from your own history — one week with data in it is all it needs —
-        and you can set your own with <strong>+ New quest</strong>.
-      </p>
+      <p class="empty">{activeEmpty[0]}<strong>{m.quests_new()}</strong>{activeEmpty[1]}</p>
     {:else}
       <div class="grid">
         {#each board.active as quest (quest.id)}
@@ -199,7 +195,7 @@
     {/if}
 
     {#if board.recent.length > 0}
-      <h3 class="section">Recent</h3>
+      <h3 class="section">{m.quests_recent()}</h3>
       <div class="grid">
         {#each board.recent as quest (quest.id)}
           <QuestCard {quest} {code} flashing={questsState.flashing.includes(quest.id)} />
@@ -208,20 +204,13 @@
     {/if}
 
     <h3 class="section">
-      Mysteries
+      {m.quests_mysteries()}
       {#if casebook.open.length > 0}<span class="count">{casebook.open.length}</span>{/if}
     </h3>
-    <p class="lede">
-      Days your numbers did something the days around them do not explain. They are optional puzzles: solving one means
-      writing down what you think happened — which pays a drop, and leaves you a notebook of what actually moves your
-      numbers.
-    </p>
+    <p class="lede">{m.quests_mysteries_lede()}</p>
 
     {#if casebook.open.length === 0}
-      <p class="empty">
-        Nothing unexplained. Loot re-reads the last fortnight every hour and flags a day only when it breaks away from
-        its own 28-day baseline.
-      </p>
+      <p class="empty">{m.quests_mysteries_empty()}</p>
     {:else}
       <div class="grid wide-grid">
         {#each casebook.open as mystery (mystery.id)}
@@ -231,7 +220,7 @@
     {/if}
 
     {#if casebook.resolved.length > 0}
-      <h3 class="section">Notebook</h3>
+      <h3 class="section">{m.quests_notebook()}</h3>
       <ul class="notebook">
         {#each casebook.resolved as mystery (mystery.id)}
           <li class:dismissed={mystery.status === 'dismissed'}>
@@ -240,9 +229,9 @@
               <span class="nb-when">{mystery.resolved_at ? timeAgo(mystery.resolved_at) : dayLabel(mystery.day)}</span>
             </div>
             {#if mystery.note}
-              <p class="nb-note">“{mystery.note}”</p>
+              <p class="nb-note">{m.quests_notebook_note({ note: mystery.note })}</p>
             {:else}
-              <p class="nb-note faint">dismissed without a note</p>
+              <p class="nb-note faint">{m.quests_notebook_dismissed()}</p>
             {/if}
           </li>
         {/each}

@@ -2,7 +2,9 @@
   import Sparkline from './Sparkline.svelte'
   import { bossesState } from './bosses.svelte'
   import type { Boss } from './types'
-  import { dayLabel, integer } from './types'
+  import { dayLabel, integer, percent } from './types'
+  import { bossUnitLabel } from './labels'
+  import { m } from '../paraglide/messages'
 
   let {
     boss,
@@ -21,7 +23,7 @@
   const confirming = $derived(bossesState.confirming === boss.id)
 
   /** "8 days" reads better than "8 days alive" under a name. */
-  const dayCount = $derived(boss.days_alive === 1 ? '1 day' : `${boss.days_alive} days`)
+  const dayCount = $derived(m.boss_days({ count: boss.days_alive }))
 
   /**
    * The one line that says how the fight is going. It is deliberately a
@@ -30,24 +32,26 @@
    */
   const statusLine = $derived(
     slain
-      ? `slain in ${dayCount}${boss.xp_awarded ? ` · +${integer(boss.xp_awarded)} XP` : ''}`
+      ? boss.xp_awarded
+        ? m.boss_slain_xp({ days: dayCount, xp: integer(boss.xp_awarded) })
+        : m.boss_slain({ days: dayCount })
       : faded
-        ? `faded after ${dayCount} — the source stopped reporting`
+        ? m.boss_faded({ days: dayCount })
         : boss.down_pct >= 0.01
-          ? `−${Math.round(boss.down_pct * 100)}% since it appeared`
+          ? m.boss_down_pct({ pct: percent(Math.round(boss.down_pct * 100) / 100) })
           : boss.enraged
-            ? 'stronger than when it appeared'
-            : 'holding at full strength',
+            ? m.boss_enraged_line()
+            : m.boss_holding(),
   )
 
-  const unit = $derived(boss.unit || 'crashes')
+  const unit = $derived(bossUnitLabel(boss.unit || 'crashes'))
 </script>
 
 <article class="boss" class:alive class:slain class:faded class:flashing class:enraged={boss.enraged && alive}>
   <div class="head">
     <h4 class="name">{boss.name}</h4>
     {#if boss.enraged && alive}
-      <span class="rage" title="It got worse before it got better">enraged</span>
+      <span class="rage" title={m.boss_enraged_title()}>{m.boss_enraged()}</span>
     {/if}
     {#if slain}
       <span class="tomb" aria-hidden="true">†</span>
@@ -59,14 +63,14 @@
   <div class="chips">
     {#if boss.app}<span class="chip">{boss.app}</span>{/if}
     {#if boss.version}<span class="chip mono">{boss.version}</span>{/if}
-    {#if boss.kind === 'anr'}<span class="chip">ANR</span>{/if}
+    {#if boss.kind === 'anr'}<span class="chip">{m.boss_anr()}</span>{/if}
     <span class="chip">{boss.source}</span>
   </div>
 
   <div
     class="track"
     role="progressbar"
-    aria-label="{boss.name} hit points"
+    aria-label={m.boss_hp_aria({ name: boss.name })}
     aria-valuemin="0"
     aria-valuemax={Math.round(boss.hp_max)}
     aria-valuenow={Math.round(boss.hp)}
@@ -90,33 +94,33 @@
   <dl class="figures-row">
     {#if boss.users_affected > 0}
       <div>
-        <dt>people hit</dt>
+        <dt>{m.boss_people_hit()}</dt>
         <dd>{integer(boss.users_affected)}</dd>
       </div>
     {/if}
     <div>
-      <dt>{alive ? 'fighting for' : 'lasted'}</dt>
+      <dt>{alive ? m.boss_fighting_for() : m.boss_lasted()}</dt>
       <dd>{dayCount}</dd>
     </div>
     <div>
-      <dt>appeared</dt>
+      <dt>{m.boss_appeared()}</dt>
       <dd>{dayLabel(boss.spawned_day)}</dd>
     </div>
   </dl>
 
   <div class="actions">
     {#if boss.url}
-      <a class="out" href={boss.url} target="_blank" rel="noreferrer noopener">Open the issue ↗</a>
+      <a class="out" href={boss.url} target="_blank" rel="noreferrer noopener">{m.boss_open_issue()}</a>
     {/if}
     {#if alive}
       {#if confirming}
-        <span class="confirm">Fixed it?</span>
+        <span class="confirm">{m.boss_confirm()}</span>
         <button class="slay yes" disabled={busy} onclick={() => bossesState.slay(boss.id)}>
-          {busy ? 'Landing the blow…' : 'Yes, slay it'}
+          {busy ? m.boss_slaying() : m.boss_slay_yes()}
         </button>
-        <button class="cancel" disabled={busy} onclick={() => bossesState.cancelConfirm()}>Not yet</button>
+        <button class="cancel" disabled={busy} onclick={() => bossesState.cancelConfirm()}>{m.boss_not_yet()}</button>
       {:else}
-        <button class="slay" disabled={busy} onclick={() => bossesState.askConfirm(boss.id)}>Mark slain</button>
+        <button class="slay" disabled={busy} onclick={() => bossesState.askConfirm(boss.id)}>{m.boss_mark_slain()}</button>
       {/if}
     {/if}
   </div>

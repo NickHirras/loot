@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Delta } from './types'
+  import { m } from '../paraglide/messages'
 
   let {
     label,
@@ -36,7 +37,7 @@
       <span class="delta {tint}">
         {#if arrow}<span aria-hidden="true">{arrow}</span>{/if}
         {delta.label}
-        <span class="vs">vs prev</span>
+        <span class="vs">{m.stat_vs_prev()}</span>
       </span>
     {/if}
     {#if note}<span class="note">{note}</span>{/if}

@@ -3,12 +3,15 @@
  * no dependency, no history juggling, and it survives being served from any
  * sub-path because the hash never reaches the server.
  */
+// A tab's name is not here: it is `tabLabel()` in labels.ts, because a message
+// has to be read at render time and a `const` would freeze the English one in
+// place at import time.
 export const TABS = [
-  { id: 'feed', label: 'Feed', hash: '#/' },
-  { id: 'vault', label: 'Vault', hash: '#/vault' },
-  { id: 'hearth', label: 'Hearth', hash: '#/hearth' },
-  { id: 'quests', label: 'Quests', hash: '#/quests' },
-  { id: 'codex', label: 'Codex', hash: '#/codex' },
+  { id: 'feed', hash: '#/' },
+  { id: 'vault', hash: '#/vault' },
+  { id: 'hearth', hash: '#/hearth' },
+  { id: 'quests', hash: '#/quests' },
+  { id: 'codex', hash: '#/codex' },
 ] as const
 
 export type Tab = (typeof TABS)[number]['id']

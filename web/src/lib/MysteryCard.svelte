@@ -2,7 +2,9 @@
   import Sparkline from './Sparkline.svelte'
   import { questsState } from './quests.svelte'
   import type { Mystery } from './types'
-  import { MYSTERY_KIND_LABEL, currency, dayLabel, integer } from './types'
+  import { currency, dayLabel, integer } from './types'
+  import { mysteryKindLabel } from './labels'
+  import { m } from '../paraglide/messages'
 
   let {
     mystery,
@@ -23,7 +25,7 @@
   }
 
   const busy = $derived(questsState.isBusy(mystery.id))
-  const label = $derived(MYSTERY_KIND_LABEL[mystery.kind] ?? mystery.kind)
+  const label = $derived(mysteryKindLabel(mystery.kind))
 </script>
 
 <article class="mystery kind-{mystery.kind}">
@@ -50,16 +52,16 @@
 
   <dl class="figures">
     <div>
-      <dt>observed</dt>
+      <dt>{m.mystery_observed()}</dt>
       <dd class="observed">{format(mystery.observed)}</dd>
     </div>
     <div>
-      <dt>expected</dt>
+      <dt>{m.mystery_expected()}</dt>
       <dd>{format(mystery.expected)}</dd>
     </div>
     {#if detail?.ratio}
       <div>
-        <dt>ratio</dt>
+        <dt>{m.mystery_ratio()}</dt>
         <dd>{detail.ratio.toFixed(1)}×</dd>
       </div>
     {/if}
@@ -78,14 +80,14 @@
   >
     <input
       type="text"
-      placeholder="What do you think happened?"
+      placeholder={m.mystery_note_placeholder()}
       bind:value={note}
-      aria-label="Your explanation for: {mystery.title}"
+      aria-label={m.mystery_note_aria({ title: mystery.title })}
       disabled={busy}
     />
-    <button type="submit" class="solve" disabled={busy}>Solve</button>
+    <button type="submit" class="solve" disabled={busy}>{m.mystery_solve()}</button>
     <button type="button" class="dismiss" disabled={busy} onclick={() => questsState.dismiss(mystery.id)}>
-      Dismiss
+      {m.mystery_dismiss()}
     </button>
   </form>
 </article>

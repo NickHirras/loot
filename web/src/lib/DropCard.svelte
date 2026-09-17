@@ -1,6 +1,8 @@
 <script lang="ts">
   import type { FeedDrop } from './state.svelte'
   import { flagEmoji, isFlashy, money, timeAgo } from './types'
+  import { rarityLabel } from './labels'
+  import { m } from '../paraglide/messages'
 
   let {
     drop,
@@ -27,7 +29,7 @@
   class:fresh={drop.fresh}
   class:flashy
   style="--i: {index}"
-  aria-label="{drop.rarity} drop: {drop.title}"
+  aria-label={m.drop_aria_label({ rarity: rarityLabel(drop.rarity), title: drop.title })}
 >
   <div class="stripe" aria-hidden="true"></div>
 
@@ -41,14 +43,14 @@
 
   <div class="body">
     <div class="top">
-      <span class="badge">{drop.rarity}</span>
+      <span class="badge">{rarityLabel(drop.rarity)}</span>
       <span class="source mono">{drop.source}</span>
       {#if drop.kind}<span class="kind mono">{drop.kind}</span>{/if}
       {#if drop.chest_date}
-        <span class="chest" title="Came out of the chest for {drop.chest_date}">📦 {drop.chest_date}</span>
+        <span class="chest" title={m.drop_chest_title({ date: drop.chest_date })}>📦 {drop.chest_date}</span>
       {/if}
       <span class="spacer"></span>
-      <span class="xp">+{drop.xp} XP</span>
+      <span class="xp">{m.drop_xp({ xp: drop.xp })}</span>
       <time class="ago" datetime={drop.created_at} title={new Date(drop.created_at).toLocaleString()}>
         {ago}
       </time>

@@ -1,13 +1,14 @@
 <script lang="ts">
   import type { BreakdownRow } from './types'
-  import { currency, integer, percent } from './types'
+  import { currency, percent } from './types'
+  import { m } from '../paraglide/messages'
 
   let {
     title,
     rows,
     code,
     color,
-    empty = 'Nothing here yet.',
+    empty = m.breakdown_empty(),
   }: {
     title: string
     rows: BreakdownRow[]
@@ -46,7 +47,7 @@
               style="width: {Math.max(1.5, (Math.abs(row.revenue_base) / top) * 100)}%; background: {color(row)}"
             ></div>
           </div>
-          <div class="units">{integer(row.units)} {row.units === 1 ? 'unit' : 'units'}</div>
+          <div class="units">{m.breakdown_units({ count: row.units })}</div>
         </li>
       {/each}
     </ul>

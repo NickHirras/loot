@@ -1,7 +1,9 @@
 package server
 
 import (
+	"bytes"
 	"errors"
+	"html"
 	"io/fs"
 	"mime"
 	"net/http"
@@ -42,7 +44,34 @@ const notBuiltPage = `<!doctype html>
 // somewhere in the client.
 var apiPrefixes = []string{"/api/", "/hooks/"}
 
+// langPlaceholder is what web/index.html ships with. The dashboard reads the
+// attribute before it mounts and treats "auto" as "ask the browser", so a Loot
+// with no configured language needs no substitution at all.
+const langPlaceholder = `data-loot-lang="auto"`
+
+// indexBytes is index.html as it will be served: read out of the embedded FS
+// once and stamped with the configured language, rather than re-read and
+// re-patched on every request that falls through to the SPA.
+func (s *Server) indexBytes() []byte {
+	s.indexOnce.Do(func() {
+		index, err := fs.ReadFile(s.Static, "index.html")
+		if err != nil {
+			return
+		}
+		if lang := strings.TrimSpace(s.Cfg.Language); lang != "" && !strings.EqualFold(lang, "auto") {
+			stamped := `data-loot-lang="` + html.EscapeString(lang) + `"`
+			index = bytes.Replace(index, []byte(langPlaceholder), []byte(stamped), 1)
+		}
+		s.index = index
+	})
+	return s.index
+}
+
 func (s *Server) spaHandler() http.Handler {
+	// Touch it once here so the read and the substitution happen while the
+	// router is being built, not on the first request to arrive.
+	s.indexBytes()
+
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		for _, prefix := range apiPrefixes {
 			if strings.HasPrefix(r.URL.Path, prefix) {
@@ -61,8 +90,13 @@ func (s *Server) spaHandler() http.Handler {
 		}
 
 		name := strings.TrimPrefix(path.Clean("/"+r.URL.Path), "/")
-		if name == "" {
-			name = "index.html"
+		// The app shell never goes out through the file server: it is the one
+		// file the language attribute is stamped into, and serving the raw
+		// embedded bytes for "/" while the history fallback served the stamped
+		// ones would make the language depend on how the page was reached.
+		if name == "" || name == "index.html" {
+			s.serveIndex(w, r)
+			return
 		}
 
 		f, err := s.Static.Open(name)
@@ -90,9 +124,9 @@ func (s *Server) spaHandler() http.Handler {
 	})
 }
 
-func (s *Server) serveIndex(w http.ResponseWriter, r *http.Request) {
-	index, err := fs.ReadFile(s.Static, "index.html")
-	if err != nil {
+func (s *Server) serveIndex(w http.ResponseWriter, _ *http.Request) {
+	index := s.indexBytes()
+	if len(index) == 0 {
 		http.Error(w, "not found", http.StatusNotFound)
 		return
 	}

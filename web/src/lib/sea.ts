@@ -15,6 +15,8 @@
  * never overlap, and themed where the theme was too good to pass up.
  */
 
+import { m } from '../paraglide/messages'
+
 /** Where a vessel sits, as [longitude, latitude]. */
 export type Anchorage = [number, number]
 
@@ -80,15 +82,21 @@ const SOURCE_NAMES: Record<string, string> = {
   dev: 'dev',
 }
 
-/** The ships' own names. Anything else is "The <Source> Vessel". */
-const VESSEL_NAMES: Record<string, string> = {
-  flathub: 'The Flathub Freighter',
-  snapcraft: 'Snapcraft Platform Nine',
-  appstore: 'The Cupertino Clipper',
-  googleplay: 'The Play Trawler',
-  microsoftstore: 'The Redmond Barge',
-  revenuecat: 'The RevenueCat Cutter',
-  github: 'The Octocat Icebreaker',
+/**
+ * The ships' own names. Anything else is "The <Source> Vessel".
+ *
+ * A name is a message rather than a string because these are jokes, and a joke
+ * translated word for word stops being one — a translator needs to be able to
+ * write a different joke.
+ */
+const VESSEL_NAMES: Record<string, () => string> = {
+  flathub: () => m.vessel_flathub(),
+  snapcraft: () => m.vessel_snapcraft(),
+  appstore: () => m.vessel_appstore(),
+  googleplay: () => m.vessel_googleplay(),
+  microsoftstore: () => m.vessel_microsoftstore(),
+  revenuecat: () => m.vessel_revenuecat(),
+  github: () => m.vessel_github(),
 }
 
 /** A stable hash, so an unlisted source keeps one anchorage forever. */
@@ -110,7 +118,7 @@ export function sourceLabel(source: string): string {
 
 /** What this source's vessel is called. */
 export function vesselName(source: string): string {
-  return VESSEL_NAMES[source] ?? `The ${sourceLabel(source)} Vessel`
+  return VESSEL_NAMES[source]?.() ?? m.vessel_generic({ source: sourceLabel(source) })
 }
 
 /** Ship or rig. */
@@ -120,5 +128,5 @@ export function vesselKind(source: string): VesselKind {
 
 /** The one line that explains why anybody is out here at all. */
 export function vesselWhy(source: string): string {
-  return `somewhere at sea — ${sourceLabel(source)} doesn't say which country its people are from`
+  return m.vessel_why({ source: sourceLabel(source) })
 }

@@ -44,6 +44,12 @@ type Config struct {
 	// (ISO 4217, e.g. "USD"). Events keep their original amount and currency;
 	// amount_base is the converted copy.
 	DisplayCurrency string `yaml:"display_currency"`
+	// Language is the language the dashboard is served in: a BCP-47 tag
+	// ("de", "pt-BR"), or empty — equivalently "auto" — to let each reader's
+	// own browser decide. Only the tags Loot ships translations for are
+	// honoured; anything else falls back to English, so this is not validated
+	// here and a typo costs nothing but the language you asked for.
+	Language string `yaml:"language"`
 	// HomeCountry is where you are: the ISO 3166-1 alpha-2 code of the
 	// Hearth's capital, the settlement every live drop arcs towards. Empty
 	// means "the biggest settlement", which needs no configuring and is right
@@ -366,6 +372,7 @@ func Load(path string, explicit bool) (Config, error) {
 	if cfg.Sources.PlayVitals.BackfillDays <= 0 {
 		cfg.Sources.PlayVitals.BackfillDays = 30
 	}
+	cfg.Language = strings.TrimSpace(cfg.Language)
 	cfg.DisplayCurrency = strings.ToUpper(strings.TrimSpace(cfg.DisplayCurrency))
 	if cfg.DisplayCurrency == "" {
 		cfg.DisplayCurrency = DefaultDisplayCurrency

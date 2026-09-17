@@ -5,6 +5,7 @@
   import { seriesColor } from './palette'
   import type { VaultPoint } from './types'
   import { currency, currencyCompact, dayLabel, integer } from './types'
+  import { m } from '../paraglide/messages'
 
   let {
     series,
@@ -141,7 +142,7 @@
   {/if}
 
   <div class="plot">
-    <svg viewBox="0 0 {width} {height}" {height} width="100%" role="img" aria-label="Revenue and units per day">
+    <svg viewBox="0 0 {width} {height}" {height} width="100%" role="img" aria-label={m.vault_chart_aria()}>
       <!-- y gridlines and ticks -->
       {#each yTicks as tick (tick)}
         <line class="grid" x1={padL} x2={padL + plotW} y1={y(tick)} y2={y(tick)} />
@@ -181,7 +182,7 @@
       {/each}
       <line class="axis" x1={padL} x2={padL + plotW} y1={unitsBottom} y2={unitsBottom} />
       <text class="panel-label" x={padL - 8} y={unitsTop + UNITS_H / 2} text-anchor="end" dominant-baseline="middle"
-        >units</text
+        >{m.vault_chart_units()}</text
       >
 
       <!-- x ticks -->
@@ -228,7 +229,7 @@
             <span class="tip-val">{currency(row.value, code)}</span>
           </div>
         {/each}
-        <div class="tip-units">{integer(point.units)} units</div>
+        <div class="tip-units">{m.vault_tip_units({ count: integer(point.units) })}</div>
       </div>
     {/if}
   </div>
