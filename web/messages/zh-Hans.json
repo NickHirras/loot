@@ -1,0 +1,1051 @@
+{
+  "$schema": "https://inlang.com/schema/inlang-message-format",
+  "ach_backfilled": "补录",
+  "ach_backfilled_title": "在 Loot 开始记录前达成，日期回溯至当天",
+  "ach_cartographer_desc": "每个有人居住的大洲都有一处聚落。",
+  "ach_cartographer_title": "制图师",
+  "ach_cursed_but_unbowed_desc": "先来一件诅咒掉落，当天又收获稀有或更好的。局面扭转了。",
+  "ach_cursed_but_unbowed_title": "受诅而不屈",
+  "ach_era_city_desc": "进入城市时代。",
+  "ach_era_city_title": "城市",
+  "ach_era_empire_desc": "进入帝国时代。",
+  "ach_era_empire_title": "帝国",
+  "ach_era_kingdom_desc": "进入王国时代。",
+  "ach_era_kingdom_title": "王国",
+  "ach_era_town_desc": "进入城镇时代。",
+  "ach_era_town_title": "城镇",
+  "ach_first_blood_desc": "你的第一件掉落——Loot 终于有东西可报了。",
+  "ach_first_blood_title": "一血",
+  "ach_first_sale_desc": "商店自家财务报告中结算的第一笔销售。",
+  "ach_first_sale_title": "首笔销售",
+  "ach_first_subscriber_desc": "有人决定持续付钱给你。",
+  "ach_first_subscriber_title": "首位订阅者",
+  "ach_hoarder_1_desc": "开启 10 个每日宝箱。",
+  "ach_hoarder_1_title": "囤积者",
+  "ach_hoarder_2_desc": "开启 50 个每日宝箱。",
+  "ach_hoarder_2_title": "大囤积者",
+  "ach_hoarder_3_desc": "开启 200 个每日宝箱。",
+  "ach_hoarder_3_title": "巨龙囤积者",
+  "ach_installs_100k_desc": "累计 100,000 次安装。",
+  "ach_installs_100k_title": "无处不在",
+  "ach_installs_10k_desc": "累计 10,000 次安装。",
+  "ach_installs_10k_title": "传开了",
+  "ach_installs_1k_desc": "累计 1,000 次安装。",
+  "ach_installs_1k_title": "口耳相传",
+  "ach_legendary_hunter_desc": "你的第一件传说掉落。",
+  "ach_legendary_hunter_title": "传说猎人",
+  "ach_merchant_2_desc": "来自 2 个不同商店的账本收入。",
+  "ach_merchant_2_title": "双界",
+  "ach_merchant_3_desc": "来自 3 个不同商店的账本收入。",
+  "ach_merchant_3_title": "三界",
+  "ach_merchant_5_desc": "来自 5 个不同商店的账本收入。",
+  "ach_merchant_5_title": "万界商人",
+  "ach_mysteries_10_desc": "解释 10 个谜团。",
+  "ach_mysteries_10_title": "实验笔记",
+  "ach_mysteries_1_desc": "解释一个谜团。",
+  "ach_mysteries_1_title": "侦探",
+  "ach_not_yet": "尚未",
+  "ach_polyglot_1_desc": "收到 5 种不同货币的款项。",
+  "ach_polyglot_1_title": "语言通",
+  "ach_polyglot_2_desc": "收到 10 种不同货币的款项。",
+  "ach_polyglot_2_title": "兑币商",
+  "ach_progress": "{value} / {target}",
+  "ach_progress_unit": "{value} / {target} {unit}",
+  "ach_quests_10_desc": "完成 10 个任务。",
+  "ach_quests_10_title": "冒险者",
+  "ach_quests_1_desc": "完成一个任务。",
+  "ach_quests_1_title": "启程",
+  "ach_quests_50_desc": "完成 50 个任务。",
+  "ach_quests_50_title": "王国英雄",
+  "ach_record_1_desc": "一天超越了此前的每一天。",
+  "ach_record_1_title": "史上最佳一天",
+  "ach_record_25_desc": "二十五个纪录日。",
+  "ach_record_25_title": "史上最佳一天 ×25",
+  "ach_record_5_desc": "五天各自超越了此前的一切。",
+  "ach_record_5_title": "史上最佳一天 ×5",
+  "ach_revenue_100_desc": "累计收入 $100。",
+  "ach_revenue_100_title": "第一个百",
+  "ach_revenue_100k_desc": "累计收入 $100,000。",
+  "ach_revenue_100k_title": "六位数",
+  "ach_revenue_10k_desc": "累计收入 $10,000。",
+  "ach_revenue_10k_title": "五位数",
+  "ach_revenue_1k_desc": "累计收入 $1,000。",
+  "ach_revenue_1k_title": "四位数",
+  "ach_settler_1_desc": "在 5 个国家拥有客户。",
+  "ach_settler_1_title": "拓荒者 I",
+  "ach_settler_2_desc": "在 10 个国家拥有客户。",
+  "ach_settler_2_title": "拓荒者 II",
+  "ach_settler_3_desc": "在 25 个国家拥有客户。",
+  "ach_settler_3_title": "拓荒者 III",
+  "ach_settler_4_desc": "在 50 个国家拥有客户。",
+  "ach_settler_4_title": "拓荒者 IV",
+  "ach_stars_1000_desc": "1,000 个 GitHub 星标。",
+  "ach_stars_1000_title": "星系",
+  "ach_stars_100_desc": "100 个 GitHub 星标。",
+  "ach_stars_100_title": "星座",
+  "ach_stars_10_desc": "10 个 GitHub 星标。",
+  "ach_stars_10_title": "观星者",
+  "ach_steady_30_desc": "连续 30 天有账本收入。",
+  "ach_steady_30_title": "稳舵前行",
+  "ach_steady_7_desc": "连续 7 天有账本收入。",
+  "ach_steady_7_title": "平稳",
+  "ach_subscribers_1000_desc": "1,000 位活跃订阅者。",
+  "ach_subscribers_1000_title": "一场运动",
+  "ach_subscribers_100_desc": "100 位活跃订阅者。",
+  "ach_subscribers_100_title": "一群拥趸",
+  "ach_subscribers_10_desc": "10 位活跃订阅者。",
+  "ach_subscribers_10_title": "一小群人",
+  "ach_tier_bronze": "青铜",
+  "ach_tier_gold": "黄金",
+  "ach_tier_legendary": "传说",
+  "ach_tier_silver": "白银",
+  "ach_tier_title": "{tier} · 奖励一件价值 {xp} XP 的{rarity}掉落",
+  "ach_unit_chests": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "个宝箱"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_continents": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "个大洲"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_countries": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "个国家"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_currencies": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "种货币"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_days": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "天"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_installs": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "次安装"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_mysteries": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "个谜团"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_quests": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "个任务"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_record_days": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "个纪录日"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_revenue": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "收入"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_stars": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "个星标"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_stores": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "个商店"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_subscribers": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "位订阅者"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_units": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "份"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_xp": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "XP"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_units_100_desc": "累计售出 100 份。",
+  "ach_units_100_title": "售出一百",
+  "ach_units_100k_desc": "累计售出 100,000 份。",
+  "ach_units_100k_title": "售出十万",
+  "ach_units_10k_desc": "累计售出 10,000 份。",
+  "ach_units_10k_title": "售出一万",
+  "ach_units_1k_desc": "累计售出 1,000 份。",
+  "ach_units_1k_title": "售出一千",
+  "app_enable_sounds": "点击开启掉落音效",
+  "app_enable_sounds_dismiss": "不用了",
+  "app_footer_mute_hint": "按 {key} 静音",
+  "app_footer_tagline": "Loot · 面向独立开发者的自托管战利品追踪",
+  "boss_anr": "ANR",
+  "boss_appeared": "已出现",
+  "boss_confirm": "已经修好了？",
+  "boss_days": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "{count} 天"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "boss_down_pct": "自出现以来 −{pct}",
+  "boss_enraged": "狂暴",
+  "boss_enraged_line": "比出现时更强了",
+  "boss_enraged_title": "情况先恶化了一阵",
+  "boss_faded": "{days}后消散——来源停止上报",
+  "boss_fighting_for": "已鏖战",
+  "boss_holding": "血量满格未动",
+  "boss_hp_aria": "{name} 的生命值",
+  "boss_lasted": "持续了",
+  "boss_mark_slain": "标记为已击杀",
+  "boss_not_yet": "还没有",
+  "boss_open_issue": "打开该 issue ↗",
+  "boss_people_hit": "受影响用户",
+  "boss_slain": "{days}内击杀",
+  "boss_slain_xp": "{days}内击杀 · +{xp} XP",
+  "boss_slay_yes": "是，击杀它",
+  "boss_slaying": "正在给出最后一击…",
+  "boss_title_anrs": "ANR",
+  "boss_title_anrs_in": "{version} 中的 ANR",
+  "boss_title_crashes": "崩溃",
+  "boss_title_crashes_in": "{version} 中的崩溃",
+  "boss_unit_crashes": "次崩溃",
+  "boss_unit_users": "位用户",
+  "breakdown_empty": "这里还空着。",
+  "breakdown_units": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural",
+        "local countFmt = count: number maximumFractionDigits=0"
+      ],
+      "match": {
+        "countPlural=other": "{countFmt} 份"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "chest_all_already_open": "那些宝箱已经开过了。",
+  "chest_already_open": "那个宝箱已经开过了。",
+  "chest_best": "最佳 · {rarity}",
+  "chest_bulk_every": "全部宝箱",
+  "chest_bulk_label": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "{count} 个宝箱 · {span}"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "chest_cell_title": "{title} · +{xp} XP",
+  "chest_close": "关闭",
+  "chest_dot_title": "{count} 件{rarity}",
+  "chest_haul_xp": "+{xp} XP",
+  "chest_more_below": "下方还有 {count} 件",
+  "chest_nice": "不错。",
+  "chest_nothing_waiting": "没有待开的宝箱。商店一天的销售会作为一个宝箱送到这里。",
+  "chest_of_date": "{date} 的宝箱",
+  "chest_open": "开启",
+  "chest_open_all": "全部开启 · {count} 个宝箱",
+  "chest_open_all_sub": "一次性 {count} 件掉落",
+  "chest_open_oldest": "开启最旧的宝箱",
+  "chest_opening": "正在开启{what}…",
+  "chest_opening_all": "正在开启全部宝箱…",
+  "chest_progress": "{revealed} / {total}",
+  "chest_progress_drops": "{revealed} / {total} 件掉落",
+  "chest_row_drops": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "{count} 件掉落"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "chest_row_xp": "+{xp} XP",
+  "chest_skip": "跳过",
+  "chest_the_chest": "宝箱",
+  "chest_title": "每日宝箱",
+  "chest_waiting": [
+    {
+      "declarations": [
+        "input drops",
+        "input chests",
+        "local dropsPlural = drops: plural",
+        "local chestsPlural = chests: plural",
+        "local dropsFmt = drops: number maximumFractionDigits=0"
+      ],
+      "match": {
+        "dropsPlural=other, chestsPlural=other": "{chests} 个宝箱中有 {dropsFmt} 件掉落待开。"
+      },
+      "selectors": [
+        "dropsPlural",
+        "chestsPlural"
+      ]
+    }
+  ],
+  "codex_counter_title": "已解锁 {total} 个成就中的 {unlocked} 个",
+  "codex_days": "{count} 天",
+  "codex_filter_all": "全部",
+  "codex_filter_empty": "此筛选下没有可显示的内容。",
+  "codex_filter_label": "筛选成就",
+  "codex_filter_locked": "待解锁",
+  "codex_filter_unlocked": "已解锁",
+  "codex_loading": "正在翻开图鉴…",
+  "codex_recap_loading": "正在撰写…",
+  "codex_recap_period_label": "回顾周期",
+  "codex_record_best_day_source": "最佳一天 · {source}",
+  "codex_record_best_install_day": "最佳安装日",
+  "codex_record_best_revenue_day": "最佳收入日",
+  "codex_record_best_units_day": "最佳销量日",
+  "codex_record_biggest_drop": "最大的单件掉落",
+  "codex_record_biggest_drop_note": "{title} · {day}",
+  "codex_record_first_event": "最早的事件",
+  "codex_record_first_event_note": "{count} 天的历史",
+  "codex_record_longest_run": "最长连续进账天数",
+  "codex_record_longest_run_note": "结束于 {day}",
+  "codex_record_most_countries_day": "单日开拓国家最多",
+  "codex_record_most_drops_day": "单日掉落最多",
+  "codex_record_most_xp_day": "单日 XP 最多",
+  "codex_records": "纪录",
+  "codex_records_empty": "暂无纪录——它们会在第一个超越前一天的日子出现。",
+  "codex_records_lede": "每次都重新计算，从不存储——所以报表被重述时纪录会随之修正，而不会留下过期数据；纪录只会向上。",
+  "codex_season_recap": "赛季回顾",
+  "codex_sub": "发生过的一切 · 奖杯永久保留",
+  "codex_this_year": "今年",
+  "codex_title": "图鉴",
+  "codex_total_chests_opened": "已开宝箱",
+  "codex_total_continents": "6 个大洲中的 {count} 个",
+  "codex_total_countries_settled": "已开拓国家",
+  "codex_total_currencies": "收到的货币",
+  "codex_total_drops": "掉落",
+  "codex_total_era": "{era}时代",
+  "codex_total_github_stars": "GitHub 星标",
+  "codex_total_installs": "安装量",
+  "codex_total_lifetime_revenue": "累计收入",
+  "codex_total_mysteries": "已解释谜团",
+  "codex_total_quests_completed": "已完成任务",
+  "codex_total_record_days": "纪录日",
+  "codex_total_refunded": "已退款 {count}",
+  "codex_total_units_sold": "售出份数",
+  "codex_total_xp": "XP",
+  "codex_trophy_lede": "成就只会解锁。这里的一切都不会衰减、过期或被收回——结束了的连续纪录依然发生过。每次解锁都会给出一件真实掉落：青铜给优秀，白银给稀有，黄金给史诗，传说给传说。",
+  "codex_trophy_wall": "奖杯墙",
+  "codex_xp": "{xp} XP",
+  "delta_new": "新增",
+  "dev_clear_country": "清除国家",
+  "dev_country_aria": "伪造掉落的国家代码",
+  "dev_country_placeholder": "国家（可选）",
+  "dev_fake_chest": "伪造宝箱（5 件掉落）",
+  "dev_fake_sales_day": "伪造销售日（EUR 250）",
+  "dev_hint": "让一件合成掉落走完真实管线。",
+  "dev_random_country": "随机选一个国家",
+  "dev_toggle": "dev",
+  "drop_aria_label": "{rarity}掉落：{title}",
+  "drop_chest_title": "来自 {date} 的宝箱",
+  "drop_xp": "+{xp} XP",
+  "era_camp": "营地",
+  "era_city": "城市",
+  "era_dynasty": "王朝",
+  "era_empire": "帝国",
+  "era_kingdom": "王国",
+  "era_town": "城镇",
+  "era_village": "村落",
+  "feed_empty_body": "把 RevenueCat webhook 指向 {hook}，在配置里加上 Flathub 应用，或用 {dev} 运行并发出一件测试掉落。",
+  "feed_empty_title": "还没有战利品。",
+  "feed_end": "全部家底就这些了。",
+  "feed_label": "掉落动态",
+  "feed_loading": "正在打开金库…",
+  "feed_loading_more": "继续往下挖…",
+  "globe_aboard": "船上",
+  "globe_aria_label": "一个地球，标出你售出过的每个国家，以及海上的船队",
+  "globe_drops": "掉落",
+  "globe_first_customer": "首位客户",
+  "globe_new_settlement": "新聚落",
+  "globe_population": "人口",
+  "globe_revenue": "收入",
+  "globe_sailing_since": "启航于",
+  "header_boss_fights_title": "{count} 场 Boss 战进行中",
+  "header_chest_aria": "开启每日宝箱：{count} 件掉落待开",
+  "header_chest_title": "{chests} 个宝箱中有 {drops} 件掉落待开",
+  "header_demo": "演示",
+  "header_demo_title": "合成数据——连接真实商店请看 README",
+  "header_level": "Lv {level}",
+  "header_live": "实时",
+  "header_live_title": "实时",
+  "header_mute": "静音掉落音效",
+  "header_muted": "已静音",
+  "header_nav_label": "分区",
+  "header_no_sources": "无来源",
+  "header_no_sources_configured": "未配置来源",
+  "header_offline": "离线",
+  "header_open_mysteries_title": "{count} 个未解谜团",
+  "header_rarity_title": "{count} 件{rarity}掉落",
+  "header_reconnecting_title": "正在重新连接…",
+  "header_scoped_to_title": "所有面板都限定在 {app}",
+  "header_sound": "音效",
+  "header_source_webhook": "webhook",
+  "header_sources_count": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "{count} 个来源"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "header_sources_in_error": "{count} 个出错",
+  "header_status_error": "出错",
+  "header_status_listening": "监听中",
+  "header_status_ok": "正常",
+  "header_status_waiting": "等待中",
+  "header_unmute": "取消掉落音效静音",
+  "header_xp_sub": [
+    {
+      "declarations": [
+        "input countries",
+        "local countriesPlural = countries: plural"
+      ],
+      "match": {
+        "countriesPlural=other": "{drops} 件掉落 · {countries} 个国家"
+      },
+      "selectors": [
+        "countriesPlural"
+      ]
+    }
+  ],
+  "header_xp_total": "{xp} XP",
+  "hearth_ambient": "环境模式",
+  "hearth_ambient_label": "炉火，环境模式",
+  "hearth_ambient_leave": "退出环境模式（Esc）",
+  "hearth_ambient_mute": "静音",
+  "hearth_ambient_unmute": "取消静音",
+  "hearth_arrivals": "最近抵达",
+  "hearth_arrivals_empty": "还没有带国家信息的掉落。",
+  "hearth_capital": "首都 {flag} {name}",
+  "hearth_civilization": "文明",
+  "hearth_era_to_next": "距{era}还差 {xp} XP",
+  "hearth_era_to_next_short": "距{era} {xp}",
+  "hearth_era_top": "已到顶端。再无可成之物。",
+  "hearth_fleet": "船队",
+  "hearth_fleet_fine": "商店从不透露他们身在何处的人。他们在海上航行。",
+  "hearth_hint_pointer": "拖动旋转 · 滚轮缩放 · 双击回正",
+  "hearth_hint_touch": "拖动旋转 · 点按标记 · 双击回正",
+  "hearth_loading": "正在生火…",
+  "hearth_population": "人口",
+  "hearth_revenue": "收入",
+  "hearth_settlements": "聚落",
+  "hearth_settlements_empty": "还没有国家买过任何东西。地球一片漆黑。",
+  "hearth_ticker_empty": "等待世界苏醒…",
+  "hearth_title": "炉火",
+  "hearth_xp": "{xp} XP",
+  "metric_drops": "掉落",
+  "metric_installs": "安装量",
+  "metric_revenue": "收入",
+  "metric_settlements": "新国家",
+  "metric_stars": "星标",
+  "metric_subscribers": "订阅者",
+  "metric_units": "销量",
+  "metric_xp": "XP",
+  "mystery_day": "{weekday} {date}",
+  "mystery_dismiss": "忽略",
+  "mystery_expected": "预期",
+  "mystery_kind_dip": "下滑",
+  "mystery_kind_new_country_cluster": "新国家",
+  "mystery_kind_record": "纪录",
+  "mystery_kind_refund_spike": "退款",
+  "mystery_kind_silence": "沉默",
+  "mystery_kind_spike": "激增",
+  "mystery_note_aria": "你对以下内容的解释：{title}",
+  "mystery_note_placeholder": "你觉得发生了什么？",
+  "mystery_observed": "实测",
+  "mystery_phrase_appeared": "凭空出现",
+  "mystery_phrase_changed": "发生了变化",
+  "mystery_phrase_doubled": "翻了一倍",
+  "mystery_phrase_dropped": "下跌 {pct}%",
+  "mystery_phrase_held_still": "纹丝不动",
+  "mystery_phrase_jumped": "跳涨 {pct}%",
+  "mystery_phrase_quadrupled": "涨到四倍",
+  "mystery_phrase_tripled": "涨到三倍",
+  "mystery_ratio": "比值",
+  "mystery_series_cancellations": "取消订阅",
+  "mystery_series_installs": "安装量",
+  "mystery_series_refunds": "退款",
+  "mystery_series_revenue": "收入",
+  "mystery_series_units": "售出份数",
+  "mystery_solve": "解答",
+  "mystery_title_dip": "{day} {source} 的{series}{phrase}",
+  "mystery_title_new_country_cluster": [
+    {
+      "declarations": [
+        "input count",
+        "input countText",
+        "input day",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "{day} 一天开拓了 {countText} 个新国家——发生了什么？"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "mystery_title_plain": "{day} {source} 的{series}",
+  "mystery_title_record": "纪录日：{day} {source} 的{series}达到 {value}",
+  "mystery_title_refund_spike": "{day} {source} 出现 {count} 笔退款——通常为 {usual}",
+  "mystery_title_silence": "{source} 自 {day} 起一直沉默",
+  "mystery_title_spike": "{day} {source} 的{series}{phrase}——为什么？",
+  "mystery_why_measured": "{observed}，而 {days} 天中位数为 {expected}（z {z}）",
+  "mystery_why_new_country_cluster": [
+    {
+      "declarations": [
+        "input count",
+        "input countText",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "{countText} 个国家在同一天首次购买"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "mystery_why_record": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "高于此前 {count} 天中的任何一天"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "mystery_why_refund_spike": "{count} 笔退款，通常为 {usual}",
+  "mystery_why_silence": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "连续 {count} 个完整日没有任何数据，而此前 7 天中有 {reported} 天有上报"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "mystery_why_silence_lag": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "连续 {count} 个完整日没有任何数据，而此前 7 天中有 {reported} 天有上报——这已经计入了该商店 {lag} 天的结算延迟"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "quest_auto_installs_week": "安装量：超越上周 · {target}",
+  "quest_auto_revenue_month": "超越上月收入 · {target}",
+  "quest_auto_revenue_week": "超越上周收入 · {target}",
+  "quest_auto_settlements_month": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "本月开拓 {count} 个新国家"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "quest_auto_stars_week": "超越上周星标数 · {target}",
+  "quest_auto_units_week": "销量：超越上周 · {target}",
+  "quest_auto_xp_week": "本周获得 {target} XP",
+  "quest_completed": "已完成",
+  "quest_completed_xp": "已完成 · +{xp} XP",
+  "quest_custom": "自定义",
+  "quest_days_left": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "还剩 {count} 天"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "quest_ended": "已结束 · {pct}",
+  "quest_error_bad_window_json": "window 必须是 \"week\"、\"month\" 或 \\{\"start\":\"…\",\"end\":\"…\"\\}",
+  "quest_error_custom_only": "只有自定义任务可以删除",
+  "quest_error_not_found": "没有这个任务",
+  "quest_error_quests_disabled": "任务功能未启用",
+  "quest_error_target_positive": "目标必须大于零",
+  "quest_error_unknown_metric": "未知指标 \"{value}\"",
+  "quest_error_unknown_window": "未知窗口 \"{value}\"（请用 week、month 或具体天数）",
+  "quest_error_window_end_format": "窗口结束日期必须为 YYYY-MM-DD",
+  "quest_error_window_order": "窗口的结束早于开始",
+  "quest_error_window_start_format": "窗口开始日期必须为 YYYY-MM-DD",
+  "quest_last_day": "最后一天",
+  "quest_remove_aria": "移除任务 {title}",
+  "quest_remove_title": "移除此任务",
+  "quest_window_days": "{count} 天",
+  "quest_window_month": "本月",
+  "quest_window_week": "本周",
+  "quests_active": "进行中",
+  "quests_active_empty": "没有进行中的任务。Loot 会根据你自己的历史写出一周的任务——只要有一周的数据就够——你也可以用 {newQuest} 自己设定。",
+  "quests_boss_empty": "没有 Boss，王国太平。把崩溃来源接到 Loot——Android vitals、Sentry，或任何能 POST 到 {hook} 的东西——下一次崩溃激增就会变成一只带血条、可以被你打空的怪物。参见 {docs}。",
+  "quests_boss_fights": "Boss 战",
+  "quests_boss_lede": "一簇脱离自身基线的崩溃，被赋予名字和血条。HP 就是它在最近一个完整日的数值，所以发布修复会打空血条，击杀会给出一件史诗掉落。这里没有失败——还站着的 Boss 就只是还站着。",
+  "quests_boss_recent": "已胜，并已淡出视线",
+  "quests_cancel": "取消",
+  "quests_every_app": "全部应用",
+  "quests_every_source": "全部来源",
+  "quests_form_app": "应用",
+  "quests_form_metric": "指标",
+  "quests_form_optional": "可选",
+  "quests_form_source": "来源",
+  "quests_form_target": "目标",
+  "quests_form_target_error": "请设置一个大于零的目标。",
+  "quests_form_title": "标题",
+  "quests_form_title_placeholder": "超越上周收入",
+  "quests_form_window": "窗口",
+  "quests_loading": "正在查看任务板…",
+  "quests_mysteries": "谜团",
+  "quests_mysteries_empty": "没有待解释的事。Loot 每小时重读最近两周，只有当某天脱离自身 28 天基线时才会标出。",
+  "quests_mysteries_lede": "那些数字做出了前后日子无法解释之举的日期。它们是可选的谜题：解答就是写下你认为发生了什么——这会给出一件掉落，也为你留下一本记录数字究竟因何波动的笔记。",
+  "quests_new": "+ 新任务",
+  "quests_notebook": "笔记本",
+  "quests_notebook_dismissed": "未留说明即忽略",
+  "quests_notebook_note": "“{note}”",
+  "quests_recent": "最近",
+  "quests_save": "设定任务",
+  "quests_saving": "正在设定…",
+  "quests_sub": "源自你自己历史的目标 · 这里没有失败",
+  "quests_title": "任务",
+  "quests_window_month": "本月",
+  "quests_window_week": "本周",
+  "rarity_common": "普通",
+  "rarity_cursed": "诅咒",
+  "rarity_epic": "史诗",
+  "rarity_legendary": "传说",
+  "rarity_rare": "稀有",
+  "rarity_uncommon": "优秀",
+  "recap_achievements": "成就",
+  "recap_chests": "宝箱",
+  "recap_copied": "已复制",
+  "recap_copy": "复制摘要",
+  "recap_copy_error": "此浏览器不允许 Loot 使用剪贴板。",
+  "recap_copy_title": "以纯文本复制此回顾",
+  "recap_country_title": "{country} · {day}",
+  "recap_delta_line": "{sign}{pct} · 上一{unit}为 {previous}",
+  "recap_drops": "掉落",
+  "recap_empty": "{period} 没有任何掉落。Loot 对此不作评价——这只是一个没有数字的{unit}。请从上面的列表里另选一个。",
+  "recap_first_with_revenue": "第一个有收入的{unit}",
+  "recap_footer_era_changed": "{from} → {to} · 等级 {levelFrom} → {levelTo}",
+  "recap_footer_era_same": "{era}时代 · 等级 {level}",
+  "recap_highlight_best_day": "最佳一天在 {day}：{value}",
+  "recap_highlight_chests_opened": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "开启了 {count} 个宝箱"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "recap_highlight_epic_drops": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "{count} 件史诗掉落"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "recap_highlight_era_reached": "进入了{era}时代",
+  "recap_highlight_legendary_drops": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "{count} 件传说掉落"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "recap_highlight_level_up": "等级 {from} → {to}",
+  "recap_highlight_most_countries": [
+    {
+      "declarations": [
+        "input count",
+        "input day",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "仅 {day} 一天就有 {count} 个新国家"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "recap_highlight_mysteries_solved": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "解释了 {count} 个谜团"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "recap_highlight_quests_completed": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "完成了 {count} 个任务"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "recap_highlight_settled": "{day} 开拓了 {flag} {country}",
+  "recap_highlight_settled_more": [
+    {
+      "declarations": [
+        "input count",
+        "input flag",
+        "input country",
+        "input day",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "{day} 开拓了 {flag} {country}（另有 {count} 个国家）"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "recap_highlight_top_country": "{flag} {country} 是你最大的市场",
+  "recap_highlight_unlocked": "解锁了 {title}",
+  "recap_highlight_unlocked_more": [
+    {
+      "declarations": [
+        "input count",
+        "input title",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "解锁了 {title} 以及另外 {count} 个成就"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "recap_installs": "安装量",
+  "recap_new_settlements": "新聚落",
+  "recap_partial": "· 截至目前",
+  "recap_refunds": "退款",
+  "recap_revenue": "收入",
+  "recap_share_achievements": "成就：{titles}",
+  "recap_share_bullet": "• {line}",
+  "recap_share_drops": "掉落     {drops} · {xp} XP",
+  "recap_share_era": "时代     {from} → {to}",
+  "recap_share_header": "◆ Loot — {period}",
+  "recap_share_header_partial": "◆ Loot — {period}（截至目前）",
+  "recap_share_installs": "安装     {installs}",
+  "recap_share_level": "等级     {level}",
+  "recap_share_level_up": "等级     {from} → {to}",
+  "recap_share_revenue": "收入     {amount}",
+  "recap_share_revenue_note": "收入     {amount}  ({note})",
+  "recap_share_settled": "开拓     {countries}",
+  "recap_share_units": "销量     {units}",
+  "recap_share_units_refunds": "销量     {units} · {refunds} 笔退款",
+  "recap_sub": "这一{unit}的战利品",
+  "recap_unit_month": "月",
+  "recap_unit_year": "年",
+  "recap_units": "销量",
+  "recap_xp": "XP",
+  "scope_all_apps": "全部应用",
+  "scope_all_apps_meta": "你发布的一切",
+  "scope_elsewhere": "其他 +{count}",
+  "scope_elsewhere_title": "有 {count} 件掉落属于其他应用",
+  "scope_events": "{count} 个事件",
+  "scope_menu_label": "应用范围",
+  "scope_title_all": "显示全部应用",
+  "scope_title_scoped": "仅显示 {app}——点击可更改",
+  "scope_unmapped": "未映射",
+  "spark_label": "截至 {day} 的 {days} 天，末值 {value}",
+  "spark_no_history": "无历史",
+  "spark_usual": "通常 {value}",
+  "stat_vs_prev": "对比上期",
+  "tab_codex": "图鉴",
+  "tab_feed": "动态",
+  "tab_hearth": "炉火",
+  "tab_quests": "任务",
+  "tab_vault": "金库",
+  "tier_city": "城市",
+  "tier_hamlet": "小村",
+  "tier_metropolis": "大都会",
+  "tier_outpost": "前哨",
+  "tier_town": "城镇",
+  "tier_village": "村庄",
+  "time_days": "{count}天",
+  "time_hours": "{count}小时",
+  "time_just_now": "刚刚",
+  "time_minutes": "{count}分",
+  "time_seconds": "{count}秒",
+  "vault_by_app": "按应用",
+  "vault_by_country": "按国家",
+  "vault_by_source": "按来源",
+  "vault_chart_aria": "每日收入与销量",
+  "vault_chart_hint": "以 {code} 计 · 销量见下",
+  "vault_chart_title": "每日收入",
+  "vault_chart_units": "销量",
+  "vault_countries_note": "本时段内出现",
+  "vault_country_empty": "本时段的收入没有附带国家信息。",
+  "vault_empty_body": "收入只统计{ledger}——来自商店自家财务报告的已结算金额。要开始填满金库，请在你的 {file} 中配置 {stores}，然后等一天结算。",
+  "vault_empty_fine": "RevenueCat webhook 仍会即时出现在动态里，但其金额是税前、未扣商店分成的{sightings}：它们只显示在上方的卡片中，永远不计入收入。完整规则见{vault}与{chest}。",
+  "vault_empty_fine_chest": "每日宝箱",
+  "vault_empty_fine_sightings": "目击记录",
+  "vault_empty_fine_vault": "金库",
+  "vault_empty_ledger_rows": "账本条目",
+  "vault_empty_stores": "App Store Connect 与 Google Play",
+  "vault_empty_title": "本时段没有账本收入。",
+  "vault_loading": "正在清点金币…",
+  "vault_no_app": "（无应用）",
+  "vault_other_countries": "其他国家",
+  "vault_range_label": "时间范围",
+  "vault_sighted_note": "{count} 笔购买 · 估算值，非账本收入",
+  "vault_subs_as_of": "截至 {date}",
+  "vault_subs_none": "没有来源上报订阅",
+  "vault_tile_active_subs": "活跃订阅",
+  "vault_tile_countries": "国家",
+  "vault_tile_refunds": "退款",
+  "vault_tile_revenue": "收入",
+  "vault_tile_sighted": "今日目击（RevenueCat）",
+  "vault_tile_units": "销量",
+  "vault_tip_units": "{count} 份",
+  "vault_title": "金库",
+  "vault_unknown_country": "未知",
+  "vessel_appstore": "库比蒂诺快帆号",
+  "vessel_flathub": "Flathub 货轮号",
+  "vessel_generic": "{source} 之船",
+  "vessel_github": "章鱼猫破冰号",
+  "vessel_googleplay": "Play 拖网号",
+  "vessel_microsoftstore": "雷德蒙德驳船号",
+  "vessel_revenuecat": "RevenueCat 快艇号",
+  "vessel_snapcraft": "Snapcraft 九号站台",
+  "vessel_why": "在海上某处——{source} 不说明它的用户来自哪个国家"
+}

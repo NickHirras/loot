@@ -141,7 +141,7 @@ func TestDropsAcceptLanguage(t *testing.T) {
 
 	// A language Loot has no overlay for is answered in English rather than in
 	// the nearest thing it does have.
-	french := h.getLang(t, "/api/drops", "fr-FR,fr;q=0.9")
+	french := h.getLang(t, "/api/drops", "xx-XX,xx;q=0.9")
 	if got := titleOfRule(t, french, "revenuecat-purchase"); got != "New subscriber" {
 		t.Fatalf("french title = %q, want the stored English", got)
 	}
@@ -242,7 +242,7 @@ func TestConfiguredLanguageWins(t *testing.T) {
 
 	h.post(t, "/hooks/revenuecat", rcWebhook)
 
-	for _, accept := range []string{"", "en-US,en;q=0.9", "fr-FR"} {
+	for _, accept := range []string{"", "en-US,en;q=0.9", "xx-XX"} {
 		body := h.getLang(t, "/api/drops", accept)
 		if got := titleOfRule(t, body, "revenuecat-purchase"); got != "Neuer Abonnent" {
 			t.Fatalf("Accept-Language %q gave %q, want German", accept, got)
@@ -273,9 +273,9 @@ func TestRequestLangNegotiation(t *testing.T) {
 		{"no header", "", english},
 		{"exact tag", "de", german},
 		{"a variant of a language we have", "de-AT", german},
-		{"a language we do not have", "fr-FR,fr;q=0.9", english},
-		{"the best available, not the best asked for", "fr;q=0.9,de;q=0.8", german},
-		{"weights are honoured", "de;q=0.2,fr;q=0.9", german},
+		{"a language we do not have", "xx-XX,xx;q=0.9", english},
+		{"the best available, not the best asked for", "xx;q=0.9,de;q=0.8", german},
+		{"weights are honoured", "de;q=0.2,xx;q=0.9", german},
 		{"a wildcard is already English", "*", english},
 		{"an explicit refusal", "de;q=0,en;q=0.9", english},
 		{"nonsense", ";;;", english},

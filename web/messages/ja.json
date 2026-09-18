@@ -1,0 +1,1051 @@
+{
+  "$schema": "https://inlang.com/schema/inlang-message-format",
+  "ach_backfilled": "遡って記録",
+  "ach_backfilled_title": "Lootが見ていない時期に獲得。実際に起きた日付で記録されます",
+  "ach_cartographer_desc": "人の住むすべての大陸に開拓地を。",
+  "ach_cartographer_title": "地図製作者",
+  "ach_cursed_but_unbowed_desc": "呪いのドロップの後、その日のうちにレア以上を獲得。持ち直しました。",
+  "ach_cursed_but_unbowed_title": "呪われてもなお",
+  "ach_era_city_desc": "都市の時代に到達する。",
+  "ach_era_city_title": "都市",
+  "ach_era_empire_desc": "帝国の時代に到達する。",
+  "ach_era_empire_title": "帝国",
+  "ach_era_kingdom_desc": "王国の時代に到達する。",
+  "ach_era_kingdom_title": "王国",
+  "ach_era_town_desc": "町の時代に到達する。",
+  "ach_era_town_title": "町",
+  "ach_first_blood_desc": "初めてのドロップ。Lootに報告できるものができた瞬間です。",
+  "ach_first_blood_title": "ファーストブラッド",
+  "ach_first_sale_desc": "ストア自身の財務レポートに載った最初の確定売上。",
+  "ach_first_sale_title": "初めての売上",
+  "ach_first_subscriber_desc": "誰かが払い続けることを決めました。",
+  "ach_first_subscriber_title": "初めての購読者",
+  "ach_hoarder_1_desc": "デイリーチェストを10個開ける。",
+  "ach_hoarder_1_title": "収集家",
+  "ach_hoarder_2_desc": "デイリーチェストを50個開ける。",
+  "ach_hoarder_2_title": "大収集家",
+  "ach_hoarder_3_desc": "デイリーチェストを200個開ける。",
+  "ach_hoarder_3_title": "竜の収集家",
+  "ach_installs_100k_desc": "累計100,000インストール。",
+  "ach_installs_100k_title": "どこにでも",
+  "ach_installs_10k_desc": "累計10,000インストール。",
+  "ach_installs_10k_title": "広まっている",
+  "ach_installs_1k_desc": "累計1,000インストール。",
+  "ach_installs_1k_title": "口コミ",
+  "ach_legendary_hunter_desc": "初めてのレジェンダリードロップ。",
+  "ach_legendary_hunter_title": "レジェンダリーハンター",
+  "ach_merchant_2_desc": "2つの異なるストアからの元帳収益。",
+  "ach_merchant_2_title": "二つの世界",
+  "ach_merchant_3_desc": "3つの異なるストアからの元帳収益。",
+  "ach_merchant_3_title": "三つの世界",
+  "ach_merchant_5_desc": "5つの異なるストアからの元帳収益。",
+  "ach_merchant_5_title": "多世界の商人",
+  "ach_mysteries_10_desc": "謎を10個解き明かす。",
+  "ach_mysteries_10_title": "実験ノート",
+  "ach_mysteries_1_desc": "謎を解き明かす。",
+  "ach_mysteries_1_title": "探偵",
+  "ach_not_yet": "未達成",
+  "ach_polyglot_1_desc": "5種類の通貨で入金を受ける。",
+  "ach_polyglot_1_title": "ポリグロット",
+  "ach_polyglot_2_desc": "10種類の通貨で入金を受ける。",
+  "ach_polyglot_2_title": "両替商",
+  "ach_progress": "{value} / {target}",
+  "ach_progress_unit": "{value} / {target} {unit}",
+  "ach_quests_10_desc": "クエストを10個達成する。",
+  "ach_quests_10_title": "冒険者",
+  "ach_quests_1_desc": "クエストを達成する。",
+  "ach_quests_1_title": "クエスト開始",
+  "ach_quests_50_desc": "クエストを50個達成する。",
+  "ach_quests_50_title": "王国の英雄",
+  "ach_record_1_desc": "それまでのすべての日を上回った日。",
+  "ach_record_1_title": "過去最高の日",
+  "ach_record_25_desc": "記録更新日が25日。",
+  "ach_record_25_title": "過去最高の日 ×25",
+  "ach_record_5_desc": "それぞれがそれまでのすべてを上回った5日間。",
+  "ach_record_5_title": "過去最高の日 ×5",
+  "ach_revenue_100_desc": "累計収益$100。",
+  "ach_revenue_100_title": "最初の100",
+  "ach_revenue_100k_desc": "累計収益$100,000。",
+  "ach_revenue_100k_title": "6桁",
+  "ach_revenue_10k_desc": "累計収益$10,000。",
+  "ach_revenue_10k_title": "5桁",
+  "ach_revenue_1k_desc": "累計収益$1,000。",
+  "ach_revenue_1k_title": "4桁",
+  "ach_settler_1_desc": "5か国に顧客。",
+  "ach_settler_1_title": "開拓者 I",
+  "ach_settler_2_desc": "10か国に顧客。",
+  "ach_settler_2_title": "開拓者 II",
+  "ach_settler_3_desc": "25か国に顧客。",
+  "ach_settler_3_title": "開拓者 III",
+  "ach_settler_4_desc": "50か国に顧客。",
+  "ach_settler_4_title": "開拓者 IV",
+  "ach_stars_1000_desc": "GitHubスター1,000。",
+  "ach_stars_1000_title": "銀河",
+  "ach_stars_100_desc": "GitHubスター100。",
+  "ach_stars_100_title": "星座",
+  "ach_stars_10_desc": "GitHubスター10。",
+  "ach_stars_10_title": "スターゲイザー",
+  "ach_steady_30_desc": "30日連続で元帳収益。",
+  "ach_steady_30_title": "順風満帆",
+  "ach_steady_7_desc": "7日連続で元帳収益。",
+  "ach_steady_7_title": "安定",
+  "ach_subscribers_1000_desc": "アクティブな購読者1,000人。",
+  "ach_subscribers_1000_title": "ムーブメント",
+  "ach_subscribers_100_desc": "アクティブな購読者100人。",
+  "ach_subscribers_100_title": "支持者たち",
+  "ach_subscribers_10_desc": "アクティブな購読者10人。",
+  "ach_subscribers_10_title": "集い",
+  "ach_tier_bronze": "ブロンズ",
+  "ach_tier_gold": "ゴールド",
+  "ach_tier_legendary": "レジェンダリー",
+  "ach_tier_silver": "シルバー",
+  "ach_tier_title": "{tier} · {xp} XPの{rarity}ドロップを獲得",
+  "ach_unit_chests": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "チェスト"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_continents": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "大陸"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_countries": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "か国"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_currencies": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "通貨"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_days": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "日"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_installs": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "インストール"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_mysteries": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "謎"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_quests": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "クエスト"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_record_days": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "記録更新日"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_revenue": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "収益"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_stars": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "スター"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_stores": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "ストア"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_subscribers": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "購読者"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_units": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "個"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_xp": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "XP"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_units_100_desc": "累計100個の有料販売。",
+  "ach_units_100_title": "百個売れた",
+  "ach_units_100k_desc": "累計100,000個の有料販売。",
+  "ach_units_100k_title": "十万個売れた",
+  "ach_units_10k_desc": "累計10,000個の有料販売。",
+  "ach_units_10k_title": "一万個売れた",
+  "ach_units_1k_desc": "累計1,000個の有料販売。",
+  "ach_units_1k_title": "千個売れた",
+  "app_enable_sounds": "クリックしてドロップ音を有効にする",
+  "app_enable_sounds_dismiss": "結構です",
+  "app_footer_mute_hint": "{key}でミュート",
+  "app_footer_tagline": "Loot · インディー開発者のためのセルフホスト型戦利品記録",
+  "boss_anr": "ANR",
+  "boss_appeared": "出現",
+  "boss_confirm": "直りましたか？",
+  "boss_days": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "{count}日"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "boss_down_pct": "出現時から−{pct}",
+  "boss_enraged": "激昂",
+  "boss_enraged_line": "出現時より強い",
+  "boss_enraged_title": "良くなる前に悪化しました",
+  "boss_faded": "{days}で消滅 — ソースの報告が止まりました",
+  "boss_fighting_for": "戦闘期間",
+  "boss_holding": "全力のまま持ちこたえている",
+  "boss_hp_aria": "{name}のHP",
+  "boss_lasted": "継続期間",
+  "boss_mark_slain": "討伐済みにする",
+  "boss_not_yet": "まだです",
+  "boss_open_issue": "Issueを開く ↗",
+  "boss_people_hit": "影響人数",
+  "boss_slain": "{days}で討伐",
+  "boss_slain_xp": "{days}で討伐 · +{xp} XP",
+  "boss_slay_yes": "はい、討伐します",
+  "boss_slaying": "とどめの一撃…",
+  "boss_title_anrs": "ANR",
+  "boss_title_anrs_in": "{version}のANR",
+  "boss_title_crashes": "クラッシュ",
+  "boss_title_crashes_in": "{version}のクラッシュ",
+  "boss_unit_crashes": "クラッシュ",
+  "boss_unit_users": "ユーザー",
+  "breakdown_empty": "まだ何もありません。",
+  "breakdown_units": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural",
+        "local countFmt = count: number maximumFractionDigits=0"
+      ],
+      "match": {
+        "countPlural=other": "{countFmt}個"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "chest_all_already_open": "それらのチェストはすでに開いています。",
+  "chest_already_open": "そのチェストはすでに開いています。",
+  "chest_best": "最高 · {rarity}",
+  "chest_bulk_every": "すべてのチェスト",
+  "chest_bulk_label": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "{count}個のチェスト · {span}"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "chest_cell_title": "{title} · +{xp} XP",
+  "chest_close": "閉じる",
+  "chest_dot_title": "{rarity} {count}個",
+  "chest_haul_xp": "+{xp} XP",
+  "chest_more_below": "ほか{count}件は下に",
+  "chest_nice": "いいですね。",
+  "chest_nothing_waiting": "待っているものはありません。1日分のストア売上が1つのチェストとして届きます。",
+  "chest_of_date": "{date}のチェスト",
+  "chest_open": "開ける",
+  "chest_open_all": "すべて開ける · {count}個",
+  "chest_open_all_sub": "{count}個のドロップを一度に",
+  "chest_open_oldest": "いちばん古いチェストを開ける",
+  "chest_opening": "{what}を開けています…",
+  "chest_opening_all": "すべてのチェストを開けています…",
+  "chest_progress": "{revealed} / {total}",
+  "chest_progress_drops": "{revealed} / {total} ドロップ",
+  "chest_row_drops": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "{count}個のドロップ"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "chest_row_xp": "+{xp} XP",
+  "chest_skip": "スキップ",
+  "chest_the_chest": "チェスト",
+  "chest_title": "デイリーチェスト",
+  "chest_waiting": [
+    {
+      "declarations": [
+        "input drops",
+        "input chests",
+        "local dropsPlural = drops: plural",
+        "local chestsPlural = chests: plural",
+        "local dropsFmt = drops: number maximumFractionDigits=0"
+      ],
+      "match": {
+        "dropsPlural=other, chestsPlural=other": "{chests}個のチェストに{dropsFmt}個のドロップが待っています。"
+      },
+      "selectors": [
+        "dropsPlural",
+        "chestsPlural"
+      ]
+    }
+  ],
+  "codex_counter_title": "{total}個中{unlocked}個の実績を解除",
+  "codex_days": "{count}日",
+  "codex_filter_all": "すべて",
+  "codex_filter_empty": "このフィルターでは表示するものがありません。",
+  "codex_filter_label": "実績を絞り込む",
+  "codex_filter_locked": "未獲得",
+  "codex_filter_unlocked": "解除済み",
+  "codex_loading": "図鑑を開いています…",
+  "codex_recap_loading": "まとめています…",
+  "codex_recap_period_label": "振り返りの期間",
+  "codex_record_best_day_source": "最高の日 · {source}",
+  "codex_record_best_install_day": "最高のインストール日",
+  "codex_record_best_revenue_day": "最高の収益日",
+  "codex_record_best_units_day": "最高の販売日",
+  "codex_record_biggest_drop": "最大のドロップ",
+  "codex_record_biggest_drop_note": "{title} · {day}",
+  "codex_record_first_event": "最初のイベント",
+  "codex_record_first_event_note": "{count}日分の履歴",
+  "codex_record_longest_run": "最長の連続収益日数",
+  "codex_record_longest_run_note": "{day}に終了",
+  "codex_record_most_countries_day": "1日の最多開拓国数",
+  "codex_record_most_drops_day": "1日の最多ドロップ数",
+  "codex_record_most_xp_day": "1日の最多XP",
+  "codex_records": "記録",
+  "codex_records_empty": "まだ記録はありません。前の日を上回った最初の日から始まります。",
+  "codex_records_lede": "毎回その場で計算し、保存はしません。レポートが訂正されれば記録も更新され、古い記録が残ることはありません。記録は上がる一方です。",
+  "codex_season_recap": "シーズンの振り返り",
+  "codex_sub": "これまでに起きたすべて · トロフィーは永久です",
+  "codex_this_year": "今年",
+  "codex_title": "図鑑",
+  "codex_total_chests_opened": "開けたチェスト",
+  "codex_total_continents": "6大陸中{count}",
+  "codex_total_countries_settled": "開拓した国",
+  "codex_total_currencies": "受け取った通貨",
+  "codex_total_drops": "ドロップ",
+  "codex_total_era": "{era}の時代",
+  "codex_total_github_stars": "GitHubスター",
+  "codex_total_installs": "インストール",
+  "codex_total_lifetime_revenue": "累計収益",
+  "codex_total_mysteries": "解き明かした謎",
+  "codex_total_quests_completed": "達成したクエスト",
+  "codex_total_record_days": "記録更新日",
+  "codex_total_refunded": "{count}件の返金",
+  "codex_total_units_sold": "販売個数",
+  "codex_total_xp": "XP",
+  "codex_trophy_lede": "実績は解除されるだけです。ここにあるものが目減りしたり、期限切れになったり、取り上げられたりすることはありません。途切れた連続記録も、起きたことに変わりはありません。解除するたびに本物のドロップを獲得します。ブロンズはアンコモン、シルバーはレア、ゴールドはエピック、レジェンダリーはレジェンダリーです。",
+  "codex_trophy_wall": "トロフィーの壁",
+  "codex_xp": "{xp} XP",
+  "delta_new": "新規",
+  "dev_clear_country": "国をクリア",
+  "dev_country_aria": "偽ドロップの国コード",
+  "dev_country_placeholder": "国（任意）",
+  "dev_fake_chest": "偽のチェスト（5ドロップ）",
+  "dev_fake_sales_day": "偽の売上日（EUR 250）",
+  "dev_hint": "実際のパイプラインに合成ドロップを流します。",
+  "dev_random_country": "ランダムな国を選ぶ",
+  "dev_toggle": "dev",
+  "drop_aria_label": "{rarity}のドロップ: {title}",
+  "drop_chest_title": "{date}のチェストから出ました",
+  "drop_xp": "+{xp} XP",
+  "era_camp": "野営地",
+  "era_city": "都市",
+  "era_dynasty": "王朝",
+  "era_empire": "帝国",
+  "era_kingdom": "王国",
+  "era_town": "町",
+  "era_village": "村",
+  "feed_empty_body": "RevenueCatのWebhookを{hook}に向けるか、設定にFlathubのアプリを追加するか、{dev}付きで起動してテストドロップを撃ってください。",
+  "feed_empty_title": "まだ戦利品はありません。",
+  "feed_end": "戦利品はこれで全部です。",
+  "feed_label": "ドロップフィード",
+  "feed_loading": "宝物庫を開けています…",
+  "feed_loading_more": "さらに掘っています…",
+  "globe_aboard": "乗船中",
+  "globe_aria_label": "販売のあったすべての国と、航海中の船団の地球儀",
+  "globe_drops": "ドロップ",
+  "globe_first_customer": "最初の顧客",
+  "globe_new_settlement": "新しい開拓地",
+  "globe_population": "人口",
+  "globe_revenue": "収益",
+  "globe_sailing_since": "航海開始",
+  "header_boss_fights_title": "{count}件のボス戦が進行中",
+  "header_chest_aria": "デイリーチェストを開ける: {count}個のドロップが待っています",
+  "header_chest_title": "{chests}個のチェストに{drops}個のドロップ",
+  "header_demo": "デモ",
+  "header_demo_title": "合成データ — 実際のストアの接続方法はREADMEを参照",
+  "header_level": "Lv {level}",
+  "header_live": "ライブ",
+  "header_live_title": "ライブ",
+  "header_mute": "ドロップ音をミュート",
+  "header_muted": "ミュート中",
+  "header_nav_label": "セクション",
+  "header_no_sources": "ソースなし",
+  "header_no_sources_configured": "ソースが未設定",
+  "header_offline": "オフライン",
+  "header_open_mysteries_title": "未解明の謎{count}件",
+  "header_rarity_title": "{rarity}のドロップ{count}個",
+  "header_reconnecting_title": "再接続しています…",
+  "header_scoped_to_title": "すべてのパネルが{app}に絞り込まれています",
+  "header_sound": "サウンド",
+  "header_source_webhook": "webhook",
+  "header_sources_count": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "{count}個のソース"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "header_sources_in_error": "{count}件がエラー",
+  "header_status_error": "エラー",
+  "header_status_listening": "待受中",
+  "header_status_ok": "正常",
+  "header_status_waiting": "待機中",
+  "header_unmute": "ドロップ音のミュートを解除",
+  "header_xp_sub": [
+    {
+      "declarations": [
+        "input countries",
+        "local countriesPlural = countries: plural"
+      ],
+      "match": {
+        "countriesPlural=other": "{drops}ドロップ · {countries}か国"
+      },
+      "selectors": [
+        "countriesPlural"
+      ]
+    }
+  ],
+  "header_xp_total": "{xp} XP",
+  "hearth_ambient": "アンビエント",
+  "hearth_ambient_label": "炉端・アンビエント",
+  "hearth_ambient_leave": "アンビエントモードを終了 (Esc)",
+  "hearth_ambient_mute": "ミュート",
+  "hearth_ambient_unmute": "ミュート解除",
+  "hearth_arrivals": "最近の到着",
+  "hearth_arrivals_empty": "国の情報が付いたドロップはまだ届いていません。",
+  "hearth_capital": "首都 {flag} {name}",
+  "hearth_civilization": "文明",
+  "hearth_era_to_next": "{era}まで{xp} XP",
+  "hearth_era_to_next_short": "{era}まで{xp}",
+  "hearth_era_top": "頂点です。これ以上はありません。",
+  "hearth_fleet": "船団",
+  "hearth_fleet_fine": "ストアが国を教えてくれない人たち。彼らは海の上です。",
+  "hearth_hint_pointer": "ドラッグで回転 · スクロールで拡大 · ダブルクリックで中央に戻す",
+  "hearth_hint_touch": "ドラッグで回転 · マーカーをタップ · ダブルタップで中央に戻す",
+  "hearth_loading": "火を灯しています…",
+  "hearth_population": "人口",
+  "hearth_revenue": "収益",
+  "hearth_settlements": "開拓地",
+  "hearth_settlements_empty": "まだどの国からも購入がありません。地球儀は暗いままです。",
+  "hearth_ticker_empty": "世界が目覚めるのを待っています…",
+  "hearth_title": "炉端",
+  "hearth_xp": "{xp} XP",
+  "metric_drops": "ドロップ",
+  "metric_installs": "インストール",
+  "metric_revenue": "収益",
+  "metric_settlements": "新しい国",
+  "metric_stars": "スター",
+  "metric_subscribers": "購読者",
+  "metric_units": "販売数",
+  "metric_xp": "XP",
+  "mystery_day": "{weekday} {date}",
+  "mystery_dismiss": "却下",
+  "mystery_expected": "予想",
+  "mystery_kind_dip": "落ち込み",
+  "mystery_kind_new_country_cluster": "新しい国",
+  "mystery_kind_record": "記録",
+  "mystery_kind_refund_spike": "返金",
+  "mystery_kind_silence": "沈黙",
+  "mystery_kind_spike": "急増",
+  "mystery_note_aria": "{title}についてのあなたの説明",
+  "mystery_note_placeholder": "何が起きたと思いますか？",
+  "mystery_observed": "実測",
+  "mystery_phrase_appeared": "何もないところから現れた",
+  "mystery_phrase_changed": "変化した",
+  "mystery_phrase_doubled": "2倍になった",
+  "mystery_phrase_dropped": "{pct}%下がった",
+  "mystery_phrase_held_still": "横ばいだった",
+  "mystery_phrase_jumped": "{pct}%跳ね上がった",
+  "mystery_phrase_quadrupled": "4倍になった",
+  "mystery_phrase_tripled": "3倍になった",
+  "mystery_ratio": "比率",
+  "mystery_series_cancellations": "解約",
+  "mystery_series_installs": "インストール",
+  "mystery_series_refunds": "返金",
+  "mystery_series_revenue": "収益",
+  "mystery_series_units": "販売数",
+  "mystery_solve": "解き明かす",
+  "mystery_title_dip": "{day}、{source}の{series}が{phrase}",
+  "mystery_title_new_country_cluster": [
+    {
+      "declarations": [
+        "input count",
+        "input countText",
+        "input day",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "{day}に{countText}か国を新たに開拓 — 何があったのでしょう？"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "mystery_title_plain": "{day}の{source}の{series}",
+  "mystery_title_record": "記録更新: {day}、{source}で{series} {value}",
+  "mystery_title_refund_spike": "{day}、{source}で{count}件の返金 — 通常は{usual}",
+  "mystery_title_silence": "{source}が{day}から沈黙しています",
+  "mystery_title_spike": "{day}、{source}の{series}が{phrase} — なぜ？",
+  "mystery_why_measured": "{days}日間の中央値{expected}に対して{observed}（z {z}）",
+  "mystery_why_new_country_cluster": [
+    {
+      "declarations": [
+        "input count",
+        "input countText",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "同じ日に{countText}か国が初めて購入しました"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "mystery_why_record": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "過去{count}日のどの日よりも高い値です"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "mystery_why_refund_spike": "通常{usual}のところ{count}件の返金",
+  "mystery_why_silence": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "直近7日のうち{reported}日は報告があったのに、{count}日分のデータが1件もありません"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "mystery_why_silence_lag": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "直近7日のうち{reported}日は報告があったのに、{count}日分のデータが1件もありません。このストアの{lag}日の確定遅延を考慮した上での話です"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "quest_auto_installs_week": "インストール: 先週を上回る · {target}",
+  "quest_auto_revenue_month": "先月の収益を上回る · {target}",
+  "quest_auto_revenue_week": "先週の収益を上回る · {target}",
+  "quest_auto_settlements_month": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "今月{count}か国を新たに開拓する"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "quest_auto_stars_week": "先週のスターを上回る · {target}",
+  "quest_auto_units_week": "販売数: 先週を上回る · {target}",
+  "quest_auto_xp_week": "今週{target} XPを獲得する",
+  "quest_completed": "達成",
+  "quest_completed_xp": "達成 · +{xp} XP",
+  "quest_custom": "カスタム",
+  "quest_days_left": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "残り{count}日"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "quest_ended": "終了 · {pct}",
+  "quest_error_bad_window_json": "window は \"week\"、\"month\"、または \\{\"start\":\"…\",\"end\":\"…\"\\} である必要があります",
+  "quest_error_custom_only": "削除できるのはカスタムクエストだけです",
+  "quest_error_not_found": "そのクエストはありません",
+  "quest_error_quests_disabled": "クエストは有効になっていません",
+  "quest_error_target_positive": "目標は0より大きい必要があります",
+  "quest_error_unknown_metric": "不明な指標 \"{value}\"",
+  "quest_error_unknown_window": "不明な期間 \"{value}\"（week、month、または日数を指定してください）",
+  "quest_error_window_end_format": "期間の終了日は YYYY-MM-DD 形式にしてください",
+  "quest_error_window_order": "期間の終了が開始より前です",
+  "quest_error_window_start_format": "期間の開始日は YYYY-MM-DD 形式にしてください",
+  "quest_last_day": "最終日",
+  "quest_remove_aria": "クエスト{title}を削除",
+  "quest_remove_title": "このクエストを削除",
+  "quest_window_days": "{count}日間",
+  "quest_window_month": "今月",
+  "quest_window_week": "今週",
+  "quests_active": "進行中",
+  "quests_active_empty": "進行中のものはありません。Lootはあなたの履歴から1週間分のクエストを作ります。データのある1週間さえあれば十分です。{newQuest}から自分で設定することもできます。",
+  "quests_boss_empty": "ボスはいません。王国は平和です。クラッシュのソースをLootに向けてください。Android vitals、Sentry、{hook}にPOSTできるものなら何でも構いません。次のクラッシュの急増が、HPバーを削れるモンスターになります。{docs}を参照してください。",
+  "quests_boss_fights": "ボス戦",
+  "quests_boss_lede": "自分のベースラインから外れたクラッシュの集まりに、名前とHPバーを与えたものです。HPは直近の完了した日の件数なので、修正を出せばバーが減り、討伐でエピックのドロップを獲得します。ここに失敗はありません。まだ立っているボスは、ただ立っているだけです。",
+  "quests_boss_recent": "討伐したもの、見失ったもの",
+  "quests_cancel": "キャンセル",
+  "quests_every_app": "すべてのアプリ",
+  "quests_every_source": "すべてのソース",
+  "quests_form_app": "アプリ",
+  "quests_form_metric": "指標",
+  "quests_form_optional": "任意",
+  "quests_form_source": "ソース",
+  "quests_form_target": "目標",
+  "quests_form_target_error": "0より大きい目標を設定してください。",
+  "quests_form_title": "タイトル",
+  "quests_form_title_placeholder": "先週の収益を上回る",
+  "quests_form_window": "期間",
+  "quests_loading": "掲示板を読んでいます…",
+  "quests_mysteries": "謎",
+  "quests_mysteries_empty": "未解明のものはありません。Lootは1時間ごとに直近2週間を読み直し、その日が自分の28日間のベースラインから外れたときだけ印を付けます。",
+  "quests_mysteries_lede": "前後の日では説明がつかない動きをした日です。解くかどうかは自由で、解くというのは何が起きたと思うかを書き留めることです。書けばドロップを獲得でき、何が数字を動かしているかのノートが残ります。",
+  "quests_new": "+ 新しいクエスト",
+  "quests_notebook": "ノート",
+  "quests_notebook_dismissed": "メモなしで却下",
+  "quests_notebook_note": "“{note}”",
+  "quests_recent": "最近",
+  "quests_save": "クエストを設定",
+  "quests_saving": "設定中…",
+  "quests_sub": "あなたの履歴から生まれる目標 · ここに失敗はありません",
+  "quests_title": "クエスト",
+  "quests_window_month": "今月",
+  "quests_window_week": "今週",
+  "rarity_common": "コモン",
+  "rarity_cursed": "呪い",
+  "rarity_epic": "エピック",
+  "rarity_legendary": "レジェンダリー",
+  "rarity_rare": "レア",
+  "rarity_uncommon": "アンコモン",
+  "recap_achievements": "実績",
+  "recap_chests": "チェスト",
+  "recap_copied": "コピーしました",
+  "recap_copy": "サマリーをコピー",
+  "recap_copy_error": "このブラウザではLootがクリップボードを使えませんでした。",
+  "recap_copy_title": "この振り返りをテキストとしてコピー",
+  "recap_country_title": "{country} · {day}",
+  "recap_delta_line": "{sign}{pct} · 前の{unit}は{previous}",
+  "recap_drops": "ドロップ",
+  "recap_empty": "{period}には何も届きませんでした。Lootはそれについて何も言いません。数字のない{unit}というだけです。上のリストから別のものを選んでください。",
+  "recap_first_with_revenue": "収益のあった最初の{unit}",
+  "recap_footer_era_changed": "{from} → {to} · レベル {levelFrom} → {levelTo}",
+  "recap_footer_era_same": "{era}の時代 · レベル {level}",
+  "recap_highlight_best_day": "最高の日は{day}: {value}",
+  "recap_highlight_chests_opened": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "チェストを{count}個開けました"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "recap_highlight_epic_drops": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "エピックのドロップ{count}個"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "recap_highlight_era_reached": "{era}の時代に到達",
+  "recap_highlight_legendary_drops": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "レジェンダリーのドロップ{count}個"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "recap_highlight_level_up": "レベル {from} → {to}",
+  "recap_highlight_most_countries": [
+    {
+      "declarations": [
+        "input count",
+        "input day",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "{day}だけで{count}か国が新規"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "recap_highlight_mysteries_solved": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "{count}件の謎を解明"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "recap_highlight_quests_completed": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "{count}件のクエストを達成"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "recap_highlight_settled": "{day}に{flag} {country}を開拓",
+  "recap_highlight_settled_more": [
+    {
+      "declarations": [
+        "input count",
+        "input flag",
+        "input country",
+        "input day",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "{day}に{flag} {country}を開拓（ほか{count}か国）"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "recap_highlight_top_country": "最大の市場は{flag} {country}",
+  "recap_highlight_unlocked": "{title}を解除",
+  "recap_highlight_unlocked_more": [
+    {
+      "declarations": [
+        "input count",
+        "input title",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "{title}ほか{count}件の実績を解除"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "recap_installs": "インストール",
+  "recap_new_settlements": "新しい開拓地",
+  "recap_partial": "· ここまで",
+  "recap_refunds": "返金",
+  "recap_revenue": "収益",
+  "recap_share_achievements": "実績: {titles}",
+  "recap_share_bullet": "• {line}",
+  "recap_share_drops": "ドロップ  {drops} · {xp} XP",
+  "recap_share_era": "時代    {from} → {to}",
+  "recap_share_header": "◆ Loot — {period}",
+  "recap_share_header_partial": "◆ Loot — {period}（ここまで）",
+  "recap_share_installs": "インストール {installs}",
+  "recap_share_level": "レベル   {level}",
+  "recap_share_level_up": "レベル   {from} → {to}",
+  "recap_share_revenue": "収益    {amount}",
+  "recap_share_revenue_note": "収益    {amount}  ({note})",
+  "recap_share_settled": "開拓    {countries}",
+  "recap_share_units": "販売数   {units}",
+  "recap_share_units_refunds": "販売数   {units} · 返金{refunds}件",
+  "recap_sub": "戦利品で見る{unit}",
+  "recap_unit_month": "月",
+  "recap_unit_year": "年",
+  "recap_units": "販売数",
+  "recap_xp": "XP",
+  "scope_all_apps": "すべてのアプリ",
+  "scope_all_apps_meta": "公開しているすべて",
+  "scope_elsewhere": "他に+{count}",
+  "scope_elsewhere_title": "他のアプリに{count}個のドロップが届きました",
+  "scope_events": "{count}件のイベント",
+  "scope_menu_label": "アプリの範囲",
+  "scope_title_all": "すべてのアプリを表示中",
+  "scope_title_scoped": "{app}のみ表示中 — クリックで変更",
+  "scope_unmapped": "未マッピング",
+  "spark_label": "{day}までの{days}日間、最終値{value}",
+  "spark_no_history": "履歴なし",
+  "spark_usual": "通常{value}",
+  "stat_vs_prev": "前期比",
+  "tab_codex": "図鑑",
+  "tab_feed": "フィード",
+  "tab_hearth": "炉端",
+  "tab_quests": "クエスト",
+  "tab_vault": "宝物庫",
+  "tier_city": "都市",
+  "tier_hamlet": "小村",
+  "tier_metropolis": "大都市",
+  "tier_outpost": "前哨地",
+  "tier_town": "町",
+  "tier_village": "村",
+  "time_days": "{count}日",
+  "time_hours": "{count}時間",
+  "time_just_now": "たった今",
+  "time_minutes": "{count}分",
+  "time_seconds": "{count}秒",
+  "vault_by_app": "アプリ別",
+  "vault_by_country": "国別",
+  "vault_by_source": "ソース別",
+  "vault_chart_aria": "日ごとの収益と販売数",
+  "vault_chart_hint": "{code}表示 · 下は販売数",
+  "vault_chart_title": "日ごとの収益",
+  "vault_chart_units": "販売数",
+  "vault_countries_note": "この期間に確認",
+  "vault_country_empty": "この期間の売上に国の情報はありませんでした。",
+  "vault_empty_body": "収益に数えるのは{ledger}だけです。ストア自身の財務レポートに載った確定済みの金額です。宝物庫を満たすには、{file}で{stores}を設定し、1日分が確定するのを待ってください。",
+  "vault_empty_fine": "RevenueCatのWebhookは今までどおり即座にフィードに届きますが、その金額は税引き前・ストア手数料前の{sightings}です。上のタイルには表示されますが、収益には加算されません。詳しいルールは{vault}と{chest}を参照してください。",
+  "vault_empty_fine_chest": "デイリーチェスト",
+  "vault_empty_fine_sightings": "目撃情報",
+  "vault_empty_fine_vault": "宝物庫",
+  "vault_empty_ledger_rows": "元帳の記録",
+  "vault_empty_stores": "App Store ConnectとGoogle Play",
+  "vault_empty_title": "この期間に元帳の売上はありません。",
+  "vault_loading": "コインを数えています…",
+  "vault_no_app": "（アプリなし）",
+  "vault_other_countries": "その他の国",
+  "vault_range_label": "期間",
+  "vault_sighted_note": "{count}件の購入 · 元帳収益ではなく推定値",
+  "vault_subs_as_of": "{date}時点",
+  "vault_subs_none": "購読を報告するソースがありません",
+  "vault_tile_active_subs": "有効な購読",
+  "vault_tile_countries": "国",
+  "vault_tile_refunds": "返金",
+  "vault_tile_revenue": "収益",
+  "vault_tile_sighted": "本日の目撃 (RevenueCat)",
+  "vault_tile_units": "販売数",
+  "vault_tip_units": "{count}個",
+  "vault_title": "宝物庫",
+  "vault_unknown_country": "不明",
+  "vessel_appstore": "クパチーノ・クリッパー号",
+  "vessel_flathub": "Flathub・フレイター号",
+  "vessel_generic": "{source}号",
+  "vessel_github": "オクトキャット・アイスブレイカー号",
+  "vessel_googleplay": "Play・トローラー号",
+  "vessel_microsoftstore": "レドモンド・バージ号",
+  "vessel_revenuecat": "RevenueCat・カッター号",
+  "vessel_snapcraft": "Snapcraft 九番線",
+  "vessel_why": "どこかの海の上 — {source}は人々の国を教えてくれません"
+}

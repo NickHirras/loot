@@ -1,0 +1,1174 @@
+{
+  "$schema": "https://inlang.com/schema/inlang-message-format",
+  "ach_backfilled": "задним числом",
+  "ach_backfilled_title": "Получено до того, как Loot начал следить; датировано днём события",
+  "ach_cartographer_desc": "Поселение на каждом обитаемом континенте.",
+  "ach_cartographer_title": "Картограф",
+  "ach_cursed_but_unbowed_desc": "Проклятый дроп, а в тот же день — редкий или выше. Всё развернулось.",
+  "ach_cursed_but_unbowed_title": "Проклят, но не сломлен",
+  "ach_era_city_desc": "Достигни эпохи Города.",
+  "ach_era_city_title": "Город",
+  "ach_era_empire_desc": "Достигни эпохи Империи.",
+  "ach_era_empire_title": "Империя",
+  "ach_era_kingdom_desc": "Достигни эпохи Королевства.",
+  "ach_era_kingdom_title": "Королевство",
+  "ach_era_town_desc": "Достигни эпохи Посёлка.",
+  "ach_era_town_title": "Посёлок",
+  "ach_first_blood_desc": "Твой самый первый дроп — момент, когда Loot стало о чём докладывать.",
+  "ach_first_blood_title": "Первая кровь",
+  "ach_first_sale_desc": "Первая подтверждённая продажа в финансовом отчёте магазина.",
+  "ach_first_sale_title": "Первая продажа",
+  "ach_first_subscriber_desc": "Кто-то решил платить тебе и дальше.",
+  "ach_first_subscriber_title": "Первый подписчик",
+  "ach_hoarder_1_desc": "Открой 10 ежедневных сундуков.",
+  "ach_hoarder_1_title": "Скопидом",
+  "ach_hoarder_2_desc": "Открой 50 ежедневных сундуков.",
+  "ach_hoarder_2_title": "Великий скопидом",
+  "ach_hoarder_3_desc": "Открой 200 ежедневных сундуков.",
+  "ach_hoarder_3_title": "Драконий скопидом",
+  "ach_installs_100k_desc": "100,000 установок за всё время.",
+  "ach_installs_100k_title": "Повсюду",
+  "ach_installs_10k_desc": "10,000 установок за всё время.",
+  "ach_installs_10k_title": "Расходится",
+  "ach_installs_1k_desc": "1,000 установок за всё время.",
+  "ach_installs_1k_title": "Сарафанное радио",
+  "ach_legendary_hunter_desc": "Твой первый легендарный дроп.",
+  "ach_legendary_hunter_title": "Охотник за легендами",
+  "ach_merchant_2_desc": "Доход в книге учёта из 2 разных магазинов.",
+  "ach_merchant_2_title": "Два мира",
+  "ach_merchant_3_desc": "Доход в книге учёта из 3 разных магазинов.",
+  "ach_merchant_3_title": "Три мира",
+  "ach_merchant_5_desc": "Доход в книге учёта из 5 разных магазинов.",
+  "ach_merchant_5_title": "Торговец многих миров",
+  "ach_mysteries_10_desc": "Объясни 10 загадок.",
+  "ach_mysteries_10_title": "Лабораторный журнал",
+  "ach_mysteries_1_desc": "Объясни загадку.",
+  "ach_mysteries_1_title": "Детектив",
+  "ach_not_yet": "пока нет",
+  "ach_polyglot_1_desc": "Получи деньги в 5 разных валютах.",
+  "ach_polyglot_1_title": "Полиглот",
+  "ach_polyglot_2_desc": "Получи деньги в 10 разных валютах.",
+  "ach_polyglot_2_title": "Меняла",
+  "ach_progress": "{value} / {target}",
+  "ach_progress_unit": "{value} / {target} {unit}",
+  "ach_quests_10_desc": "Заверши 10 квестов.",
+  "ach_quests_10_title": "Искатель приключений",
+  "ach_quests_1_desc": "Заверши квест.",
+  "ach_quests_1_title": "В пути",
+  "ach_quests_50_desc": "Заверши 50 квестов.",
+  "ach_quests_50_title": "Герой королевства",
+  "ach_record_1_desc": "День, который побил все предыдущие.",
+  "ach_record_1_title": "Лучший день в истории",
+  "ach_record_25_desc": "Двадцать пять рекордных дней.",
+  "ach_record_25_title": "Лучший день в истории ×25",
+  "ach_record_5_desc": "Пять дней, и каждый побил всё, что было до него.",
+  "ach_record_5_title": "Лучший день в истории ×5",
+  "ach_revenue_100_desc": "$100 дохода за всё время.",
+  "ach_revenue_100_title": "Первая сотня",
+  "ach_revenue_100k_desc": "$100,000 дохода за всё время.",
+  "ach_revenue_100k_title": "Шесть знаков",
+  "ach_revenue_10k_desc": "$10,000 дохода за всё время.",
+  "ach_revenue_10k_title": "Пять знаков",
+  "ach_revenue_1k_desc": "$1,000 дохода за всё время.",
+  "ach_revenue_1k_title": "Четыре знака",
+  "ach_settler_1_desc": "Покупатели в 5 странах.",
+  "ach_settler_1_title": "Поселенец I",
+  "ach_settler_2_desc": "Покупатели в 10 странах.",
+  "ach_settler_2_title": "Поселенец II",
+  "ach_settler_3_desc": "Покупатели в 25 странах.",
+  "ach_settler_3_title": "Поселенец III",
+  "ach_settler_4_desc": "Покупатели в 50 странах.",
+  "ach_settler_4_title": "Поселенец IV",
+  "ach_stars_1000_desc": "1,000 звёзд на GitHub.",
+  "ach_stars_1000_title": "Галактика",
+  "ach_stars_100_desc": "100 звёзд на GitHub.",
+  "ach_stars_100_title": "Созвездие",
+  "ach_stars_10_desc": "10 звёзд на GitHub.",
+  "ach_stars_10_title": "Звездочёт",
+  "ach_steady_30_desc": "Доход в книге учёта 30 дней подряд.",
+  "ach_steady_30_title": "Так держать",
+  "ach_steady_7_desc": "Доход в книге учёта 7 дней подряд.",
+  "ach_steady_7_title": "Ровный ход",
+  "ach_subscribers_1000_desc": "1,000 активных подписчиков.",
+  "ach_subscribers_1000_title": "Движение",
+  "ach_subscribers_100_desc": "100 активных подписчиков.",
+  "ach_subscribers_100_title": "Последователи",
+  "ach_subscribers_10_desc": "10 активных подписчиков.",
+  "ach_subscribers_10_title": "Паства",
+  "ach_tier_bronze": "бронза",
+  "ach_tier_gold": "золото",
+  "ach_tier_legendary": "легенда",
+  "ach_tier_silver": "серебро",
+  "ach_tier_title": "{tier} · даёт {rarity} дроп на {xp} XP",
+  "ach_unit_chests": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=few": "сундука",
+        "countPlural=many": "сундуков",
+        "countPlural=one": "сундук",
+        "countPlural=other": "сундука"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_continents": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=few": "континента",
+        "countPlural=many": "континентов",
+        "countPlural=one": "континент",
+        "countPlural=other": "континента"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_countries": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=few": "страны",
+        "countPlural=many": "стран",
+        "countPlural=one": "страна",
+        "countPlural=other": "страны"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_currencies": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=few": "валюты",
+        "countPlural=many": "валют",
+        "countPlural=one": "валюта",
+        "countPlural=other": "валюты"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_days": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=few": "дня",
+        "countPlural=many": "дней",
+        "countPlural=one": "день",
+        "countPlural=other": "дня"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_installs": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=few": "установки",
+        "countPlural=many": "установок",
+        "countPlural=one": "установка",
+        "countPlural=other": "установки"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_mysteries": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=few": "загадки",
+        "countPlural=many": "загадок",
+        "countPlural=one": "загадка",
+        "countPlural=other": "загадки"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_quests": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=few": "квеста",
+        "countPlural=many": "квестов",
+        "countPlural=one": "квест",
+        "countPlural=other": "квеста"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_record_days": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=few": "рекордных дня",
+        "countPlural=many": "рекордных дней",
+        "countPlural=one": "рекордный день",
+        "countPlural=other": "рекордного дня"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_revenue": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=few": "дохода",
+        "countPlural=many": "дохода",
+        "countPlural=one": "дохода",
+        "countPlural=other": "дохода"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_stars": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=few": "звезды",
+        "countPlural=many": "звёзд",
+        "countPlural=one": "звезда",
+        "countPlural=other": "звезды"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_stores": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=few": "магазина",
+        "countPlural=many": "магазинов",
+        "countPlural=one": "магазин",
+        "countPlural=other": "магазина"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_subscribers": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=few": "подписчика",
+        "countPlural=many": "подписчиков",
+        "countPlural=one": "подписчик",
+        "countPlural=other": "подписчика"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_units": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=few": "единицы",
+        "countPlural=many": "единиц",
+        "countPlural=one": "единица",
+        "countPlural=other": "единицы"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_xp": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=few": "XP",
+        "countPlural=many": "XP",
+        "countPlural=one": "XP",
+        "countPlural=other": "XP"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_units_100_desc": "100 платных единиц за всё время.",
+  "ach_units_100_title": "Сотня продана",
+  "ach_units_100k_desc": "100,000 платных единиц за всё время.",
+  "ach_units_100k_title": "Сто тысяч продано",
+  "ach_units_10k_desc": "10,000 платных единиц за всё время.",
+  "ach_units_10k_title": "Десять тысяч продано",
+  "ach_units_1k_desc": "1,000 платных единиц за всё время.",
+  "ach_units_1k_title": "Тысяча продана",
+  "app_enable_sounds": "Нажми, чтобы включить звуки дропов",
+  "app_enable_sounds_dismiss": "нет, спасибо",
+  "app_footer_mute_hint": "{key} — выключить звук",
+  "app_footer_tagline": "Loot · учёт добычи на своём сервере для инди-разработчиков",
+  "boss_anr": "ANR",
+  "boss_appeared": "появился",
+  "boss_confirm": "Починил?",
+  "boss_days": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=few": "{count} дня",
+        "countPlural=many": "{count} дней",
+        "countPlural=one": "{count} день",
+        "countPlural=other": "{count} дня"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "boss_down_pct": "−{pct} с появления",
+  "boss_enraged": "в ярости",
+  "boss_enraged_line": "сильнее, чем при появлении",
+  "boss_enraged_title": "Сначала стало хуже",
+  "boss_faded": "угас через {days} — источник перестал присылать данные",
+  "boss_fighting_for": "в бою уже",
+  "boss_holding": "держится в полную силу",
+  "boss_hp_aria": "{name} — очки здоровья",
+  "boss_lasted": "продержался",
+  "boss_mark_slain": "Отметить убитым",
+  "boss_not_yet": "Ещё нет",
+  "boss_open_issue": "Открыть задачу ↗",
+  "boss_people_hit": "задето людей",
+  "boss_slain": "убит за {days}",
+  "boss_slain_xp": "убит за {days} · +{xp} XP",
+  "boss_slay_yes": "Да, добить",
+  "boss_slaying": "Наносим удар…",
+  "boss_title_anrs": "ANR",
+  "boss_title_anrs_in": "ANR в {version}",
+  "boss_title_crashes": "Сбои",
+  "boss_title_crashes_in": "Сбои в {version}",
+  "boss_unit_crashes": "сбоев",
+  "boss_unit_users": "пользователей",
+  "breakdown_empty": "Здесь пока пусто.",
+  "breakdown_units": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural",
+        "local countFmt = count: number maximumFractionDigits=0"
+      ],
+      "match": {
+        "countPlural=few": "{countFmt} единицы",
+        "countPlural=many": "{countFmt} единиц",
+        "countPlural=one": "{countFmt} единица",
+        "countPlural=other": "{countFmt} единицы"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "chest_all_already_open": "Эти сундуки уже открыты.",
+  "chest_already_open": "Этот сундук уже открыт.",
+  "chest_best": "лучший · {rarity}",
+  "chest_bulk_every": "Все сундуки",
+  "chest_bulk_label": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=few": "{count} сундука · {span}",
+        "countPlural=many": "{count} сундуков · {span}",
+        "countPlural=one": "{count} сундук · {span}",
+        "countPlural=other": "{count} сундука · {span}"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "chest_cell_title": "{title} · +{xp} XP",
+  "chest_close": "Закрыть",
+  "chest_dot_title": "{rarity}: {count}",
+  "chest_haul_xp": "+{xp} XP",
+  "chest_more_below": "и ещё {count} ниже",
+  "chest_nice": "Неплохо.",
+  "chest_nothing_waiting": "Ничего не ждёт. День магазинных продаж придёт сюда одним сундуком.",
+  "chest_of_date": "Сундук за {date}",
+  "chest_open": "Открыть",
+  "chest_open_all": "Открыть все · {count} сундуков",
+  "chest_open_all_sub": "{count} дропов разом",
+  "chest_open_oldest": "Открыть самый старый сундук",
+  "chest_opening": "Открываем {what}…",
+  "chest_opening_all": "Открываем все сундуки…",
+  "chest_progress": "{revealed} / {total}",
+  "chest_progress_drops": "{revealed} / {total} дропов",
+  "chest_row_drops": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=few": "{count} дропа",
+        "countPlural=many": "{count} дропов",
+        "countPlural=one": "{count} дроп",
+        "countPlural=other": "{count} дропа"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "chest_row_xp": "+{xp} XP",
+  "chest_skip": "Пропустить",
+  "chest_the_chest": "сундук",
+  "chest_title": "Ежедневный сундук",
+  "chest_waiting": [
+    {
+      "declarations": [
+        "input drops",
+        "input chests",
+        "local dropsPlural = drops: plural",
+        "local chestsPlural = chests: plural",
+        "local dropsFmt = drops: number maximumFractionDigits=0"
+      ],
+      "match": {
+        "dropsPlural=few, chestsPlural=few": "{dropsFmt} дропа ждут в {chests} сундуках.",
+        "dropsPlural=few, chestsPlural=many": "{dropsFmt} дропа ждут в {chests} сундуках.",
+        "dropsPlural=few, chestsPlural=one": "{dropsFmt} дропа ждут в {chests} сундуке.",
+        "dropsPlural=few, chestsPlural=other": "{dropsFmt} дропа ждут в {chests} сундуках.",
+        "dropsPlural=many, chestsPlural=few": "{dropsFmt} дропов ждут в {chests} сундуках.",
+        "dropsPlural=many, chestsPlural=many": "{dropsFmt} дропов ждут в {chests} сундуках.",
+        "dropsPlural=many, chestsPlural=one": "{dropsFmt} дропов ждут в {chests} сундуке.",
+        "dropsPlural=many, chestsPlural=other": "{dropsFmt} дропов ждут в {chests} сундуках.",
+        "dropsPlural=one, chestsPlural=few": "{dropsFmt} дроп ждёт в {chests} сундуках.",
+        "dropsPlural=one, chestsPlural=many": "{dropsFmt} дроп ждёт в {chests} сундуках.",
+        "dropsPlural=one, chestsPlural=one": "{dropsFmt} дроп ждёт в {chests} сундуке.",
+        "dropsPlural=one, chestsPlural=other": "{dropsFmt} дроп ждёт в {chests} сундуках.",
+        "dropsPlural=other, chestsPlural=few": "{dropsFmt} дропа ждут в {chests} сундуках.",
+        "dropsPlural=other, chestsPlural=many": "{dropsFmt} дропа ждут в {chests} сундуках.",
+        "dropsPlural=other, chestsPlural=one": "{dropsFmt} дропа ждут в {chests} сундуке.",
+        "dropsPlural=other, chestsPlural=other": "{dropsFmt} дропа ждут в {chests} сундуках."
+      },
+      "selectors": [
+        "dropsPlural",
+        "chestsPlural"
+      ]
+    }
+  ],
+  "codex_counter_title": "Открыто достижений: {unlocked} из {total}",
+  "codex_days": "{count} дн.",
+  "codex_filter_all": "Все",
+  "codex_filter_empty": "С этим фильтром ничего нет.",
+  "codex_filter_label": "Фильтр достижений",
+  "codex_filter_locked": "Осталось",
+  "codex_filter_unlocked": "Открытые",
+  "codex_loading": "Открываем кодекс…",
+  "codex_recap_loading": "Пишем сводку…",
+  "codex_recap_period_label": "Период сводки",
+  "codex_record_best_day_source": "Лучший день · {source}",
+  "codex_record_best_install_day": "Лучший день по установкам",
+  "codex_record_best_revenue_day": "Лучший день по доходу",
+  "codex_record_best_units_day": "Лучший день по продажам",
+  "codex_record_biggest_drop": "Самый крупный дроп",
+  "codex_record_biggest_drop_note": "{title} · {day}",
+  "codex_record_first_event": "Первое событие",
+  "codex_record_first_event_note": "{count} дн. истории",
+  "codex_record_longest_run": "Самая длинная серия доходных дней",
+  "codex_record_longest_run_note": "закончилась {day}",
+  "codex_record_most_countries_day": "Больше всего стран освоено за день",
+  "codex_record_most_drops_day": "Больше всего дропов за день",
+  "codex_record_most_xp_day": "Больше всего XP за день",
+  "codex_records": "Рекорды",
+  "codex_records_empty": "Рекордов пока нет — они появятся с первым днём, который побьёт предыдущий.",
+  "codex_records_lede": "Считаются заново каждый раз и никогда не хранятся: пересчитанный отчёт улучшает рекорд, а не оставляет устаревший, и рекорд может только расти.",
+  "codex_season_recap": "Сводка сезона",
+  "codex_sub": "всё, что когда-либо случилось · трофеи остаются навсегда",
+  "codex_this_year": "В этом году",
+  "codex_title": "Кодекс",
+  "codex_total_chests_opened": "Сундуков открыто",
+  "codex_total_continents": "{count} из 6 континентов",
+  "codex_total_countries_settled": "Стран освоено",
+  "codex_total_currencies": "Валют получено",
+  "codex_total_drops": "Дропы",
+  "codex_total_era": "Эпоха: {era}",
+  "codex_total_github_stars": "Звёзды на GitHub",
+  "codex_total_installs": "Установки",
+  "codex_total_lifetime_revenue": "Доход за всё время",
+  "codex_total_mysteries": "Загадок объяснено",
+  "codex_total_quests_completed": "Квестов завершено",
+  "codex_total_record_days": "Рекордных дней",
+  "codex_total_refunded": "{count} возвращено",
+  "codex_total_units_sold": "Продано единиц",
+  "codex_total_xp": "XP",
+  "codex_trophy_lede": "Достижения только открываются. Здесь ничто не угасает, не истекает и не отбирается — серия закончилась, но она была. Каждое открытие приносит настоящий дроп: необычный за бронзу, редкий за серебро, эпический за золото, легендарный за легенду.",
+  "codex_trophy_wall": "Стена трофеев",
+  "codex_xp": "{xp} XP",
+  "delta_new": "новое",
+  "dev_clear_country": "Очистить страну",
+  "dev_country_aria": "Код страны для тестового дропа",
+  "dev_country_placeholder": "страна (необязательно)",
+  "dev_fake_chest": "Тестовый сундук (5 дропов)",
+  "dev_fake_sales_day": "Тестовый день продаж (EUR 250)",
+  "dev_hint": "Запустить синтетический дроп через настоящий конвейер.",
+  "dev_random_country": "Случайная страна",
+  "dev_toggle": "dev",
+  "drop_aria_label": "{rarity} дроп: {title}",
+  "drop_chest_title": "Из сундука за {date}",
+  "drop_xp": "+{xp} XP",
+  "era_camp": "Лагерь",
+  "era_city": "Город",
+  "era_dynasty": "Династия",
+  "era_empire": "Империя",
+  "era_kingdom": "Королевство",
+  "era_town": "Посёлок",
+  "era_village": "Деревня",
+  "feed_empty_body": "Направь вебхук RevenueCat на {hook}, добавь приложения Flathub в конфиг или запусти с {dev} и выстрели тестовым дропом.",
+  "feed_empty_title": "Добычи пока нет.",
+  "feed_end": "Это весь клад.",
+  "feed_label": "Лента дропов",
+  "feed_loading": "Открываем сокровищницу…",
+  "feed_loading_more": "Копаем глубже…",
+  "globe_aboard": "На борту",
+  "globe_aria_label": "Глобус со всеми странами, где были продажи, и флот в море",
+  "globe_drops": "Дропы",
+  "globe_first_customer": "Первый покупатель",
+  "globe_new_settlement": "Новое поселение",
+  "globe_population": "Население",
+  "globe_revenue": "Доход",
+  "globe_sailing_since": "В плавании с",
+  "header_boss_fights_title": "Идёт боёв с боссами: {count}",
+  "header_chest_aria": "Открыть ежедневный сундук: ждёт {count} дропов",
+  "header_chest_title": "Ждёт дропов: {drops}, в сундуках: {chests}",
+  "header_demo": "демо",
+  "header_demo_title": "Синтетические данные — как подключить настоящие магазины, см. README",
+  "header_level": "УР. {level}",
+  "header_live": "онлайн",
+  "header_live_title": "Онлайн",
+  "header_mute": "Выключить звуки дропов",
+  "header_muted": "Без звука",
+  "header_nav_label": "Разделы",
+  "header_no_sources": "нет источников",
+  "header_no_sources_configured": "источники не настроены",
+  "header_offline": "не в сети",
+  "header_open_mysteries_title": "Открытых загадок: {count}",
+  "header_rarity_title": "{rarity}, дропов: {count}",
+  "header_reconnecting_title": "Переподключаемся…",
+  "header_scoped_to_title": "Все панели — только по {app}",
+  "header_sound": "Звук",
+  "header_source_webhook": "вебхук",
+  "header_sources_count": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=few": "{count} источника",
+        "countPlural=many": "{count} источников",
+        "countPlural=one": "{count} источник",
+        "countPlural=other": "{count} источника"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "header_sources_in_error": "{count} с ошибкой",
+  "header_status_error": "ошибка",
+  "header_status_listening": "слушаем",
+  "header_status_ok": "ок",
+  "header_status_waiting": "ждём",
+  "header_unmute": "Включить звуки дропов",
+  "header_xp_sub": [
+    {
+      "declarations": [
+        "input countries",
+        "local countriesPlural = countries: plural"
+      ],
+      "match": {
+        "countriesPlural=few": "{drops} дропов · {countries} страны",
+        "countriesPlural=many": "{drops} дропов · {countries} стран",
+        "countriesPlural=one": "{drops} дропов · {countries} страна",
+        "countriesPlural=other": "{drops} дропов · {countries} страны"
+      },
+      "selectors": [
+        "countriesPlural"
+      ]
+    }
+  ],
+  "header_xp_total": "{xp} XP",
+  "hearth_ambient": "Фон",
+  "hearth_ambient_label": "Очаг, фоновый режим",
+  "hearth_ambient_leave": "Выйти из фонового режима (Esc)",
+  "hearth_ambient_mute": "Без звука",
+  "hearth_ambient_unmute": "Со звуком",
+  "hearth_arrivals": "Недавние прибытия",
+  "hearth_arrivals_empty": "Пока ничего не пришло с указанием страны.",
+  "hearth_capital": "столица {flag} {name}",
+  "hearth_civilization": "Цивилизация",
+  "hearth_era_to_next": "{xp} XP до эпохи {era}",
+  "hearth_era_to_next_short": "{xp} до эпохи {era}",
+  "hearth_era_top": "Вершина лестницы. Дальше становиться некем.",
+  "hearth_fleet": "Флот",
+  "hearth_fleet_fine": "Люди, чей магазин не говорит, откуда они. Они в плавании.",
+  "hearth_hint_pointer": "Тяни, чтобы вращать · колесо — масштаб · двойной клик — по центру",
+  "hearth_hint_touch": "Тяни, чтобы вращать · коснись метки · двойное касание — по центру",
+  "hearth_loading": "Разжигаем огонь…",
+  "hearth_population": "Население",
+  "hearth_revenue": "Доход",
+  "hearth_settlements": "Поселения",
+  "hearth_settlements_empty": "Ни одна страна ещё ничего не купила. Глобус тёмный.",
+  "hearth_ticker_empty": "Ждём, когда мир проснётся…",
+  "hearth_title": "Очаг",
+  "hearth_xp": "{xp} XP",
+  "metric_drops": "дропы",
+  "metric_installs": "установки",
+  "metric_revenue": "доход",
+  "metric_settlements": "новые страны",
+  "metric_stars": "звёзды",
+  "metric_subscribers": "подписчики",
+  "metric_units": "единицы",
+  "metric_xp": "XP",
+  "mystery_day": "{weekday} {date}",
+  "mystery_dismiss": "Отклонить",
+  "mystery_expected": "ожидалось",
+  "mystery_kind_dip": "спад",
+  "mystery_kind_new_country_cluster": "новые страны",
+  "mystery_kind_record": "рекорд",
+  "mystery_kind_refund_spike": "возвраты",
+  "mystery_kind_silence": "тишина",
+  "mystery_kind_spike": "всплеск",
+  "mystery_note_aria": "Твоё объяснение для: {title}",
+  "mystery_note_placeholder": "Как думаешь, что произошло?",
+  "mystery_observed": "наблюдалось",
+  "mystery_phrase_appeared": "появление из ниоткуда",
+  "mystery_phrase_changed": "изменение",
+  "mystery_phrase_doubled": "рост вдвое",
+  "mystery_phrase_dropped": "падение на {pct}%",
+  "mystery_phrase_held_still": "без изменений",
+  "mystery_phrase_jumped": "скачок на {pct}%",
+  "mystery_phrase_quadrupled": "рост вчетверо",
+  "mystery_phrase_tripled": "рост втрое",
+  "mystery_ratio": "отношение",
+  "mystery_series_cancellations": "отмены",
+  "mystery_series_installs": "установки",
+  "mystery_series_refunds": "возвраты",
+  "mystery_series_revenue": "доход",
+  "mystery_series_units": "продано единиц",
+  "mystery_solve": "Разгадать",
+  "mystery_title_dip": "{source}: {series} — {phrase}, {day}",
+  "mystery_title_new_country_cluster": [
+    {
+      "declarations": [
+        "input count",
+        "input countText",
+        "input day",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=few": "{countText} новые страны освоены {day} — что случилось?",
+        "countPlural=many": "{countText} новых стран освоено {day} — что случилось?",
+        "countPlural=one": "{countText} новая страна освоена {day} — что случилось?",
+        "countPlural=other": "{countText} новой страны освоено {day} — что случилось?"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "mystery_title_plain": "{source}: {series}, {day}",
+  "mystery_title_record": "Рекордный день: {value} {series} — {source}, {day}",
+  "mystery_title_refund_spike": "{count} возвратов в {source} — {day}, обычно {usual}",
+  "mystery_title_silence": "{source} молчит с {day}",
+  "mystery_title_spike": "{source}: {series} — {phrase}, {day}. Почему?",
+  "mystery_why_measured": "{observed} против медианы за {days} дн. — {expected} (z {z})",
+  "mystery_why_new_country_cluster": [
+    {
+      "declarations": [
+        "input count",
+        "input countText",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=few": "{countText} страны купили впервые в один и тот же день",
+        "countPlural=many": "{countText} стран купили впервые в один и тот же день",
+        "countPlural=one": "{countText} страна купила впервые в один и тот же день",
+        "countPlural=other": "{countText} страны купили впервые в один и тот же день"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "mystery_why_record": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=few": "выше, чем за любой из предыдущих {count} дней",
+        "countPlural=many": "выше, чем за любой из предыдущих {count} дней",
+        "countPlural=one": "выше, чем за предыдущий {count} день",
+        "countPlural=other": "выше, чем за любой из предыдущих {count} дня"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "mystery_why_refund_spike": "{count} возвратов при обычных {usual}",
+  "mystery_why_silence": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=few": "{count} завершённых дня вообще без строк, после данных за {reported} из предыдущих 7",
+        "countPlural=many": "{count} завершённых дней вообще без строк, после данных за {reported} из предыдущих 7",
+        "countPlural=one": "{count} завершённый день вообще без строк, после данных за {reported} из предыдущих 7",
+        "countPlural=other": "{count} завершённого дня вообще без строк, после данных за {reported} из предыдущих 7"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "mystery_why_silence_lag": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=few": "{count} завершённых дня вообще без строк, после данных за {reported} из предыдущих 7 — и это уже с учётом задержки расчётов этого магазина в {lag} дн.",
+        "countPlural=many": "{count} завершённых дней вообще без строк, после данных за {reported} из предыдущих 7 — и это уже с учётом задержки расчётов этого магазина в {lag} дн.",
+        "countPlural=one": "{count} завершённый день вообще без строк, после данных за {reported} из предыдущих 7 — и это уже с учётом задержки расчётов этого магазина в {lag} дн.",
+        "countPlural=other": "{count} завершённого дня вообще без строк, после данных за {reported} из предыдущих 7 — и это уже с учётом задержки расчётов этого магазина в {lag} дн."
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "quest_auto_installs_week": "Установки: побей прошлую неделю · {target}",
+  "quest_auto_revenue_month": "Побей доход прошлого месяца · {target}",
+  "quest_auto_revenue_week": "Побей доход прошлой недели · {target}",
+  "quest_auto_settlements_month": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=few": "Освой {count} новые страны в этом месяце",
+        "countPlural=many": "Освой {count} новых стран в этом месяце",
+        "countPlural=one": "Освой {count} новую страну в этом месяце",
+        "countPlural=other": "Освой {count} новой страны в этом месяце"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "quest_auto_stars_week": "Побей звёзды прошлой недели · {target}",
+  "quest_auto_units_week": "Единицы: побей прошлую неделю · {target}",
+  "quest_auto_xp_week": "Заработай {target} XP на этой неделе",
+  "quest_completed": "выполнен",
+  "quest_completed_xp": "выполнен · +{xp} XP",
+  "quest_custom": "свой",
+  "quest_days_left": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=few": "осталось {count} дня",
+        "countPlural=many": "осталось {count} дней",
+        "countPlural=one": "остался {count} день",
+        "countPlural=other": "осталось {count} дня"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "quest_ended": "завершён · {pct}",
+  "quest_error_bad_window_json": "окно должно быть \"week\", \"month\" или \\{\"start\":\"…\",\"end\":\"…\"\\}",
+  "quest_error_custom_only": "удалять можно только свои квесты",
+  "quest_error_not_found": "такого квеста нет",
+  "quest_error_quests_disabled": "квесты не включены",
+  "quest_error_target_positive": "цель должна быть больше нуля",
+  "quest_error_unknown_metric": "неизвестная метрика \"{value}\"",
+  "quest_error_unknown_window": "неизвестное окно \"{value}\" (укажи week, month или число дней)",
+  "quest_error_window_end_format": "конец окна должен быть в формате YYYY-MM-DD",
+  "quest_error_window_order": "окно заканчивается раньше, чем начинается",
+  "quest_error_window_start_format": "начало окна должно быть в формате YYYY-MM-DD",
+  "quest_last_day": "последний день",
+  "quest_remove_aria": "Убрать квест {title}",
+  "quest_remove_title": "Убрать этот квест",
+  "quest_window_days": "{count} дн.",
+  "quest_window_month": "этот месяц",
+  "quest_window_week": "эта неделя",
+  "quests_active": "Активные",
+  "quests_active_empty": "Ничего не запущено. Loot составляет недельные квесты из твоей же истории — хватит одной недели с данными — а свои можно задать через {newQuest}.",
+  "quests_boss_empty": "Боссов нет. В королевстве мир. Направь источник сбоев в Loot — Android vitals, Sentry или что угодно, умеющее слать POST на {hook} — и следующий всплеск сбоев станет монстром с полоской здоровья, которую можно опустошить. См. {docs}.",
+  "quests_boss_fights": "Бои с боссами",
+  "quests_boss_lede": "Скопление сбоев, оторвавшееся от собственной нормы, с именем и полоской здоровья. HP — это то, сколько сбоев было в последний завершённый день, так что выпущенный фикс опустошает полоску, а убийство приносит эпический дроп. Здесь нельзя проиграть: босс, который ещё стоит, просто ещё стоит.",
+  "quests_boss_recent": "Побеждены и потеряны из виду",
+  "quests_cancel": "Отмена",
+  "quests_every_app": "все приложения",
+  "quests_every_source": "все источники",
+  "quests_form_app": "Приложение",
+  "quests_form_metric": "Метрика",
+  "quests_form_optional": "необязательно",
+  "quests_form_source": "Источник",
+  "quests_form_target": "Цель",
+  "quests_form_target_error": "Задай цель больше нуля.",
+  "quests_form_title": "Название",
+  "quests_form_title_placeholder": "Побей доход прошлой недели",
+  "quests_form_window": "Окно",
+  "quests_loading": "Читаем доску…",
+  "quests_mysteries": "Загадки",
+  "quests_mysteries_empty": "Необъяснённого нет. Loot перечитывает последние две недели каждый час и отмечает день, только если тот оторвался от своей 28-дневной нормы.",
+  "quests_mysteries_lede": "Дни, когда числа сделали то, чего соседние дни не объясняют. Это необязательные головоломки: разгадать — значит записать, что, по-твоему, произошло; за это платят дропом, а у тебя остаётся тетрадь о том, что на самом деле двигает твои числа.",
+  "quests_new": "+ Новый квест",
+  "quests_notebook": "Тетрадь",
+  "quests_notebook_dismissed": "отклонено без записи",
+  "quests_notebook_note": "«{note}»",
+  "quests_recent": "Недавние",
+  "quests_save": "Поставить квест",
+  "quests_saving": "Ставим…",
+  "quests_sub": "цели из твоей же истории · здесь нельзя проиграть",
+  "quests_title": "Квесты",
+  "quests_window_month": "этот месяц",
+  "quests_window_week": "эта неделя",
+  "rarity_common": "обычный",
+  "rarity_cursed": "проклятый",
+  "rarity_epic": "эпический",
+  "rarity_legendary": "легендарный",
+  "rarity_rare": "редкий",
+  "rarity_uncommon": "необычный",
+  "recap_achievements": "Достижения",
+  "recap_chests": "сундуки",
+  "recap_copied": "Скопировано",
+  "recap_copy": "Копировать сводку",
+  "recap_copy_error": "Браузер не дал Loot доступ к буферу обмена.",
+  "recap_copy_title": "Скопировать эту сводку обычным текстом",
+  "recap_country_title": "{country} · {day}",
+  "recap_delta_line": "{sign}{pct} · было {previous} · {unit}",
+  "recap_drops": "дропы",
+  "recap_empty": "В {period} ничего не пришло. У Loot нет на этот счёт мнения — просто {unit} без чисел. Выбери другой из списка выше.",
+  "recap_first_with_revenue": "{unit}: впервые с доходом",
+  "recap_footer_era_changed": "{from} → {to} · уровень {levelFrom} → {levelTo}",
+  "recap_footer_era_same": "эпоха {era} · уровень {level}",
+  "recap_highlight_best_day": "Лучший день {day}: {value}",
+  "recap_highlight_chests_opened": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=few": "Открыто {count} сундука",
+        "countPlural=many": "Открыто {count} сундуков",
+        "countPlural=one": "Открыт {count} сундук",
+        "countPlural=other": "Открыто {count} сундука"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "recap_highlight_epic_drops": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=few": "{count} эпических дропа",
+        "countPlural=many": "{count} эпических дропов",
+        "countPlural=one": "{count} эпический дроп",
+        "countPlural=other": "{count} эпического дропа"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "recap_highlight_era_reached": "Достигнута эпоха {era}",
+  "recap_highlight_legendary_drops": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=few": "{count} легендарных дропа",
+        "countPlural=many": "{count} легендарных дропов",
+        "countPlural=one": "{count} легендарный дроп",
+        "countPlural=other": "{count} легендарного дропа"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "recap_highlight_level_up": "Уровень {from} → {to}",
+  "recap_highlight_most_countries": [
+    {
+      "declarations": [
+        "input count",
+        "input day",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=few": "{count} новые страны только за {day}",
+        "countPlural=many": "{count} новых стран только за {day}",
+        "countPlural=one": "{count} новая страна только за {day}",
+        "countPlural=other": "{count} новой страны только за {day}"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "recap_highlight_mysteries_solved": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=few": "Объяснено {count} загадки",
+        "countPlural=many": "Объяснено {count} загадок",
+        "countPlural=one": "Объяснена {count} загадка",
+        "countPlural=other": "Объяснено {count} загадки"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "recap_highlight_quests_completed": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=few": "Выполнено {count} квеста",
+        "countPlural=many": "Выполнено {count} квестов",
+        "countPlural=one": "Выполнен {count} квест",
+        "countPlural=other": "Выполнено {count} квеста"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "recap_highlight_settled": "Освоена {flag} {country} — {day}",
+  "recap_highlight_settled_more": [
+    {
+      "declarations": [
+        "input count",
+        "input flag",
+        "input country",
+        "input day",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=few": "Освоена {flag} {country} — {day} (и ещё {count} страны)",
+        "countPlural=many": "Освоена {flag} {country} — {day} (и ещё {count} стран)",
+        "countPlural=one": "Освоена {flag} {country} — {day} (и ещё {count} страна)",
+        "countPlural=other": "Освоена {flag} {country} — {day} (и ещё {count} страны)"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "recap_highlight_top_country": "{flag} {country} — твой крупнейший рынок",
+  "recap_highlight_unlocked": "Открыто: {title}",
+  "recap_highlight_unlocked_more": [
+    {
+      "declarations": [
+        "input count",
+        "input title",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=few": "Открыто: {title} и ещё {count} достижения",
+        "countPlural=many": "Открыто: {title} и ещё {count} достижений",
+        "countPlural=one": "Открыто: {title} и ещё {count} достижение",
+        "countPlural=other": "Открыто: {title} и ещё {count} достижения"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "recap_installs": "установки",
+  "recap_new_settlements": "Новые поселения",
+  "recap_partial": "· пока что",
+  "recap_refunds": "возвраты",
+  "recap_revenue": "доход",
+  "recap_share_achievements": "Достижения: {titles}",
+  "recap_share_bullet": "• {line}",
+  "recap_share_drops": "Дропы    {drops} · {xp} XP",
+  "recap_share_era": "Эпоха    {from} → {to}",
+  "recap_share_header": "◆ Loot — {period}",
+  "recap_share_header_partial": "◆ Loot — {period} (пока что)",
+  "recap_share_installs": "Установки {installs}",
+  "recap_share_level": "Уровень  {level}",
+  "recap_share_level_up": "Уровень  {from} → {to}",
+  "recap_share_revenue": "Доход    {amount}",
+  "recap_share_revenue_note": "Доход    {amount}  ({note})",
+  "recap_share_settled": "Освоено  {countries}",
+  "recap_share_units": "Единицы  {units}",
+  "recap_share_units_refunds": "Единицы  {units} · возвратов: {refunds}",
+  "recap_sub": "{unit} в добыче",
+  "recap_unit_month": "месяц",
+  "recap_unit_year": "год",
+  "recap_units": "единицы",
+  "recap_xp": "XP",
+  "scope_all_apps": "Все приложения",
+  "scope_all_apps_meta": "всё, что ты выпускаешь",
+  "scope_elsewhere": "+{count} в других",
+  "scope_elsewhere_title": "Дропов в других приложениях: {count}",
+  "scope_events": "{count} событий",
+  "scope_menu_label": "Область приложений",
+  "scope_title_all": "Показаны все приложения",
+  "scope_title_scoped": "Показано только {app} — нажми, чтобы изменить",
+  "scope_unmapped": "без привязки",
+  "spark_label": "{days} дн. до {day}, на конце {value}",
+  "spark_no_history": "нет истории",
+  "spark_usual": "обычно {value}",
+  "stat_vs_prev": "к пред.",
+  "tab_codex": "Кодекс",
+  "tab_feed": "Лента",
+  "tab_hearth": "Очаг",
+  "tab_quests": "Квесты",
+  "tab_vault": "Сокровищница",
+  "tier_city": "город",
+  "tier_hamlet": "хутор",
+  "tier_metropolis": "мегаполис",
+  "tier_outpost": "застава",
+  "tier_town": "посёлок",
+  "tier_village": "деревня",
+  "time_days": "{count} д",
+  "time_hours": "{count} ч",
+  "time_just_now": "только что",
+  "time_minutes": "{count} мин",
+  "time_seconds": "{count} с",
+  "vault_by_app": "По приложениям",
+  "vault_by_country": "По странам",
+  "vault_by_source": "По источникам",
+  "vault_chart_aria": "Доход и единицы по дням",
+  "vault_chart_hint": "в {code} · единицы ниже",
+  "vault_chart_title": "Доход по дням",
+  "vault_chart_units": "единицы",
+  "vault_countries_note": "в этом окне",
+  "vault_country_empty": "К деньгам этого окна не привязана ни одна страна.",
+  "vault_empty_body": "В доход идут только {ledger} — подтверждённые деньги из собственных финансовых отчётов магазинов. Чтобы сокровищница начала наполняться, настрой {stores} в {file} и дай дню закрыться.",
+  "vault_empty_fine": "Вебхуки RevenueCat по-прежнему мгновенно попадают в ленту, но их суммы — это {sightings} до налогов и доли магазина: они видны в плитке выше и никогда не идут в доход. Полное правило — см. {vault} и {chest}.",
+  "vault_empty_fine_chest": "ежедневный сундук",
+  "vault_empty_fine_sightings": "замеченные покупки",
+  "vault_empty_fine_vault": "сокровищница",
+  "vault_empty_ledger_rows": "строки книги учёта",
+  "vault_empty_stores": "App Store Connect и Google Play",
+  "vault_empty_title": "В этом окне денег в книге учёта нет.",
+  "vault_loading": "Считаем монеты…",
+  "vault_no_app": "(без приложения)",
+  "vault_other_countries": "другие страны",
+  "vault_range_label": "Период",
+  "vault_sighted_note": "{count} покупок · оценка, а не доход из книги учёта",
+  "vault_subs_as_of": "на {date}",
+  "vault_subs_none": "ни один источник не сообщает о подписках",
+  "vault_tile_active_subs": "Активные подписки",
+  "vault_tile_countries": "Страны",
+  "vault_tile_refunds": "Возвраты",
+  "vault_tile_revenue": "Доход",
+  "vault_tile_sighted": "Замечено сегодня (RevenueCat)",
+  "vault_tile_units": "Единицы",
+  "vault_tip_units": "{count} единиц",
+  "vault_title": "Сокровищница",
+  "vault_unknown_country": "неизвестно",
+  "vessel_appstore": "Купертинский клипер",
+  "vessel_flathub": "Сухогруз Flathub",
+  "vessel_generic": "Судно {source}",
+  "vessel_github": "Ледокол Octocat",
+  "vessel_googleplay": "Траулер Play",
+  "vessel_microsoftstore": "Редмондская баржа",
+  "vessel_revenuecat": "Катер RevenueCat",
+  "vessel_snapcraft": "Snapcraft, платформа девять",
+  "vessel_why": "где-то в море — {source} не говорит, из какой страны его люди"
+}

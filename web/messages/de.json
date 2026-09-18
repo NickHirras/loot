@@ -1,0 +1,1090 @@
+{
+  "$schema": "https://inlang.com/schema/inlang-message-format",
+  "ach_backfilled": "nachgetragen",
+  "ach_backfilled_title": "Verdient, bevor Loot zusah; datiert auf den Tag, an dem es geschah",
+  "ach_cartographer_desc": "Eine Siedlung auf jedem bewohnten Kontinent.",
+  "ach_cartographer_title": "Kartograf",
+  "ach_cursed_but_unbowed_desc": "Ein verfluchter Fund, und noch am selben Tag etwas Seltenes oder Besseres. Es hat sich gedreht.",
+  "ach_cursed_but_unbowed_title": "Verflucht, aber ungebeugt",
+  "ach_era_city_desc": "Erreiche die Ära Großstadt.",
+  "ach_era_city_title": "Großstadt",
+  "ach_era_empire_desc": "Erreiche die Ära Imperium.",
+  "ach_era_empire_title": "Imperium",
+  "ach_era_kingdom_desc": "Erreiche die Ära Königreich.",
+  "ach_era_kingdom_title": "Königreich",
+  "ach_era_town_desc": "Erreiche die Ära Stadt.",
+  "ach_era_town_title": "Stadt",
+  "ach_first_blood_desc": "Dein allererster Fund — der Moment, in dem Loot etwas zu melden hatte.",
+  "ach_first_blood_title": "Erstes Blut",
+  "ach_first_sale_desc": "Der erste abgerechnete Verkauf im Finanzbericht eines Stores.",
+  "ach_first_sale_title": "Erster Verkauf",
+  "ach_first_subscriber_desc": "Jemand hat beschlossen, dich weiter zu bezahlen.",
+  "ach_first_subscriber_title": "Erster Abonnent",
+  "ach_hoarder_1_desc": "Öffne 10 Tagestruhen.",
+  "ach_hoarder_1_title": "Horter",
+  "ach_hoarder_2_desc": "Öffne 50 Tagestruhen.",
+  "ach_hoarder_2_title": "Großer Horter",
+  "ach_hoarder_3_desc": "Öffne 200 Tagestruhen.",
+  "ach_hoarder_3_title": "Drachenhorter",
+  "ach_installs_100k_desc": "100,000 Installs insgesamt.",
+  "ach_installs_100k_title": "Überall",
+  "ach_installs_10k_desc": "10,000 Installs insgesamt.",
+  "ach_installs_10k_title": "Macht die Runde",
+  "ach_installs_1k_desc": "1,000 Installs insgesamt.",
+  "ach_installs_1k_title": "Mundpropaganda",
+  "ach_legendary_hunter_desc": "Dein erster legendärer Fund.",
+  "ach_legendary_hunter_title": "Legendärer Jäger",
+  "ach_merchant_2_desc": "Abgerechneter Umsatz aus 2 verschiedenen Stores.",
+  "ach_merchant_2_title": "Zwei Welten",
+  "ach_merchant_3_desc": "Abgerechneter Umsatz aus 3 verschiedenen Stores.",
+  "ach_merchant_3_title": "Drei Welten",
+  "ach_merchant_5_desc": "Abgerechneter Umsatz aus 5 verschiedenen Stores.",
+  "ach_merchant_5_title": "Händler vieler Welten",
+  "ach_mysteries_10_desc": "Erkläre 10 Mysterien.",
+  "ach_mysteries_10_title": "Laborbuch",
+  "ach_mysteries_1_desc": "Erkläre ein Mysterium.",
+  "ach_mysteries_1_title": "Detektiv",
+  "ach_not_yet": "noch nicht",
+  "ach_polyglot_1_desc": "Nimm Geld in 5 verschiedenen Währungen ein.",
+  "ach_polyglot_1_title": "Polyglott",
+  "ach_polyglot_2_desc": "Nimm Geld in 10 verschiedenen Währungen ein.",
+  "ach_polyglot_2_title": "Geldwechsler",
+  "ach_progress": "{value} / {target}",
+  "ach_progress_unit": "{value} / {target} {unit}",
+  "ach_quests_10_desc": "Schließe 10 Quests ab.",
+  "ach_quests_10_title": "Abenteurer",
+  "ach_quests_1_desc": "Schließe eine Quest ab.",
+  "ach_quests_1_title": "Auf Quest",
+  "ach_quests_50_desc": "Schließe 50 Quests ab.",
+  "ach_quests_50_title": "Held des Reiches",
+  "ach_record_1_desc": "Ein Tag, der jeden Tag davor übertroffen hat.",
+  "ach_record_1_title": "Bester Tag aller Zeiten",
+  "ach_record_25_desc": "Fünfundzwanzig Rekordtage.",
+  "ach_record_25_title": "Bester Tag aller Zeiten ×25",
+  "ach_record_5_desc": "Fünf Tage, die jeweils alles davor übertroffen haben.",
+  "ach_record_5_title": "Bester Tag aller Zeiten ×5",
+  "ach_revenue_100_desc": "$100 Umsatz insgesamt.",
+  "ach_revenue_100_title": "Erste Hundert",
+  "ach_revenue_100k_desc": "$100,000 Umsatz insgesamt.",
+  "ach_revenue_100k_title": "Sechsstellig",
+  "ach_revenue_10k_desc": "$10,000 Umsatz insgesamt.",
+  "ach_revenue_10k_title": "Fünfstellig",
+  "ach_revenue_1k_desc": "$1,000 Umsatz insgesamt.",
+  "ach_revenue_1k_title": "Vierstellig",
+  "ach_settler_1_desc": "Kundschaft in 5 Ländern.",
+  "ach_settler_1_title": "Siedler I",
+  "ach_settler_2_desc": "Kundschaft in 10 Ländern.",
+  "ach_settler_2_title": "Siedler II",
+  "ach_settler_3_desc": "Kundschaft in 25 Ländern.",
+  "ach_settler_3_title": "Siedler III",
+  "ach_settler_4_desc": "Kundschaft in 50 Ländern.",
+  "ach_settler_4_title": "Siedler IV",
+  "ach_stars_1000_desc": "1,000 GitHub-Sterne.",
+  "ach_stars_1000_title": "Galaxie",
+  "ach_stars_100_desc": "100 GitHub-Sterne.",
+  "ach_stars_100_title": "Sternbild",
+  "ach_stars_10_desc": "10 GitHub-Sterne.",
+  "ach_stars_10_title": "Sternengucker",
+  "ach_steady_30_desc": "Abgerechneter Umsatz an 30 Tagen in Folge.",
+  "ach_steady_30_title": "Kurs halten",
+  "ach_steady_7_desc": "Abgerechneter Umsatz an 7 Tagen in Folge.",
+  "ach_steady_7_title": "Stetig",
+  "ach_subscribers_1000_desc": "1,000 aktive Abonnenten.",
+  "ach_subscribers_1000_title": "Eine Bewegung",
+  "ach_subscribers_100_desc": "100 aktive Abonnenten.",
+  "ach_subscribers_100_title": "Eine Gefolgschaft",
+  "ach_subscribers_10_desc": "10 aktive Abonnenten.",
+  "ach_subscribers_10_title": "Eine Gemeinde",
+  "ach_tier_bronze": "Bronze",
+  "ach_tier_gold": "Gold",
+  "ach_tier_legendary": "Legendär",
+  "ach_tier_silver": "Silber",
+  "ach_tier_title": "{tier} · bringt einen Fund der Seltenheit {rarity} mit {xp} XP",
+  "ach_unit_chests": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "Truhe",
+        "countPlural=other": "Truhen"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_continents": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "Kontinent",
+        "countPlural=other": "Kontinente"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_countries": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "Land",
+        "countPlural=other": "Länder"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_currencies": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "Währung",
+        "countPlural=other": "Währungen"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_days": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "Tag",
+        "countPlural=other": "Tage"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_installs": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "Install",
+        "countPlural=other": "Installs"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_mysteries": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "Mysterium",
+        "countPlural=other": "Mysterien"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_quests": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "Quest",
+        "countPlural=other": "Quests"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_record_days": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "Rekordtag",
+        "countPlural=other": "Rekordtage"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_revenue": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "Umsatz",
+        "countPlural=other": "Umsatz"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_stars": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "Stern",
+        "countPlural=other": "Sterne"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_stores": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "Store",
+        "countPlural=other": "Stores"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_subscribers": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "Abonnent",
+        "countPlural=other": "Abonnenten"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_units": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "Einheit",
+        "countPlural=other": "Einheiten"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_xp": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "XP",
+        "countPlural=other": "XP"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_units_100_desc": "100 bezahlte Einheiten insgesamt.",
+  "ach_units_100_title": "Hundert verkauft",
+  "ach_units_100k_desc": "100,000 bezahlte Einheiten insgesamt.",
+  "ach_units_100k_title": "Hunderttausend verkauft",
+  "ach_units_10k_desc": "10,000 bezahlte Einheiten insgesamt.",
+  "ach_units_10k_title": "Zehntausend verkauft",
+  "ach_units_1k_desc": "1,000 bezahlte Einheiten insgesamt.",
+  "ach_units_1k_title": "Tausend verkauft",
+  "app_enable_sounds": "Klicken, um Fund-Sounds zu aktivieren",
+  "app_enable_sounds_dismiss": "nein danke",
+  "app_footer_mute_hint": "{key} drücken zum Stummschalten",
+  "app_footer_tagline": "Loot · selbstgehostetes Beute-Tracking für Indie-Devs",
+  "boss_anr": "ANR",
+  "boss_appeared": "erschienen",
+  "boss_confirm": "Behoben?",
+  "boss_days": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "{count} Tag",
+        "countPlural=other": "{count} Tage"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "boss_down_pct": "−{pct} seit dem Erscheinen",
+  "boss_enraged": "erzürnt",
+  "boss_enraged_line": "stärker als bei seinem Erscheinen",
+  "boss_enraged_title": "Erst wurde es schlimmer",
+  "boss_faded": "verblasst nach {days} — die Quelle meldet nichts mehr",
+  "boss_fighting_for": "im Kampf seit",
+  "boss_holding": "hält volle Stärke",
+  "boss_hp_aria": "Trefferpunkte von {name}",
+  "boss_lasted": "dauerte",
+  "boss_mark_slain": "Als erlegt markieren",
+  "boss_not_yet": "Noch nicht",
+  "boss_open_issue": "Issue öffnen ↗",
+  "boss_people_hit": "Betroffene",
+  "boss_slain": "erlegt in {days}",
+  "boss_slain_xp": "erlegt in {days} · +{xp} XP",
+  "boss_slay_yes": "Ja, erlegen",
+  "boss_slaying": "Der Schlag sitzt…",
+  "boss_title_anrs": "ANRs",
+  "boss_title_anrs_in": "ANRs in {version}",
+  "boss_title_crashes": "Abstürze",
+  "boss_title_crashes_in": "Abstürze in {version}",
+  "boss_unit_crashes": "Abstürze",
+  "boss_unit_users": "Nutzer",
+  "breakdown_empty": "Hier ist noch nichts.",
+  "breakdown_units": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural",
+        "local countFmt = count: number maximumFractionDigits=0"
+      ],
+      "match": {
+        "countPlural=one": "{countFmt} Einheit",
+        "countPlural=other": "{countFmt} Einheiten"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "chest_all_already_open": "Diese Truhen sind schon offen.",
+  "chest_already_open": "Diese Truhe ist schon offen.",
+  "chest_best": "bester · {rarity}",
+  "chest_bulk_every": "Alle Truhen",
+  "chest_bulk_label": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "{count} Truhe · {span}",
+        "countPlural=other": "{count} Truhen · {span}"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "chest_cell_title": "{title} · +{xp} XP",
+  "chest_close": "Schließen",
+  "chest_dot_title": "{count} {rarity}",
+  "chest_haul_xp": "+{xp} XP",
+  "chest_more_below": "und {count} weitere unten",
+  "chest_nice": "Schön.",
+  "chest_nothing_waiting": "Nichts wartet. Ein Tag Store-Verkäufe landet hier als eine Truhe.",
+  "chest_of_date": "Truhe vom {date}",
+  "chest_open": "Öffnen",
+  "chest_open_all": "Alle öffnen · {count} Truhen",
+  "chest_open_all_sub": "{count} Funde auf einen Schlag",
+  "chest_open_oldest": "Älteste Truhe öffnen",
+  "chest_opening": "Öffne {what}…",
+  "chest_opening_all": "Öffne alle Truhen…",
+  "chest_progress": "{revealed} / {total}",
+  "chest_progress_drops": "{revealed} / {total} Funde",
+  "chest_row_drops": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "{count} Fund",
+        "countPlural=other": "{count} Funde"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "chest_row_xp": "+{xp} XP",
+  "chest_skip": "Überspringen",
+  "chest_the_chest": "die Truhe",
+  "chest_title": "Tagestruhe",
+  "chest_waiting": [
+    {
+      "declarations": [
+        "input drops",
+        "input chests",
+        "local dropsPlural = drops: plural",
+        "local chestsPlural = chests: plural",
+        "local dropsFmt = drops: number maximumFractionDigits=0"
+      ],
+      "match": {
+        "dropsPlural=one, chestsPlural=one": "{dropsFmt} Fund wartet in {chests} Truhe.",
+        "dropsPlural=one, chestsPlural=other": "{dropsFmt} Fund wartet in {chests} Truhen.",
+        "dropsPlural=other, chestsPlural=one": "{dropsFmt} Funde warten in {chests} Truhe.",
+        "dropsPlural=other, chestsPlural=other": "{dropsFmt} Funde warten in {chests} Truhen."
+      },
+      "selectors": [
+        "dropsPlural",
+        "chestsPlural"
+      ]
+    }
+  ],
+  "codex_counter_title": "{unlocked} von {total} Erfolgen freigeschaltet",
+  "codex_days": "{count} Tage",
+  "codex_filter_all": "Alle",
+  "codex_filter_empty": "Mit diesem Filter gibt es nichts zu zeigen.",
+  "codex_filter_label": "Erfolge filtern",
+  "codex_filter_locked": "Zu holen",
+  "codex_filter_unlocked": "Freigeschaltet",
+  "codex_loading": "Öffne den Kodex…",
+  "codex_recap_loading": "Wird aufgeschrieben…",
+  "codex_recap_period_label": "Rückblick-Zeitraum",
+  "codex_record_best_day_source": "Bester Tag · {source}",
+  "codex_record_best_install_day": "Bester Install-Tag",
+  "codex_record_best_revenue_day": "Bester Umsatztag",
+  "codex_record_best_units_day": "Bester Einheiten-Tag",
+  "codex_record_biggest_drop": "Größter Einzelfund",
+  "codex_record_biggest_drop_note": "{title} · {day}",
+  "codex_record_first_event": "Allererstes Ereignis",
+  "codex_record_first_event_note": "{count} Tage Historie",
+  "codex_record_longest_run": "Längste Serie an Tagen mit Umsatz",
+  "codex_record_longest_run_note": "endete {day}",
+  "codex_record_most_countries_day": "Meiste Länder an einem Tag besiedelt",
+  "codex_record_most_drops_day": "Meiste Funde an einem Tag",
+  "codex_record_most_xp_day": "Meiste XP an einem Tag",
+  "codex_records": "Rekorde",
+  "codex_records_empty": "Noch keine Rekorde — sie kommen mit dem ersten Tag, der den davor übertrifft.",
+  "codex_records_lede": "Jedes Mal frisch berechnet, nie gespeichert — ein korrigierter Bericht verbessert also einen Rekord, statt einen veralteten zurückzulassen, und ein Rekord kann nur steigen.",
+  "codex_season_recap": "Saison-Rückblick",
+  "codex_sub": "alles, was je passiert ist · Trophäen bleiben für immer",
+  "codex_this_year": "Dieses Jahr",
+  "codex_title": "Kodex",
+  "codex_total_chests_opened": "Geöffnete Truhen",
+  "codex_total_continents": "{count} von 6 Kontinenten",
+  "codex_total_countries_settled": "Besiedelte Länder",
+  "codex_total_currencies": "Angenommene Währungen",
+  "codex_total_drops": "Funde",
+  "codex_total_era": "Ära {era}",
+  "codex_total_github_stars": "GitHub-Sterne",
+  "codex_total_installs": "Installs",
+  "codex_total_lifetime_revenue": "Umsatz insgesamt",
+  "codex_total_mysteries": "Erklärte Mysterien",
+  "codex_total_quests_completed": "Abgeschlossene Quests",
+  "codex_total_record_days": "Rekordtage",
+  "codex_total_refunded": "{count} erstattet",
+  "codex_total_units_sold": "Verkaufte Einheiten",
+  "codex_total_xp": "XP",
+  "codex_trophy_lede": "Erfolge werden nur freigeschaltet. Nichts hier verfällt, läuft ab oder wird dir genommen — eine Serie, die endete, hat trotzdem stattgefunden. Jede Freischaltung zahlt einen echten Fund: ungewöhnlich für Bronze, selten für Silber, episch für Gold, legendär für Legendär.",
+  "codex_trophy_wall": "Trophäenwand",
+  "codex_xp": "{xp} XP",
+  "delta_new": "neu",
+  "dev_clear_country": "Land löschen",
+  "dev_country_aria": "Ländercode für den Fake-Fund",
+  "dev_country_placeholder": "Land (optional)",
+  "dev_fake_chest": "Fake-Truhe (5 Funde)",
+  "dev_fake_sales_day": "Fake-Verkaufstag (EUR 250)",
+  "dev_hint": "Schick einen synthetischen Fund durch die echte Pipeline.",
+  "dev_random_country": "Zufälliges Land wählen",
+  "dev_toggle": "dev",
+  "drop_aria_label": "Fund ({rarity}): {title}",
+  "drop_chest_title": "Kam aus der Truhe vom {date}",
+  "drop_xp": "+{xp} XP",
+  "era_camp": "Lager",
+  "era_city": "Großstadt",
+  "era_dynasty": "Dynastie",
+  "era_empire": "Imperium",
+  "era_kingdom": "Königreich",
+  "era_town": "Stadt",
+  "era_village": "Dorf",
+  "feed_empty_body": "Richte einen RevenueCat-Webhook auf {hook}, trag Flathub-Apps in deine Config ein oder starte mit {dev} und schick einen Test-Fund.",
+  "feed_empty_title": "Noch keine Beute.",
+  "feed_end": "Das ist der ganze Hort.",
+  "feed_label": "Fund-Feed",
+  "feed_loading": "Öffne die Schatzkammer…",
+  "feed_loading_more": "Grabe tiefer…",
+  "globe_aboard": "An Bord",
+  "globe_aria_label": "Ein Globus aller Länder, in denen du verkauft hast, und die Flotte auf See",
+  "globe_drops": "Funde",
+  "globe_first_customer": "Erster Kunde",
+  "globe_new_settlement": "Neue Siedlung",
+  "globe_population": "Bevölkerung",
+  "globe_revenue": "Umsatz",
+  "globe_sailing_since": "Auf See seit",
+  "header_boss_fights_title": "{count} laufende Bosskämpfe",
+  "header_chest_aria": "Tagestruhe öffnen: {count} Funde warten",
+  "header_chest_title": "{drops} Funde warten in {chests} Truhe(n)",
+  "header_demo": "Demo",
+  "header_demo_title": "Synthetische Daten — echte Stores verbindest du laut README",
+  "header_level": "LVL {level}",
+  "header_live": "live",
+  "header_live_title": "Live",
+  "header_mute": "Fund-Sounds stumm",
+  "header_muted": "Stumm",
+  "header_nav_label": "Bereiche",
+  "header_no_sources": "keine Quellen",
+  "header_no_sources_configured": "keine Quellen konfiguriert",
+  "header_offline": "offline",
+  "header_open_mysteries_title": "{count} offene Mysterien",
+  "header_rarity_title": "{count} Funde ({rarity})",
+  "header_reconnecting_title": "Verbinde neu…",
+  "header_scoped_to_title": "Alle Panels zeigen nur {app}",
+  "header_sound": "Sound",
+  "header_source_webhook": "Webhook",
+  "header_sources_count": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "{count} Quelle",
+        "countPlural=other": "{count} Quellen"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "header_sources_in_error": "{count} mit Fehler",
+  "header_status_error": "Fehler",
+  "header_status_listening": "lauscht",
+  "header_status_ok": "ok",
+  "header_status_waiting": "wartet",
+  "header_unmute": "Fund-Sounds an",
+  "header_xp_sub": [
+    {
+      "declarations": [
+        "input countries",
+        "local countriesPlural = countries: plural"
+      ],
+      "match": {
+        "countriesPlural=one": "{drops} Funde · {countries} Land",
+        "countriesPlural=other": "{drops} Funde · {countries} Länder"
+      },
+      "selectors": [
+        "countriesPlural"
+      ]
+    }
+  ],
+  "header_xp_total": "{xp} XP",
+  "hearth_ambient": "Ambiente",
+  "hearth_ambient_label": "Das Herdfeuer, Ambiente",
+  "hearth_ambient_leave": "Ambiente verlassen (Esc)",
+  "hearth_ambient_mute": "Stumm",
+  "hearth_ambient_unmute": "Ton an",
+  "hearth_arrivals": "Zuletzt angekommen",
+  "hearth_arrivals_empty": "Bisher ist nichts mit einem Land dabei gelandet.",
+  "hearth_capital": "Hauptstadt {flag} {name}",
+  "hearth_civilization": "Zivilisation",
+  "hearth_era_to_next": "{xp} XP bis {era}",
+  "hearth_era_to_next_short": "{xp} bis {era}",
+  "hearth_era_top": "Ganz oben. Mehr wirst du nicht.",
+  "hearth_fleet": "Die Flotte",
+  "hearth_fleet_fine": "Leute, deren Store nie verrät, wo sie sind. Sie segeln.",
+  "hearth_hint_pointer": "Ziehen zum Drehen · Scrollen zum Zoomen · Doppelklick zum Zentrieren",
+  "hearth_hint_touch": "Ziehen zum Drehen · Marker antippen · Doppeltippen zum Zentrieren",
+  "hearth_loading": "Entfache das Feuer…",
+  "hearth_population": "Bevölkerung",
+  "hearth_revenue": "Umsatz",
+  "hearth_settlements": "Siedlungen",
+  "hearth_settlements_empty": "Noch hat kein Land etwas gekauft. Der Globus ist dunkel.",
+  "hearth_ticker_empty": "Warte darauf, dass die Welt erwacht…",
+  "hearth_title": "Herdfeuer",
+  "hearth_xp": "{xp} XP",
+  "metric_drops": "Funde",
+  "metric_installs": "Installs",
+  "metric_revenue": "Umsatz",
+  "metric_settlements": "neue Länder",
+  "metric_stars": "Sterne",
+  "metric_subscribers": "Abonnenten",
+  "metric_units": "Einheiten",
+  "metric_xp": "XP",
+  "mystery_day": "{weekday} {date}",
+  "mystery_dismiss": "Verwerfen",
+  "mystery_expected": "erwartet",
+  "mystery_kind_dip": "Einbruch",
+  "mystery_kind_new_country_cluster": "neue Länder",
+  "mystery_kind_record": "Rekord",
+  "mystery_kind_refund_spike": "Erstattungen",
+  "mystery_kind_silence": "Stille",
+  "mystery_kind_spike": "Ausschlag",
+  "mystery_note_aria": "Deine Erklärung für: {title}",
+  "mystery_note_placeholder": "Was ist deiner Meinung nach passiert?",
+  "mystery_observed": "beobachtet",
+  "mystery_phrase_appeared": "kam aus dem Nichts",
+  "mystery_phrase_changed": "veränderte sich",
+  "mystery_phrase_doubled": "verdoppelte sich",
+  "mystery_phrase_dropped": "fiel um {pct}%",
+  "mystery_phrase_held_still": "blieb unverändert",
+  "mystery_phrase_jumped": "sprang um {pct}%",
+  "mystery_phrase_quadrupled": "vervierfachte sich",
+  "mystery_phrase_tripled": "verdreifachte sich",
+  "mystery_ratio": "Verhältnis",
+  "mystery_series_cancellations": "Kündigungen",
+  "mystery_series_installs": "Installs",
+  "mystery_series_refunds": "Erstattungen",
+  "mystery_series_revenue": "Umsatz",
+  "mystery_series_units": "verkaufte Einheiten",
+  "mystery_solve": "Lösen",
+  "mystery_title_dip": "{series} bei {source} {phrase} am {day}",
+  "mystery_title_new_country_cluster": [
+    {
+      "declarations": [
+        "input count",
+        "input countText",
+        "input day",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "{countText} neues Land am {day} besiedelt — was ist passiert?",
+        "countPlural=other": "{countText} neue Länder am {day} besiedelt — was ist passiert?"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "mystery_title_plain": "{series} bei {source} am {day}",
+  "mystery_title_record": "Rekordtag: {value} {series} bei {source}, {day}",
+  "mystery_title_refund_spike": "{count} Erstattungen bei {source} am {day} — sonst {usual}",
+  "mystery_title_silence": "{source} ist seit {day} still",
+  "mystery_title_spike": "{series} bei {source} {phrase} am {day} — warum?",
+  "mystery_why_measured": "{observed} gegen einen {days}-Tage-Median von {expected} (z {z})",
+  "mystery_why_new_country_cluster": [
+    {
+      "declarations": [
+        "input count",
+        "input countText",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "{countText} Land hat am selben Tag zum ersten Mal gekauft",
+        "countPlural=other": "{countText} Länder haben am selben Tag zum ersten Mal gekauft"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "mystery_why_record": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "höher als am {count} Tag davor",
+        "countPlural=other": "höher als an jedem der {count} Tage davor"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "mystery_why_refund_spike": "{count} Erstattungen gegenüber sonst {usual}",
+  "mystery_why_silence": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "{count} abgeschlossener Tag ganz ohne Zeilen, nachdem an {reported} der letzten 7 gemeldet wurde",
+        "countPlural=other": "{count} abgeschlossene Tage ganz ohne Zeilen, nachdem an {reported} der letzten 7 gemeldet wurde"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "mystery_why_silence_lag": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "{count} abgeschlossener Tag ganz ohne Zeilen, nachdem an {reported} der letzten 7 gemeldet wurde — und dabei ist der Abrechnungsverzug dieses Stores von {lag} Tagen schon eingerechnet",
+        "countPlural=other": "{count} abgeschlossene Tage ganz ohne Zeilen, nachdem an {reported} der letzten 7 gemeldet wurde — und dabei ist der Abrechnungsverzug dieses Stores von {lag} Tagen schon eingerechnet"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "quest_auto_installs_week": "Installs: letzte Woche schlagen · {target}",
+  "quest_auto_revenue_month": "Umsatz des letzten Monats schlagen · {target}",
+  "quest_auto_revenue_week": "Umsatz der letzten Woche schlagen · {target}",
+  "quest_auto_settlements_month": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "Besiedle {count} neues Land in diesem Monat",
+        "countPlural=other": "Besiedle {count} neue Länder in diesem Monat"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "quest_auto_stars_week": "Sterne der letzten Woche schlagen · {target}",
+  "quest_auto_units_week": "Einheiten: letzte Woche schlagen · {target}",
+  "quest_auto_xp_week": "Verdiene {target} XP diese Woche",
+  "quest_completed": "abgeschlossen",
+  "quest_completed_xp": "abgeschlossen · +{xp} XP",
+  "quest_custom": "eigen",
+  "quest_days_left": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "noch {count} Tag",
+        "countPlural=other": "noch {count} Tage"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "quest_ended": "beendet · {pct}",
+  "quest_error_bad_window_json": "window muss \"week\", \"month\" oder \\{\"start\":\"…\",\"end\":\"…\"\\} sein",
+  "quest_error_custom_only": "nur eigene Quests können gelöscht werden",
+  "quest_error_not_found": "keine solche Quest",
+  "quest_error_quests_disabled": "Quests sind nicht aktiviert",
+  "quest_error_target_positive": "Ziel muss größer als null sein",
+  "quest_error_unknown_metric": "unbekannte Metrik \"{value}\"",
+  "quest_error_unknown_window": "unbekannter Zeitraum \"{value}\" (nutze week, month oder explizite Tage)",
+  "quest_error_window_end_format": "Zeitraum-Ende muss YYYY-MM-DD sein",
+  "quest_error_window_order": "Zeitraum endet vor seinem Beginn",
+  "quest_error_window_start_format": "Zeitraum-Beginn muss YYYY-MM-DD sein",
+  "quest_last_day": "letzter Tag",
+  "quest_remove_aria": "Quest {title} entfernen",
+  "quest_remove_title": "Diese Quest entfernen",
+  "quest_window_days": "{count} Tage",
+  "quest_window_month": "dieser Monat",
+  "quest_window_week": "diese Woche",
+  "quests_active": "Aktiv",
+  "quests_active_empty": "Nichts läuft. Loot schreibt die Quests einer Woche aus deiner eigenen Historie — eine Woche mit Daten genügt — und eigene setzt du mit {newQuest}.",
+  "quests_boss_empty": "Keine Bosse. Frieden im Reich. Richte eine Crash-Quelle auf Loot — Android vitals, Sentry oder alles, was an {hook} POSTen kann — und der nächste Absturz-Ausschlag wird ein Monster mit Lebensbalken, den du leeren kannst. Siehe {docs}.",
+  "quests_boss_fights": "Bosskämpfe",
+  "quests_boss_lede": "Ein Absturz-Cluster, das aus seiner eigenen Baseline ausgebrochen ist, mit Namen und Lebensbalken. HP ist das, was es am letzten abgeschlossenen Tag angerichtet hat — ein Fix leert also den Balken, und der Kill zahlt einen epischen Fund. Hier kann nichts scheitern: Ein Boss, der noch steht, steht eben noch.",
+  "quests_boss_recent": "Gewonnen und aus den Augen verloren",
+  "quests_cancel": "Abbrechen",
+  "quests_every_app": "alle Apps",
+  "quests_every_source": "alle Quellen",
+  "quests_form_app": "App",
+  "quests_form_metric": "Metrik",
+  "quests_form_optional": "optional",
+  "quests_form_source": "Quelle",
+  "quests_form_target": "Ziel",
+  "quests_form_target_error": "Gib ein Ziel über null an.",
+  "quests_form_title": "Titel",
+  "quests_form_title_placeholder": "Umsatz der letzten Woche schlagen",
+  "quests_form_window": "Zeitraum",
+  "quests_loading": "Lese das Questbrett…",
+  "quests_mysteries": "Mysterien",
+  "quests_mysteries_empty": "Nichts Unerklärtes. Loot liest die letzten zwei Wochen jede Stunde neu und markiert einen Tag nur, wenn er aus seiner eigenen 28-Tage-Baseline ausbricht.",
+  "quests_mysteries_lede": "Tage, an denen deine Zahlen etwas taten, das die Tage drumherum nicht erklären. Sie sind optionale Rätsel: Eines zu lösen heißt aufzuschreiben, was deiner Meinung nach passiert ist — das zahlt einen Fund und hinterlässt dir ein Notizbuch darüber, was deine Zahlen wirklich bewegt.",
+  "quests_new": "+ Neue Quest",
+  "quests_notebook": "Notizbuch",
+  "quests_notebook_dismissed": "ohne Notiz verworfen",
+  "quests_notebook_note": "„{note}“",
+  "quests_recent": "Zuletzt",
+  "quests_save": "Quest setzen",
+  "quests_saving": "Wird gesetzt…",
+  "quests_sub": "Ziele aus deiner eigenen Historie · hier kann nichts scheitern",
+  "quests_title": "Quests",
+  "quests_window_month": "dieser Monat",
+  "quests_window_week": "diese Woche",
+  "rarity_common": "gewöhnlich",
+  "rarity_cursed": "verflucht",
+  "rarity_epic": "episch",
+  "rarity_legendary": "legendär",
+  "rarity_rare": "selten",
+  "rarity_uncommon": "ungewöhnlich",
+  "recap_achievements": "Erfolge",
+  "recap_chests": "Truhen",
+  "recap_copied": "Kopiert",
+  "recap_copy": "Zusammenfassung kopieren",
+  "recap_copy_error": "Dieser Browser hat Loot die Zwischenablage nicht erlaubt.",
+  "recap_copy_title": "Diesen Rückblick als Text kopieren",
+  "recap_country_title": "{country} · {day}",
+  "recap_delta_line": "{sign}{pct} · {unit} davor: {previous}",
+  "recap_drops": "Funde",
+  "recap_empty": "In {period} ist nichts gelandet. Loot hat dazu keine Meinung — {unit} ohne Zahlen, mehr nicht. Wähl oben etwas anderes.",
+  "recap_first_with_revenue": "{unit} mit Umsatz — zum ersten Mal",
+  "recap_footer_era_changed": "{from} → {to} · Level {levelFrom} → {levelTo}",
+  "recap_footer_era_same": "Ära {era} · Level {level}",
+  "recap_highlight_best_day": "Bester Tag am {day}: {value}",
+  "recap_highlight_chests_opened": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "{count} Truhe geöffnet",
+        "countPlural=other": "{count} Truhen geöffnet"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "recap_highlight_epic_drops": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "{count} epischer Fund",
+        "countPlural=other": "{count} epische Funde"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "recap_highlight_era_reached": "Ära {era} erreicht",
+  "recap_highlight_legendary_drops": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "{count} legendärer Fund",
+        "countPlural=other": "{count} legendäre Funde"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "recap_highlight_level_up": "Level {from} → {to}",
+  "recap_highlight_most_countries": [
+    {
+      "declarations": [
+        "input count",
+        "input day",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "{count} neues Land allein am {day}",
+        "countPlural=other": "{count} neue Länder allein am {day}"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "recap_highlight_mysteries_solved": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "{count} Mysterium erklärt",
+        "countPlural=other": "{count} Mysterien erklärt"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "recap_highlight_quests_completed": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "{count} Quest abgeschlossen",
+        "countPlural=other": "{count} Quests abgeschlossen"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "recap_highlight_settled": "{flag} {country} am {day} besiedelt",
+  "recap_highlight_settled_more": [
+    {
+      "declarations": [
+        "input count",
+        "input flag",
+        "input country",
+        "input day",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "{flag} {country} am {day} besiedelt (und {count} weiteres Land)",
+        "countPlural=other": "{flag} {country} am {day} besiedelt (und {count} weitere Länder)"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "recap_highlight_top_country": "{flag} {country} war dein größter Markt",
+  "recap_highlight_unlocked": "{title} freigeschaltet",
+  "recap_highlight_unlocked_more": [
+    {
+      "declarations": [
+        "input count",
+        "input title",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "{title} und {count} weiteren Erfolg freigeschaltet",
+        "countPlural=other": "{title} und {count} weitere Erfolge freigeschaltet"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "recap_installs": "Installs",
+  "recap_new_settlements": "Neue Siedlungen",
+  "recap_partial": "· bisher",
+  "recap_refunds": "Erstattungen",
+  "recap_revenue": "Umsatz",
+  "recap_share_achievements": "Erfolge: {titles}",
+  "recap_share_bullet": "• {line}",
+  "recap_share_drops": "Funde     {drops} · {xp} XP",
+  "recap_share_era": "Ära       {from} → {to}",
+  "recap_share_header": "◆ Loot — {period}",
+  "recap_share_header_partial": "◆ Loot — {period} (bisher)",
+  "recap_share_installs": "Installs  {installs}",
+  "recap_share_level": "Level     {level}",
+  "recap_share_level_up": "Level     {from} → {to}",
+  "recap_share_revenue": "Umsatz    {amount}",
+  "recap_share_revenue_note": "Umsatz    {amount}  ({note})",
+  "recap_share_settled": "Länder    {countries}",
+  "recap_share_units": "Einheiten {units}",
+  "recap_share_units_refunds": "Einheiten {units} · {refunds} Erstattungen",
+  "recap_sub": "{unit} in Beute gerechnet",
+  "recap_unit_month": "Monat",
+  "recap_unit_year": "Jahr",
+  "recap_units": "Einheiten",
+  "recap_xp": "XP",
+  "scope_all_apps": "Alle Apps",
+  "scope_all_apps_meta": "alles, was du veröffentlichst",
+  "scope_elsewhere": "+{count} anderswo",
+  "scope_elsewhere_title": "{count} Fund(e) für andere Apps gelandet",
+  "scope_events": "{count} Ereignisse",
+  "scope_menu_label": "App-Auswahl",
+  "scope_title_all": "Zeigt alle Apps",
+  "scope_title_scoped": "Zeigt nur {app} — klicken zum Ändern",
+  "scope_unmapped": "nicht zugeordnet",
+  "spark_label": "{days} Tage bis {day}, endet bei {value}",
+  "spark_no_history": "keine Historie",
+  "spark_usual": "sonst {value}",
+  "stat_vs_prev": "vs. vorher",
+  "tab_codex": "Kodex",
+  "tab_feed": "Feed",
+  "tab_hearth": "Herdfeuer",
+  "tab_quests": "Quests",
+  "tab_vault": "Schatzkammer",
+  "tier_city": "Großstadt",
+  "tier_hamlet": "Weiler",
+  "tier_metropolis": "Metropole",
+  "tier_outpost": "Außenposten",
+  "tier_town": "Stadt",
+  "tier_village": "Dorf",
+  "time_days": "{count}T",
+  "time_hours": "{count}Std",
+  "time_just_now": "gerade eben",
+  "time_minutes": "{count}Min",
+  "time_seconds": "{count}Sek",
+  "vault_by_app": "Nach App",
+  "vault_by_country": "Nach Land",
+  "vault_by_source": "Nach Quelle",
+  "vault_chart_aria": "Umsatz und Einheiten pro Tag",
+  "vault_chart_hint": "in {code} · Einheiten unten",
+  "vault_chart_title": "Umsatz pro Tag",
+  "vault_chart_units": "Einheiten",
+  "vault_countries_note": "in diesem Zeitraum gesehen",
+  "vault_country_empty": "Dem Geld in diesem Zeitraum war kein Land zugeordnet.",
+  "vault_empty_body": "Als Umsatz zählen nur {ledger} — abgerechnetes Geld aus den Finanzberichten der Stores. Damit sich die Schatzkammer füllt, konfiguriere {stores} in deiner {file} und lass einen Tag abrechnen.",
+  "vault_empty_fine": "RevenueCat-Webhooks landen weiterhin sofort im Feed, aber ihre Beträge sind {sightings} vor Steuern und Store-Anteil: Sie erscheinen in der Kachel oben und zählen nie zum Umsatz. Die ganze Regel steht unter {vault} und {chest}.",
+  "vault_empty_fine_chest": "die Tagestruhe",
+  "vault_empty_fine_sightings": "Sichtungen",
+  "vault_empty_fine_vault": "die Schatzkammer",
+  "vault_empty_ledger_rows": "Abrechnungszeilen",
+  "vault_empty_stores": "App Store Connect und Google Play",
+  "vault_empty_title": "Kein abgerechnetes Geld in diesem Zeitraum.",
+  "vault_loading": "Zähle die Münzen…",
+  "vault_no_app": "(keine App)",
+  "vault_other_countries": "andere Länder",
+  "vault_range_label": "Zeitraum",
+  "vault_sighted_note": "{count} Käufe · Schätzung, kein abgerechneter Umsatz",
+  "vault_subs_as_of": "Stand {date}",
+  "vault_subs_none": "keine Quelle meldet Abos",
+  "vault_tile_active_subs": "Aktive Abos",
+  "vault_tile_countries": "Länder",
+  "vault_tile_refunds": "Erstattungen",
+  "vault_tile_revenue": "Umsatz",
+  "vault_tile_sighted": "Heute gesichtet (RevenueCat)",
+  "vault_tile_units": "Einheiten",
+  "vault_tip_units": "{count} Einheiten",
+  "vault_title": "Schatzkammer",
+  "vault_unknown_country": "unbekannt",
+  "vessel_appstore": "Der Cupertino-Klipper",
+  "vessel_flathub": "Der Flathub-Frachter",
+  "vessel_generic": "Das {source}-Schiff",
+  "vessel_github": "Der Octocat-Eisbrecher",
+  "vessel_googleplay": "Der Play-Trawler",
+  "vessel_microsoftstore": "Die Redmond-Barke",
+  "vessel_revenuecat": "Der RevenueCat-Kutter",
+  "vessel_snapcraft": "Snapcraft Gleis neun",
+  "vessel_why": "irgendwo auf See — {source} verrät nicht, aus welchem Land seine Leute kommen"
+}

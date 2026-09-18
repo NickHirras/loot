@@ -7,7 +7,11 @@
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "allowJs": true,
-    "checkJs": true,
+    // The only JavaScript under src/ is what paraglide-js generates from
+    // web/messages, and its per-locale plural code trips noUnusedLocals for a
+    // language with a single plural form. Types still flow out of its JSDoc
+    // with checkJs off; only error reporting inside those files stops.
+    "checkJs": false,
     // svelte-check only type-checks; without this, the generated
     // src/paraglide/*.js files look like emit targets that would overwrite
     // their own inputs.
