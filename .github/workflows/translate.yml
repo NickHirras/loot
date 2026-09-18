@@ -23,6 +23,10 @@ on:
         description: Comma-separated locales to translate (blank = all of them)
         type: string
         required: false
+      model:
+        description: Model id (blank = claude-sonnet-5; claude-opus-5 for a one-off quality pass)
+        type: string
+        required: false
 
 permissions:
   contents: write
@@ -57,6 +61,7 @@ jobs:
           # being interpolated into the command, so neither can become shell.
           FORCE: ${{ inputs.force }}
           LANGUAGES: ${{ inputs.languages }}
+          LOOT_TRANSLATE_MODEL: ${{ inputs.model }}
         run: |
           if [ -z "$ANTHROPIC_API_KEY" ]; then
             echo "::error::ANTHROPIC_API_KEY is not set for this repository."

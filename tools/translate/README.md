@@ -137,7 +137,9 @@ Pinning does not retranslate anything by itself. Change the English, run with
 
 ## How it talks to the API
 
-One request per batch of 40 keys, to `claude-opus-5`, with the system prompt
+One request per batch of 40 keys, to `claude-sonnet-5` by default (set
+`LOOT_TRANSLATE_MODEL=claude-opus-5` for a one-off run where quality is the
+point), with the system prompt
 and the glossary in a cached prefix that every batch and every language shares.
 The reply is constrained by a JSON schema (`output_config.format`). A refusal
 or a malformed reply retries the batch once in smaller pieces; keys that still
