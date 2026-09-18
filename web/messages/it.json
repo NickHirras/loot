@@ -1,0 +1,1131 @@
+{
+  "$schema": "https://inlang.com/schema/inlang-message-format",
+  "ach_backfilled": "retroattivo",
+  "ach_backfilled_title": "Ottenuto prima che Loot guardasse; datato al giorno in cui è successo",
+  "ach_cartographer_desc": "Un insediamento in ogni continente abitato.",
+  "ach_cartographer_title": "Cartografo",
+  "ach_cursed_but_unbowed_desc": "Un drop maledetto e, in giornata, qualcosa di raro o meglio. La situazione è girata.",
+  "ach_cursed_but_unbowed_title": "Maledetto ma indomito",
+  "ach_era_city_desc": "Raggiungi l'era Città.",
+  "ach_era_city_title": "Città",
+  "ach_era_empire_desc": "Raggiungi l'era Impero.",
+  "ach_era_empire_title": "Impero",
+  "ach_era_kingdom_desc": "Raggiungi l'era Regno.",
+  "ach_era_kingdom_title": "Regno",
+  "ach_era_town_desc": "Raggiungi l'era Borgo.",
+  "ach_era_town_title": "Borgo",
+  "ach_first_blood_desc": "Il tuo primo drop in assoluto: il momento in cui Loot ha avuto qualcosa da dire.",
+  "ach_first_blood_title": "Primo sangue",
+  "ach_first_sale_desc": "La prima vendita liquidata nel rendiconto finanziario di uno store.",
+  "ach_first_sale_title": "Prima vendita",
+  "ach_first_subscriber_desc": "Qualcuno ha deciso di continuare a pagarti.",
+  "ach_first_subscriber_title": "Primo abbonato",
+  "ach_hoarder_1_desc": "Apri 10 forzieri quotidiani.",
+  "ach_hoarder_1_title": "Accumulatore",
+  "ach_hoarder_2_desc": "Apri 50 forzieri quotidiani.",
+  "ach_hoarder_2_title": "Grande accumulatore",
+  "ach_hoarder_3_desc": "Apri 200 forzieri quotidiani.",
+  "ach_hoarder_3_title": "Drago accumulatore",
+  "ach_installs_100k_desc": "100,000 installazioni totali.",
+  "ach_installs_100k_title": "Ovunque",
+  "ach_installs_10k_desc": "10,000 installazioni totali.",
+  "ach_installs_10k_title": "In giro",
+  "ach_installs_1k_desc": "1,000 installazioni totali.",
+  "ach_installs_1k_title": "Passaparola",
+  "ach_legendary_hunter_desc": "Il tuo primo drop leggendario.",
+  "ach_legendary_hunter_title": "Cacciatore leggendario",
+  "ach_merchant_2_desc": "Ricavi contabilizzati da 2 store diversi.",
+  "ach_merchant_2_title": "Due mondi",
+  "ach_merchant_3_desc": "Ricavi contabilizzati da 3 store diversi.",
+  "ach_merchant_3_title": "Tre mondi",
+  "ach_merchant_5_desc": "Ricavi contabilizzati da 5 store diversi.",
+  "ach_merchant_5_title": "Mercante di molti mondi",
+  "ach_mysteries_10_desc": "Spiega 10 misteri.",
+  "ach_mysteries_10_title": "Quaderno di laboratorio",
+  "ach_mysteries_1_desc": "Spiega un mistero.",
+  "ach_mysteries_1_title": "Detective",
+  "ach_not_yet": "non ancora",
+  "ach_polyglot_1_desc": "Incassa in 5 valute diverse.",
+  "ach_polyglot_1_title": "Poliglotta",
+  "ach_polyglot_2_desc": "Incassa in 10 valute diverse.",
+  "ach_polyglot_2_title": "Cambiavalute",
+  "ach_progress": "{value} / {target}",
+  "ach_progress_unit": "{value} / {target} {unit}",
+  "ach_quests_10_desc": "Completa 10 missioni.",
+  "ach_quests_10_title": "Avventuriero",
+  "ach_quests_1_desc": "Completa una missione.",
+  "ach_quests_1_title": "In missione",
+  "ach_quests_50_desc": "Completa 50 missioni.",
+  "ach_quests_50_title": "Eroe del reame",
+  "ach_record_1_desc": "Un giorno che ha battuto tutti quelli prima di lui.",
+  "ach_record_1_title": "Giorno migliore di sempre",
+  "ach_record_25_desc": "Venticinque giorni da record.",
+  "ach_record_25_title": "Giorno migliore di sempre ×25",
+  "ach_record_5_desc": "Cinque giorni che hanno battuto tutto ciò che li precedeva.",
+  "ach_record_5_title": "Giorno migliore di sempre ×5",
+  "ach_revenue_100_desc": "$100 di ricavi totali.",
+  "ach_revenue_100_title": "Primo centinaio",
+  "ach_revenue_100k_desc": "$100,000 di ricavi totali.",
+  "ach_revenue_100k_title": "Sei cifre",
+  "ach_revenue_10k_desc": "$10,000 di ricavi totali.",
+  "ach_revenue_10k_title": "Cinque cifre",
+  "ach_revenue_1k_desc": "$1,000 di ricavi totali.",
+  "ach_revenue_1k_title": "Quattro cifre",
+  "ach_settler_1_desc": "Clienti in 5 paesi.",
+  "ach_settler_1_title": "Colono I",
+  "ach_settler_2_desc": "Clienti in 10 paesi.",
+  "ach_settler_2_title": "Colono II",
+  "ach_settler_3_desc": "Clienti in 25 paesi.",
+  "ach_settler_3_title": "Colono III",
+  "ach_settler_4_desc": "Clienti in 50 paesi.",
+  "ach_settler_4_title": "Colono IV",
+  "ach_stars_1000_desc": "1,000 stelle GitHub.",
+  "ach_stars_1000_title": "Galassia",
+  "ach_stars_100_desc": "100 stelle GitHub.",
+  "ach_stars_100_title": "Costellazione",
+  "ach_stars_10_desc": "10 stelle GitHub.",
+  "ach_stars_10_title": "Astrofilo",
+  "ach_steady_30_desc": "Ricavi contabilizzati per 30 giorni consecutivi.",
+  "ach_steady_30_title": "Rotta stabile",
+  "ach_steady_7_desc": "Ricavi contabilizzati per 7 giorni consecutivi.",
+  "ach_steady_7_title": "Stabile",
+  "ach_subscribers_1000_desc": "1,000 abbonati attivi.",
+  "ach_subscribers_1000_title": "Un movimento",
+  "ach_subscribers_100_desc": "100 abbonati attivi.",
+  "ach_subscribers_100_title": "Un seguito",
+  "ach_subscribers_10_desc": "10 abbonati attivi.",
+  "ach_subscribers_10_title": "Una congregazione",
+  "ach_tier_bronze": "bronzo",
+  "ach_tier_gold": "oro",
+  "ach_tier_legendary": "leggendario",
+  "ach_tier_silver": "argento",
+  "ach_tier_title": "{tier} · dà un drop {rarity} da {xp} XP",
+  "ach_unit_chests": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=many": "forzieri",
+        "countPlural=one": "forziere",
+        "countPlural=other": "forzieri"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_continents": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=many": "continenti",
+        "countPlural=one": "continente",
+        "countPlural=other": "continenti"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_countries": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=many": "paesi",
+        "countPlural=one": "paese",
+        "countPlural=other": "paesi"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_currencies": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=many": "valute",
+        "countPlural=one": "valuta",
+        "countPlural=other": "valute"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_days": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=many": "giorni",
+        "countPlural=one": "giorno",
+        "countPlural=other": "giorni"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_installs": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=many": "installazioni",
+        "countPlural=one": "installazione",
+        "countPlural=other": "installazioni"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_mysteries": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=many": "misteri",
+        "countPlural=one": "mistero",
+        "countPlural=other": "misteri"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_quests": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=many": "missioni",
+        "countPlural=one": "missione",
+        "countPlural=other": "missioni"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_record_days": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=many": "giorni da record",
+        "countPlural=one": "giorno da record",
+        "countPlural=other": "giorni da record"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_revenue": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=many": "ricavi",
+        "countPlural=one": "ricavi",
+        "countPlural=other": "ricavi"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_stars": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=many": "stelle",
+        "countPlural=one": "stella",
+        "countPlural=other": "stelle"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_stores": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=many": "store",
+        "countPlural=one": "store",
+        "countPlural=other": "store"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_subscribers": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=many": "abbonati",
+        "countPlural=one": "abbonato",
+        "countPlural=other": "abbonati"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_units": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=many": "unità",
+        "countPlural=one": "unità",
+        "countPlural=other": "unità"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_xp": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=many": "XP",
+        "countPlural=one": "XP",
+        "countPlural=other": "XP"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_units_100_desc": "100 unità a pagamento totali.",
+  "ach_units_100_title": "Cento vendute",
+  "ach_units_100k_desc": "100,000 unità a pagamento totali.",
+  "ach_units_100k_title": "Centomila vendute",
+  "ach_units_10k_desc": "10,000 unità a pagamento totali.",
+  "ach_units_10k_title": "Diecimila vendute",
+  "ach_units_1k_desc": "1,000 unità a pagamento totali.",
+  "ach_units_1k_title": "Mille vendute",
+  "app_enable_sounds": "Clicca per attivare i suoni dei drop",
+  "app_enable_sounds_dismiss": "no grazie",
+  "app_footer_mute_hint": "premi {key} per silenziare",
+  "app_footer_tagline": "Loot · monitoraggio del bottino self-hosted per dev indie",
+  "boss_anr": "ANR",
+  "boss_appeared": "apparso",
+  "boss_confirm": "Risolto?",
+  "boss_days": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=many": "{count} giorni",
+        "countPlural=one": "{count} giorno",
+        "countPlural=other": "{count} giorni"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "boss_down_pct": "−{pct} da quando è apparso",
+  "boss_enraged": "infuriato",
+  "boss_enraged_line": "più forte di quando è apparso",
+  "boss_enraged_title": "È peggiorato prima di migliorare",
+  "boss_faded": "svanito dopo {days}: la fonte ha smesso di inviare dati",
+  "boss_fighting_for": "in lotta da",
+  "boss_holding": "resiste a piena forza",
+  "boss_hp_aria": "punti vita di {name}",
+  "boss_lasted": "durato",
+  "boss_mark_slain": "Segna come ucciso",
+  "boss_not_yet": "Non ancora",
+  "boss_open_issue": "Apri la issue ↗",
+  "boss_people_hit": "persone colpite",
+  "boss_slain": "ucciso in {days}",
+  "boss_slain_xp": "ucciso in {days} · +{xp} XP",
+  "boss_slay_yes": "Sì, uccidilo",
+  "boss_slaying": "Colpo finale…",
+  "boss_title_anrs": "ANR",
+  "boss_title_anrs_in": "ANR in {version}",
+  "boss_title_crashes": "Crash",
+  "boss_title_crashes_in": "Crash in {version}",
+  "boss_unit_crashes": "crash",
+  "boss_unit_users": "utenti",
+  "breakdown_empty": "Ancora niente qui.",
+  "breakdown_units": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural",
+        "local countFmt = count: number maximumFractionDigits=0"
+      ],
+      "match": {
+        "countPlural=many": "{countFmt} unità",
+        "countPlural=one": "{countFmt} unità",
+        "countPlural=other": "{countFmt} unità"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "chest_all_already_open": "Quei forzieri sono già aperti.",
+  "chest_already_open": "Quel forziere è già aperto.",
+  "chest_best": "migliore · {rarity}",
+  "chest_bulk_every": "Tutti i forzieri",
+  "chest_bulk_label": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=many": "{count} forzieri · {span}",
+        "countPlural=one": "{count} forziere · {span}",
+        "countPlural=other": "{count} forzieri · {span}"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "chest_cell_title": "{title} · +{xp} XP",
+  "chest_close": "Chiudi",
+  "chest_dot_title": "{count} {rarity}",
+  "chest_haul_xp": "+{xp} XP",
+  "chest_more_below": "e altri {count} qui sotto",
+  "chest_nice": "Niente male.",
+  "chest_nothing_waiting": "Niente in attesa. Un giorno di vendite arriva qui come un unico forziere.",
+  "chest_of_date": "Forziere del {date}",
+  "chest_open": "Apri",
+  "chest_open_all": "Apri tutti · {count} forzieri",
+  "chest_open_all_sub": "{count} drop in una volta sola",
+  "chest_open_oldest": "Apri il forziere più vecchio",
+  "chest_opening": "Apro {what}…",
+  "chest_opening_all": "Apro tutti i forzieri…",
+  "chest_progress": "{revealed} / {total}",
+  "chest_progress_drops": "{revealed} / {total} drop",
+  "chest_row_drops": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=many": "{count} drop",
+        "countPlural=one": "{count} drop",
+        "countPlural=other": "{count} drop"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "chest_row_xp": "+{xp} XP",
+  "chest_skip": "Salta",
+  "chest_the_chest": "il forziere",
+  "chest_title": "Forziere quotidiano",
+  "chest_waiting": [
+    {
+      "declarations": [
+        "input drops",
+        "input chests",
+        "local dropsPlural = drops: plural",
+        "local chestsPlural = chests: plural",
+        "local dropsFmt = drops: number maximumFractionDigits=0"
+      ],
+      "match": {
+        "dropsPlural=many, chestsPlural=many": "{dropsFmt} drop in attesa in {chests} forzieri.",
+        "dropsPlural=many, chestsPlural=one": "{dropsFmt} drop in attesa in {chests} forziere.",
+        "dropsPlural=many, chestsPlural=other": "{dropsFmt} drop in attesa in {chests} forzieri.",
+        "dropsPlural=one, chestsPlural=many": "{dropsFmt} drop in attesa in {chests} forzieri.",
+        "dropsPlural=one, chestsPlural=one": "{dropsFmt} drop in attesa in {chests} forziere.",
+        "dropsPlural=one, chestsPlural=other": "{dropsFmt} drop in attesa in {chests} forzieri.",
+        "dropsPlural=other, chestsPlural=many": "{dropsFmt} drop in attesa in {chests} forzieri.",
+        "dropsPlural=other, chestsPlural=one": "{dropsFmt} drop in attesa in {chests} forziere.",
+        "dropsPlural=other, chestsPlural=other": "{dropsFmt} drop in attesa in {chests} forzieri."
+      },
+      "selectors": [
+        "dropsPlural",
+        "chestsPlural"
+      ]
+    }
+  ],
+  "codex_counter_title": "{unlocked} di {total} obiettivi sbloccati",
+  "codex_days": "{count} giorni",
+  "codex_filter_all": "Tutti",
+  "codex_filter_empty": "Niente da mostrare con questo filtro.",
+  "codex_filter_label": "Filtra gli obiettivi",
+  "codex_filter_locked": "Da conquistare",
+  "codex_filter_unlocked": "Sbloccati",
+  "codex_loading": "Apro il codex…",
+  "codex_recap_loading": "Sto scrivendo…",
+  "codex_recap_period_label": "Periodo del riepilogo",
+  "codex_record_best_day_source": "Giorno migliore · {source}",
+  "codex_record_best_install_day": "Miglior giorno di installazioni",
+  "codex_record_best_revenue_day": "Miglior giorno di ricavi",
+  "codex_record_best_units_day": "Miglior giorno di unità",
+  "codex_record_biggest_drop": "Drop singolo più grande",
+  "codex_record_biggest_drop_note": "{title} · {day}",
+  "codex_record_first_event": "Primo evento in assoluto",
+  "codex_record_first_event_note": "{count} giorni di storia",
+  "codex_record_longest_run": "Serie più lunga di giorni con incassi",
+  "codex_record_longest_run_note": "finita il {day}",
+  "codex_record_most_countries_day": "Più paesi insediati in un giorno",
+  "codex_record_most_drops_day": "Più drop in un giorno",
+  "codex_record_most_xp_day": "Più XP in un giorno",
+  "codex_records": "Record",
+  "codex_records_empty": "Ancora nessun record: arrivano con il primo giorno che batte quello prima.",
+  "codex_records_lede": "Calcolati ogni volta da zero, mai salvati: così un report corretto migliora un record invece di lasciarne indietro uno vecchio, e un record può solo salire.",
+  "codex_season_recap": "Riepilogo della stagione",
+  "codex_sub": "tutto quello che è successo · i trofei sono permanenti",
+  "codex_this_year": "Quest'anno",
+  "codex_title": "Codex",
+  "codex_total_chests_opened": "Forzieri aperti",
+  "codex_total_continents": "{count} continenti su 6",
+  "codex_total_countries_settled": "Paesi insediati",
+  "codex_total_currencies": "Valute incassate",
+  "codex_total_drops": "Drop",
+  "codex_total_era": "Era {era}",
+  "codex_total_github_stars": "Stelle GitHub",
+  "codex_total_installs": "Installazioni",
+  "codex_total_lifetime_revenue": "Ricavi totali",
+  "codex_total_mysteries": "Misteri spiegati",
+  "codex_total_quests_completed": "Missioni completate",
+  "codex_total_record_days": "Giorni da record",
+  "codex_total_refunded": "{count} rimborsati",
+  "codex_total_units_sold": "Unità vendute",
+  "codex_total_xp": "XP",
+  "codex_trophy_lede": "Gli obiettivi si sbloccano e basta. Qui niente decade, scade o può essere tolto: una serie finita è comunque successa. Ogni sblocco paga un drop vero: non comune per il bronzo, raro per l'argento, epico per l'oro, leggendario per il leggendario.",
+  "codex_trophy_wall": "Bacheca dei trofei",
+  "codex_xp": "{xp} XP",
+  "delta_new": "nuovo",
+  "dev_clear_country": "Cancella il paese",
+  "dev_country_aria": "Codice paese per il drop finto",
+  "dev_country_placeholder": "paese (facoltativo)",
+  "dev_fake_chest": "Forziere finto (5 drop)",
+  "dev_fake_sales_day": "Giorno di vendite finto (EUR 250)",
+  "dev_hint": "Lancia un drop sintetico nella pipeline vera.",
+  "dev_random_country": "Scegli un paese a caso",
+  "dev_toggle": "dev",
+  "drop_aria_label": "drop {rarity}: {title}",
+  "drop_chest_title": "Uscito dal forziere del {date}",
+  "drop_xp": "+{xp} XP",
+  "era_camp": "Accampamento",
+  "era_city": "Città",
+  "era_dynasty": "Dinastia",
+  "era_empire": "Impero",
+  "era_kingdom": "Regno",
+  "era_town": "Borgo",
+  "era_village": "Villaggio",
+  "feed_empty_body": "Punta un webhook RevenueCat su {hook}, aggiungi app Flathub alla tua configurazione, oppure avvia con {dev} e lancia un drop di prova.",
+  "feed_empty_title": "Ancora nessun bottino.",
+  "feed_end": "Fine del bottino.",
+  "feed_label": "Feed dei drop",
+  "feed_loading": "Apro il tesoro…",
+  "feed_loading_more": "Scavo più a fondo…",
+  "globe_aboard": "A bordo",
+  "globe_aria_label": "Un globo con ogni paese in cui hai venduto e la flotta in mare",
+  "globe_drops": "Drop",
+  "globe_first_customer": "Primo cliente",
+  "globe_new_settlement": "Nuovo insediamento",
+  "globe_population": "Popolazione",
+  "globe_revenue": "Ricavi",
+  "globe_sailing_since": "In mare da",
+  "header_boss_fights_title": "{count} scontri con boss in corso",
+  "header_chest_aria": "Apri il forziere quotidiano: {count} drop in attesa",
+  "header_chest_title": "{drops} drop in attesa in {chests} forzieri",
+  "header_demo": "demo",
+  "header_demo_title": "Dati sintetici: vedi il README per collegare store veri",
+  "header_level": "LIV {level}",
+  "header_live": "live",
+  "header_live_title": "Live",
+  "header_mute": "Silenzia i suoni dei drop",
+  "header_muted": "Silenziato",
+  "header_nav_label": "Sezioni",
+  "header_no_sources": "nessuna fonte",
+  "header_no_sources_configured": "nessuna fonte configurata",
+  "header_offline": "offline",
+  "header_open_mysteries_title": "{count} misteri aperti",
+  "header_rarity_title": "{count} drop {rarity}",
+  "header_reconnecting_title": "Riconnessione…",
+  "header_scoped_to_title": "Tutti i pannelli sono limitati a {app}",
+  "header_sound": "Audio",
+  "header_source_webhook": "webhook",
+  "header_sources_count": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=many": "{count} fonti",
+        "countPlural=one": "{count} fonte",
+        "countPlural=other": "{count} fonti"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "header_sources_in_error": "{count} in errore",
+  "header_status_error": "errore",
+  "header_status_listening": "in ascolto",
+  "header_status_ok": "ok",
+  "header_status_waiting": "in attesa",
+  "header_unmute": "Riattiva i suoni dei drop",
+  "header_xp_sub": [
+    {
+      "declarations": [
+        "input countries",
+        "local countriesPlural = countries: plural"
+      ],
+      "match": {
+        "countriesPlural=many": "{drops} drop · {countries} paesi",
+        "countriesPlural=one": "{drops} drop · {countries} paese",
+        "countriesPlural=other": "{drops} drop · {countries} paesi"
+      },
+      "selectors": [
+        "countriesPlural"
+      ]
+    }
+  ],
+  "header_xp_total": "{xp} XP",
+  "hearth_ambient": "Ambiente",
+  "hearth_ambient_label": "Il Focolare, modalità ambiente",
+  "hearth_ambient_leave": "Esci dalla modalità ambiente (Esc)",
+  "hearth_ambient_mute": "Silenzia",
+  "hearth_ambient_unmute": "Riattiva",
+  "hearth_arrivals": "Arrivi recenti",
+  "hearth_arrivals_empty": "Non è ancora arrivato niente con un paese associato.",
+  "hearth_capital": "capitale {flag} {name}",
+  "hearth_civilization": "Civiltà",
+  "hearth_era_to_next": "{xp} XP a {era}",
+  "hearth_era_to_next_short": "{xp} a {era}",
+  "hearth_era_top": "In cima alla scala. Non c'è altro da diventare.",
+  "hearth_fleet": "La flotta",
+  "hearth_fleet_fine": "Persone di cui lo store non dice mai la provenienza. Navigano.",
+  "hearth_hint_pointer": "Trascina per ruotare · scorri per lo zoom · doppio clic per ricentrare",
+  "hearth_hint_touch": "Trascina per ruotare · tocca un segnalino · doppio tocco per ricentrare",
+  "hearth_loading": "Accendo il fuoco…",
+  "hearth_population": "Popolazione",
+  "hearth_revenue": "Ricavi",
+  "hearth_settlements": "Insediamenti",
+  "hearth_settlements_empty": "Nessun paese ha ancora comprato. Il globo è spento.",
+  "hearth_ticker_empty": "Aspetto che il mondo si svegli…",
+  "hearth_title": "Focolare",
+  "hearth_xp": "{xp} XP",
+  "metric_drops": "drop",
+  "metric_installs": "installazioni",
+  "metric_revenue": "ricavi",
+  "metric_settlements": "nuovi paesi",
+  "metric_stars": "stelle",
+  "metric_subscribers": "abbonati",
+  "metric_units": "unità",
+  "metric_xp": "XP",
+  "mystery_day": "{weekday} {date}",
+  "mystery_dismiss": "Ignora",
+  "mystery_expected": "atteso",
+  "mystery_kind_dip": "calo",
+  "mystery_kind_new_country_cluster": "nuovi paesi",
+  "mystery_kind_record": "record",
+  "mystery_kind_refund_spike": "rimborsi",
+  "mystery_kind_silence": "silenzio",
+  "mystery_kind_spike": "picco",
+  "mystery_note_aria": "La tua spiegazione per: {title}",
+  "mystery_note_placeholder": "Secondo te cos'è successo?",
+  "mystery_observed": "osservato",
+  "mystery_phrase_appeared": "dal nulla",
+  "mystery_phrase_changed": "in variazione",
+  "mystery_phrase_doubled": "al doppio",
+  "mystery_phrase_dropped": "in calo del {pct}%",
+  "mystery_phrase_held_still": "senza variazioni",
+  "mystery_phrase_jumped": "in salita del {pct}%",
+  "mystery_phrase_quadrupled": "al quadruplo",
+  "mystery_phrase_tripled": "al triplo",
+  "mystery_ratio": "rapporto",
+  "mystery_series_cancellations": "cancellazioni",
+  "mystery_series_installs": "installazioni",
+  "mystery_series_refunds": "rimborsi",
+  "mystery_series_revenue": "ricavi",
+  "mystery_series_units": "unità vendute",
+  "mystery_solve": "Risolvi",
+  "mystery_title_dip": "{series} di {source} {phrase} il {day}",
+  "mystery_title_new_country_cluster": [
+    {
+      "declarations": [
+        "input count",
+        "input countText",
+        "input day",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=many": "{countText} nuovi paesi insediati il {day} — cos'è successo?",
+        "countPlural=one": "{countText} nuovo paese insediato il {day} — cos'è successo?",
+        "countPlural=other": "{countText} nuovi paesi insediati il {day} — cos'è successo?"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "mystery_title_plain": "{series} di {source} il {day}",
+  "mystery_title_record": "Giorno da record: {value} {series} su {source}, {day}",
+  "mystery_title_refund_spike": "{count} rimborsi su {source} il {day} — di solito {usual}",
+  "mystery_title_silence": "{source} è in silenzio dal {day}",
+  "mystery_title_spike": "{series} di {source} {phrase} il {day} — perché?",
+  "mystery_why_measured": "{observed} contro una mediana a {days} giorni di {expected} (z {z})",
+  "mystery_why_new_country_cluster": [
+    {
+      "declarations": [
+        "input count",
+        "input countText",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=many": "{countText} paesi hanno comprato per la prima volta nello stesso giorno",
+        "countPlural=one": "{countText} paese ha comprato per la prima volta nello stesso giorno",
+        "countPlural=other": "{countText} paesi hanno comprato per la prima volta nello stesso giorno"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "mystery_why_record": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=many": "superiore a tutti i {count} giorni precedenti",
+        "countPlural=one": "superiore a {count} giorno precedente",
+        "countPlural=other": "superiore a tutti i {count} giorni precedenti"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "mystery_why_refund_spike": "{count} rimborsi contro i soliti {usual}",
+  "mystery_why_silence": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=many": "{count} giorni completi senza nemmeno una riga, dopo aver riportato in {reported} dei 7 precedenti",
+        "countPlural=one": "{count} giorno completo senza nemmeno una riga, dopo aver riportato in {reported} dei 7 precedenti",
+        "countPlural=other": "{count} giorni completi senza nemmeno una riga, dopo aver riportato in {reported} dei 7 precedenti"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "mystery_why_silence_lag": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=many": "{count} giorni completi senza nemmeno una riga, dopo aver riportato in {reported} dei 7 precedenti — e questo tenendo già conto dei {lag} giorni di ritardo di liquidazione di questo store",
+        "countPlural=one": "{count} giorno completo senza nemmeno una riga, dopo aver riportato in {reported} dei 7 precedenti — e questo tenendo già conto dei {lag} giorni di ritardo di liquidazione di questo store",
+        "countPlural=other": "{count} giorni completi senza nemmeno una riga, dopo aver riportato in {reported} dei 7 precedenti — e questo tenendo già conto dei {lag} giorni di ritardo di liquidazione di questo store"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "quest_auto_installs_week": "Installazioni: batti la scorsa settimana · {target}",
+  "quest_auto_revenue_month": "Batti i ricavi del mese scorso · {target}",
+  "quest_auto_revenue_week": "Batti i ricavi della scorsa settimana · {target}",
+  "quest_auto_settlements_month": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=many": "Insedia {count} nuovi paesi questo mese",
+        "countPlural=one": "Insedia {count} nuovo paese questo mese",
+        "countPlural=other": "Insedia {count} nuovi paesi questo mese"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "quest_auto_stars_week": "Batti le stelle della scorsa settimana · {target}",
+  "quest_auto_units_week": "Unità: batti la scorsa settimana · {target}",
+  "quest_auto_xp_week": "Guadagna {target} XP questa settimana",
+  "quest_completed": "completata",
+  "quest_completed_xp": "completata · +{xp} XP",
+  "quest_custom": "personalizzata",
+  "quest_days_left": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=many": "{count} giorni rimasti",
+        "countPlural=one": "{count} giorno rimasto",
+        "countPlural=other": "{count} giorni rimasti"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "quest_ended": "finita · {pct}",
+  "quest_error_bad_window_json": "la finestra deve essere \"week\", \"month\" o \\{\"start\":\"…\",\"end\":\"…\"\\}",
+  "quest_error_custom_only": "si possono eliminare solo le missioni personalizzate",
+  "quest_error_not_found": "missione inesistente",
+  "quest_error_quests_disabled": "le missioni non sono abilitate",
+  "quest_error_target_positive": "l'obiettivo deve essere maggiore di zero",
+  "quest_error_unknown_metric": "metrica sconosciuta \"{value}\"",
+  "quest_error_unknown_window": "finestra sconosciuta \"{value}\" (usa week, month o giorni espliciti)",
+  "quest_error_window_end_format": "la fine della finestra deve essere YYYY-MM-DD",
+  "quest_error_window_order": "la finestra finisce prima di iniziare",
+  "quest_error_window_start_format": "l'inizio della finestra deve essere YYYY-MM-DD",
+  "quest_last_day": "ultimo giorno",
+  "quest_remove_aria": "Rimuovi la missione {title}",
+  "quest_remove_title": "Rimuovi questa missione",
+  "quest_window_days": "{count} giorni",
+  "quest_window_month": "questo mese",
+  "quest_window_week": "questa settimana",
+  "quests_active": "Attive",
+  "quests_active_empty": "Niente in corso. Loot scrive le missioni della settimana dalla tua storia — gli basta una settimana con dei dati dentro — e con {newQuest} puoi crearne di tue.",
+  "quests_boss_empty": "Nessun boss. Pace nel reame. Punta una fonte di crash su Loot — Android vitals, Sentry o qualsiasi cosa sappia fare POST su {hook} — e il prossimo picco di crash diventa un mostro con una barra della vita da svuotare. Vedi {docs}.",
+  "quests_boss_fights": "Scontri con i boss",
+  "quests_boss_lede": "Un gruppo di crash che si è staccato dalla propria linea di base, con un nome e una barra della vita. Gli HP sono quello che ha fatto nell'ultimo giorno completo, così rilasciare una correzione svuota la barra e l'uccisione paga un drop epico. Qui non si può fallire: un boss ancora in piedi è semplicemente ancora in piedi.",
+  "quests_boss_recent": "Vinti, e persi di vista",
+  "quests_cancel": "Annulla",
+  "quests_every_app": "tutte le app",
+  "quests_every_source": "tutte le fonti",
+  "quests_form_app": "App",
+  "quests_form_metric": "Metrica",
+  "quests_form_optional": "facoltativo",
+  "quests_form_source": "Fonte",
+  "quests_form_target": "Obiettivo",
+  "quests_form_target_error": "Dagli un obiettivo sopra lo zero.",
+  "quests_form_title": "Titolo",
+  "quests_form_title_placeholder": "Batti i ricavi della scorsa settimana",
+  "quests_form_window": "Finestra",
+  "quests_loading": "Leggo la bacheca…",
+  "quests_mysteries": "Misteri",
+  "quests_mysteries_empty": "Niente di inspiegato. Loot rilegge le ultime due settimane ogni ora e segnala un giorno solo quando si stacca dalla propria linea di base a 28 giorni.",
+  "quests_mysteries_lede": "Giorni in cui i tuoi numeri hanno fatto qualcosa che i giorni intorno non spiegano. Sono enigmi facoltativi: risolverne uno significa scrivere cosa pensi sia successo — cosa che paga un drop e ti lascia un quaderno di ciò che muove davvero i tuoi numeri.",
+  "quests_new": "+ Nuova missione",
+  "quests_notebook": "Quaderno",
+  "quests_notebook_dismissed": "ignorato senza una nota",
+  "quests_notebook_note": "“{note}”",
+  "quests_recent": "Recenti",
+  "quests_save": "Crea missione",
+  "quests_saving": "Creazione…",
+  "quests_sub": "obiettivi dalla tua storia · qui non si può fallire",
+  "quests_title": "Missioni",
+  "quests_window_month": "questo mese",
+  "quests_window_week": "questa settimana",
+  "rarity_common": "comune",
+  "rarity_cursed": "maledetto",
+  "rarity_epic": "epico",
+  "rarity_legendary": "leggendario",
+  "rarity_rare": "raro",
+  "rarity_uncommon": "non comune",
+  "recap_achievements": "Obiettivi",
+  "recap_chests": "forzieri",
+  "recap_copied": "Copiato",
+  "recap_copy": "Copia il riepilogo",
+  "recap_copy_error": "Questo browser non ha lasciato usare gli appunti a Loot.",
+  "recap_copy_title": "Copia questo riepilogo come testo semplice",
+  "recap_country_title": "{country} · {day}",
+  "recap_delta_line": "{sign}{pct} · {unit} precedente {previous}",
+  "recap_drops": "drop",
+  "recap_empty": "Niente è arrivato in {period}. Loot non ha opinioni al riguardo: {unit} senza numeri dentro, tutto qui. Scegline un altro dalla lista qui sopra.",
+  "recap_first_with_revenue": "{unit} d'esordio con ricavi",
+  "recap_footer_era_changed": "{from} → {to} · livello {levelFrom} → {levelTo}",
+  "recap_footer_era_same": "Era {era} · livello {level}",
+  "recap_highlight_best_day": "Giorno migliore il {day}: {value}",
+  "recap_highlight_chests_opened": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=many": "{count} forzieri aperti",
+        "countPlural=one": "{count} forziere aperto",
+        "countPlural=other": "{count} forzieri aperti"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "recap_highlight_epic_drops": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=many": "{count} drop epici",
+        "countPlural=one": "{count} drop epico",
+        "countPlural=other": "{count} drop epici"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "recap_highlight_era_reached": "Raggiunta l'era {era}",
+  "recap_highlight_legendary_drops": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=many": "{count} drop leggendari",
+        "countPlural=one": "{count} drop leggendario",
+        "countPlural=other": "{count} drop leggendari"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "recap_highlight_level_up": "Livello {from} → {to}",
+  "recap_highlight_most_countries": [
+    {
+      "declarations": [
+        "input count",
+        "input day",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=many": "{count} nuovi paesi solo il {day}",
+        "countPlural=one": "{count} nuovo paese solo il {day}",
+        "countPlural=other": "{count} nuovi paesi solo il {day}"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "recap_highlight_mysteries_solved": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=many": "{count} misteri spiegati",
+        "countPlural=one": "{count} mistero spiegato",
+        "countPlural=other": "{count} misteri spiegati"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "recap_highlight_quests_completed": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=many": "{count} missioni completate",
+        "countPlural=one": "{count} missione completata",
+        "countPlural=other": "{count} missioni completate"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "recap_highlight_settled": "Insediato {flag} {country} il {day}",
+  "recap_highlight_settled_more": [
+    {
+      "declarations": [
+        "input count",
+        "input flag",
+        "input country",
+        "input day",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=many": "Insediato {flag} {country} il {day} (e altri {count} paesi)",
+        "countPlural=one": "Insediato {flag} {country} il {day} (e {count} paese in più)",
+        "countPlural=other": "Insediato {flag} {country} il {day} (e altri {count} paesi)"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "recap_highlight_top_country": "{flag} {country} è stato il tuo mercato più grande",
+  "recap_highlight_unlocked": "Sbloccato {title}",
+  "recap_highlight_unlocked_more": [
+    {
+      "declarations": [
+        "input count",
+        "input title",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=many": "Sbloccato {title} e altri {count} obiettivi",
+        "countPlural=one": "Sbloccato {title} e {count} altro obiettivo",
+        "countPlural=other": "Sbloccato {title} e altri {count} obiettivi"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "recap_installs": "installazioni",
+  "recap_new_settlements": "Nuovi insediamenti",
+  "recap_partial": "· finora",
+  "recap_refunds": "rimborsi",
+  "recap_revenue": "ricavi",
+  "recap_share_achievements": "Obiettivi: {titles}",
+  "recap_share_bullet": "• {line}",
+  "recap_share_drops": "Drop          {drops} · {xp} XP",
+  "recap_share_era": "Era           {from} → {to}",
+  "recap_share_header": "◆ Loot — {period}",
+  "recap_share_header_partial": "◆ Loot — {period} (finora)",
+  "recap_share_installs": "Installazioni {installs}",
+  "recap_share_level": "Livello       {level}",
+  "recap_share_level_up": "Livello       {from} → {to}",
+  "recap_share_revenue": "Ricavi        {amount}",
+  "recap_share_revenue_note": "Ricavi        {amount}  ({note})",
+  "recap_share_settled": "Insediati     {countries}",
+  "recap_share_units": "Unità         {units}",
+  "recap_share_units_refunds": "Unità         {units} · {refunds} rimborsi",
+  "recap_sub": "{unit} di bottino",
+  "recap_unit_month": "mese",
+  "recap_unit_year": "anno",
+  "recap_units": "unità",
+  "recap_xp": "XP",
+  "scope_all_apps": "Tutte le app",
+  "scope_all_apps_meta": "tutto quello che pubblichi",
+  "scope_elsewhere": "+{count} altrove",
+  "scope_elsewhere_title": "{count} drop arrivati per altre app",
+  "scope_events": "{count} eventi",
+  "scope_menu_label": "Ambito app",
+  "scope_title_all": "Mostro tutte le app",
+  "scope_title_scoped": "Mostro solo {app} — clicca per cambiare",
+  "scope_unmapped": "non mappata",
+  "spark_label": "{days} giorni fino al {day}, finisce a {value}",
+  "spark_no_history": "nessuno storico",
+  "spark_usual": "di solito {value}",
+  "stat_vs_prev": "vs prec.",
+  "tab_codex": "Codex",
+  "tab_feed": "Feed",
+  "tab_hearth": "Focolare",
+  "tab_quests": "Missioni",
+  "tab_vault": "Tesoro",
+  "tier_city": "città",
+  "tier_hamlet": "casale",
+  "tier_metropolis": "metropoli",
+  "tier_outpost": "avamposto",
+  "tier_town": "borgo",
+  "tier_village": "villaggio",
+  "time_days": "{count}g",
+  "time_hours": "{count}h",
+  "time_just_now": "proprio ora",
+  "time_minutes": "{count}m",
+  "time_seconds": "{count}s",
+  "vault_by_app": "Per app",
+  "vault_by_country": "Per paese",
+  "vault_by_source": "Per fonte",
+  "vault_chart_aria": "Ricavi e unità al giorno",
+  "vault_chart_hint": "in {code} · unità sotto",
+  "vault_chart_title": "Ricavi al giorno",
+  "vault_chart_units": "unità",
+  "vault_countries_note": "visti in questa finestra",
+  "vault_country_empty": "Nessun paese era associato al denaro di questa finestra.",
+  "vault_empty_body": "Nei ricavi contano solo {ledger}: denaro liquidato dai rendiconti finanziari degli store. Per iniziare a riempire il tesoro, configura {stores} nel tuo {file}, poi lascia che un giorno si chiuda.",
+  "vault_empty_fine": "I webhook RevenueCat arrivano comunque nel feed all'istante, ma i loro importi sono {sightings} al lordo di tasse e commissioni dello store: compaiono nel riquadro qui sopra e non vengono mai sommati ai ricavi. Vedi {vault} e {chest} per la regola completa.",
+  "vault_empty_fine_chest": "il forziere quotidiano",
+  "vault_empty_fine_sightings": "avvistamenti",
+  "vault_empty_fine_vault": "il tesoro",
+  "vault_empty_ledger_rows": "righe contabili",
+  "vault_empty_stores": "App Store Connect e Google Play",
+  "vault_empty_title": "Nessun denaro contabilizzato in questa finestra.",
+  "vault_loading": "Conto le monete…",
+  "vault_no_app": "(nessuna app)",
+  "vault_other_countries": "altri paesi",
+  "vault_range_label": "Intervallo di tempo",
+  "vault_sighted_note": "{count} acquisti · stima, non ricavi contabilizzati",
+  "vault_subs_as_of": "al {date}",
+  "vault_subs_none": "nessuna fonte riporta abbonamenti",
+  "vault_tile_active_subs": "Abbonamenti attivi",
+  "vault_tile_countries": "Paesi",
+  "vault_tile_refunds": "Rimborsi",
+  "vault_tile_revenue": "Ricavi",
+  "vault_tile_sighted": "Avvistati oggi (RevenueCat)",
+  "vault_tile_units": "Unità",
+  "vault_tip_units": "{count} unità",
+  "vault_title": "Tesoro",
+  "vault_unknown_country": "sconosciuto",
+  "vessel_appstore": "Il Clipper di Cupertino",
+  "vessel_flathub": "Il Cargo di Flathub",
+  "vessel_generic": "Il Vascello di {source}",
+  "vessel_github": "Il Rompighiaccio Octocat",
+  "vessel_googleplay": "Il Peschereccio Play",
+  "vessel_microsoftstore": "La Chiatta di Redmond",
+  "vessel_revenuecat": "Il Cutter di RevenueCat",
+  "vessel_snapcraft": "Snapcraft Binario Nove",
+  "vessel_why": "da qualche parte in mare — {source} non dice da che paese vengono i suoi utenti"
+}

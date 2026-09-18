@@ -17,6 +17,7 @@ import (
 	"sort"
 	"strings"
 	"text/template"
+	"unicode"
 	"unicode/utf8"
 )
 
@@ -291,7 +292,10 @@ func (v *Validator) checkGlossary(english, translated Value, warn func(string, .
 	enText := strings.Join(english.Patterns(), " ")
 	trText := strings.Join(translated.Patterns(), " ")
 	for _, term := range v.Glossary.Pinned(v.Locale) {
-		if !containsWord(enText, term.Term) {
+		// A capitalised term is a name — "Loot" — and only the name counts:
+		// "no loot yet" is the common noun, and a translation of it that
+		// does not say "Loot" is exactly right.
+		if !containsWord(enText, term.Term, isCapitalised(term.Term)) {
 			continue
 		}
 		want := term.Translations[v.Locale]
@@ -410,11 +414,23 @@ func actions(s string) []string {
 	return out
 }
 
+// isCapitalised reports whether s starts with an upper-case letter.
+func isCapitalised(s string) bool {
+	for _, r := range s {
+		return unicode.IsUpper(r)
+	}
+	return false
+}
+
 // containsWord reports whether text contains term as a whole word, ignoring
-// case. It is deliberately simple: the glossary holds single English nouns.
-func containsWord(text, term string) bool {
-	lt := strings.ToLower(text)
-	lterm := strings.ToLower(term)
+// case unless matchCase is set. It is deliberately simple: the glossary holds
+// single English nouns.
+func containsWord(text, term string, matchCase bool) bool {
+	lt, lterm := text, term
+	if !matchCase {
+		lt = strings.ToLower(text)
+		lterm = strings.ToLower(term)
+	}
 	for i := 0; ; {
 		j := strings.Index(lt[i:], lterm)
 		if j < 0 {

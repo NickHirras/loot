@@ -1,0 +1,1051 @@
+{
+  "$schema": "https://inlang.com/schema/inlang-message-format",
+  "ach_backfilled": "소급 기록",
+  "ach_backfilled_title": "Loot가 지켜보기 전에 달성했어요. 실제 그날로 기록했어요",
+  "ach_cartographer_desc": "사람이 사는 모든 대륙에 정착지를 세웠어요.",
+  "ach_cartographer_title": "지도 제작자",
+  "ach_cursed_but_unbowed_desc": "저주 드롭이 뜨고, 같은 날 안에 희귀 이상이 떴어요. 분위기가 뒤집혔어요.",
+  "ach_cursed_but_unbowed_title": "저주에도 굴하지 않고",
+  "ach_era_city_desc": "도시 시대에 도달하기.",
+  "ach_era_city_title": "도시",
+  "ach_era_empire_desc": "제국 시대에 도달하기.",
+  "ach_era_empire_title": "제국",
+  "ach_era_kingdom_desc": "왕국 시대에 도달하기.",
+  "ach_era_kingdom_title": "왕국",
+  "ach_era_town_desc": "소도시 시대에 도달하기.",
+  "ach_era_town_title": "소도시",
+  "ach_first_blood_desc": "첫 드롭이에요. Loot에 전할 소식이 처음 생긴 순간이에요.",
+  "ach_first_blood_title": "퍼스트 블러드",
+  "ach_first_sale_desc": "스토어 정산 보고서에 처음으로 잡힌 판매예요.",
+  "ach_first_sale_title": "첫 판매",
+  "ach_first_subscriber_desc": "누군가 계속 결제하기로 했어요.",
+  "ach_first_subscriber_title": "첫 구독자",
+  "ach_hoarder_1_desc": "일일 상자 10개 열기.",
+  "ach_hoarder_1_title": "수집가",
+  "ach_hoarder_2_desc": "일일 상자 50개 열기.",
+  "ach_hoarder_2_title": "대수집가",
+  "ach_hoarder_3_desc": "일일 상자 200개 열기.",
+  "ach_hoarder_3_title": "용의 수집가",
+  "ach_installs_100k_desc": "누적 설치 100,000회.",
+  "ach_installs_100k_title": "어디에나",
+  "ach_installs_10k_desc": "누적 설치 10,000회.",
+  "ach_installs_10k_title": "널리 퍼지는 중",
+  "ach_installs_1k_desc": "누적 설치 1,000회.",
+  "ach_installs_1k_title": "입소문",
+  "ach_legendary_hunter_desc": "첫 전설 드롭이에요.",
+  "ach_legendary_hunter_title": "전설 사냥꾼",
+  "ach_merchant_2_desc": "서로 다른 스토어 2곳에서 장부 매출 올리기.",
+  "ach_merchant_2_title": "두 세계",
+  "ach_merchant_3_desc": "서로 다른 스토어 3곳에서 장부 매출 올리기.",
+  "ach_merchant_3_title": "세 세계",
+  "ach_merchant_5_desc": "서로 다른 스토어 5곳에서 장부 매출 올리기.",
+  "ach_merchant_5_title": "만국의 상인",
+  "ach_mysteries_10_desc": "미스터리 10개 설명하기.",
+  "ach_mysteries_10_title": "연구 노트",
+  "ach_mysteries_1_desc": "미스터리 하나 설명하기.",
+  "ach_mysteries_1_title": "탐정",
+  "ach_not_yet": "아직",
+  "ach_polyglot_1_desc": "서로 다른 통화 5종으로 수익 받기.",
+  "ach_polyglot_1_title": "폴리글롯",
+  "ach_polyglot_2_desc": "서로 다른 통화 10종으로 수익 받기.",
+  "ach_polyglot_2_title": "환전상",
+  "ach_progress": "{value} / {target}",
+  "ach_progress_unit": "{value} / {target} {unit}",
+  "ach_quests_10_desc": "퀘스트 10개 완료하기.",
+  "ach_quests_10_title": "모험가",
+  "ach_quests_1_desc": "퀘스트 하나 완료하기.",
+  "ach_quests_1_title": "모험의 시작",
+  "ach_quests_50_desc": "퀘스트 50개 완료하기.",
+  "ach_quests_50_title": "왕국의 영웅",
+  "ach_record_1_desc": "이전의 모든 날을 넘어선 하루예요.",
+  "ach_record_1_title": "역대 최고의 날",
+  "ach_record_25_desc": "기록 경신일 25일.",
+  "ach_record_25_title": "역대 최고의 날 ×25",
+  "ach_record_5_desc": "이전 기록을 모두 넘어선 날이 다섯 번이에요.",
+  "ach_record_5_title": "역대 최고의 날 ×5",
+  "ach_revenue_100_desc": "누적 매출 $100.",
+  "ach_revenue_100_title": "첫 백 달러",
+  "ach_revenue_100k_desc": "누적 매출 $100,000.",
+  "ach_revenue_100k_title": "여섯 자릿수",
+  "ach_revenue_10k_desc": "누적 매출 $10,000.",
+  "ach_revenue_10k_title": "다섯 자릿수",
+  "ach_revenue_1k_desc": "누적 매출 $1,000.",
+  "ach_revenue_1k_title": "네 자릿수",
+  "ach_settler_1_desc": "5개국에 고객이 생겼어요.",
+  "ach_settler_1_title": "정착민 I",
+  "ach_settler_2_desc": "10개국에 고객이 생겼어요.",
+  "ach_settler_2_title": "정착민 II",
+  "ach_settler_3_desc": "25개국에 고객이 생겼어요.",
+  "ach_settler_3_title": "정착민 III",
+  "ach_settler_4_desc": "50개국에 고객이 생겼어요.",
+  "ach_settler_4_title": "정착민 IV",
+  "ach_stars_1000_desc": "GitHub 스타 1,000개.",
+  "ach_stars_1000_title": "은하",
+  "ach_stars_100_desc": "GitHub 스타 100개.",
+  "ach_stars_100_title": "별자리",
+  "ach_stars_10_desc": "GitHub 스타 10개.",
+  "ach_stars_10_title": "별 관측자",
+  "ach_steady_30_desc": "30일 연속 장부 매출.",
+  "ach_steady_30_title": "순항 중",
+  "ach_steady_7_desc": "7일 연속 장부 매출.",
+  "ach_steady_7_title": "꾸준히",
+  "ach_subscribers_1000_desc": "활성 구독자 1,000명.",
+  "ach_subscribers_1000_title": "하나의 물결",
+  "ach_subscribers_100_desc": "활성 구독자 100명.",
+  "ach_subscribers_100_title": "따르는 무리",
+  "ach_subscribers_10_desc": "활성 구독자 10명.",
+  "ach_subscribers_10_title": "작은 모임",
+  "ach_tier_bronze": "브론즈",
+  "ach_tier_gold": "골드",
+  "ach_tier_legendary": "전설",
+  "ach_tier_silver": "실버",
+  "ach_tier_title": "{tier} · {xp} XP짜리 {rarity} 드롭 지급",
+  "ach_unit_chests": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "상자"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_continents": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "대륙"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_countries": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "국가"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_currencies": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "통화"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_days": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "일"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_installs": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "설치"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_mysteries": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "미스터리"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_quests": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "퀘스트"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_record_days": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "기록 경신일"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_revenue": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "매출"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_stars": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "스타"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_stores": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "스토어"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_subscribers": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "구독자"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_units": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "수량"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_xp": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "XP"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_units_100_desc": "누적 유료 판매 100개.",
+  "ach_units_100_title": "백 개 판매",
+  "ach_units_100k_desc": "누적 유료 판매 100,000개.",
+  "ach_units_100k_title": "십만 개 판매",
+  "ach_units_10k_desc": "누적 유료 판매 10,000개.",
+  "ach_units_10k_title": "만 개 판매",
+  "ach_units_1k_desc": "누적 유료 판매 1,000개.",
+  "ach_units_1k_title": "천 개 판매",
+  "app_enable_sounds": "클릭해서 드롭 사운드 켜기",
+  "app_enable_sounds_dismiss": "괜찮아요",
+  "app_footer_mute_hint": "{key} 키로 음소거",
+  "app_footer_tagline": "Loot · 인디 개발자를 위한 셀프호스팅 전리품 추적기",
+  "boss_anr": "ANR",
+  "boss_appeared": "등장",
+  "boss_confirm": "고쳤나요?",
+  "boss_days": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "{count}일"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "boss_down_pct": "등장 이후 −{pct}",
+  "boss_enraged": "격노",
+  "boss_enraged_line": "등장했을 때보다 강해졌어요",
+  "boss_enraged_title": "나아지기 전에 더 나빠졌어요",
+  "boss_faded": "{days} 뒤 사라짐 — 소스가 보고를 멈췄어요",
+  "boss_fighting_for": "교전 기간",
+  "boss_holding": "전력 그대로 버티는 중",
+  "boss_hp_aria": "{name} 체력",
+  "boss_lasted": "지속 기간",
+  "boss_mark_slain": "처치로 표시",
+  "boss_not_yet": "아직이에요",
+  "boss_open_issue": "이슈 열기 ↗",
+  "boss_people_hit": "영향받은 사용자",
+  "boss_slain": "{days} 만에 처치",
+  "boss_slain_xp": "{days} 만에 처치 · +{xp} XP",
+  "boss_slay_yes": "네, 처치할게요",
+  "boss_slaying": "마지막 일격…",
+  "boss_title_anrs": "ANR",
+  "boss_title_anrs_in": "{version}의 ANR",
+  "boss_title_crashes": "크래시",
+  "boss_title_crashes_in": "{version}의 크래시",
+  "boss_unit_crashes": "크래시",
+  "boss_unit_users": "사용자",
+  "breakdown_empty": "아직 아무것도 없어요.",
+  "breakdown_units": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural",
+        "local countFmt = count: number maximumFractionDigits=0"
+      ],
+      "match": {
+        "countPlural=other": "{countFmt}개"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "chest_all_already_open": "그 상자들은 이미 열려 있어요.",
+  "chest_already_open": "그 상자는 이미 열려 있어요.",
+  "chest_best": "최고 · {rarity}",
+  "chest_bulk_every": "모든 상자",
+  "chest_bulk_label": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "상자 {count}개 · {span}"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "chest_cell_title": "{title} · +{xp} XP",
+  "chest_close": "닫기",
+  "chest_dot_title": "{rarity} {count}개",
+  "chest_haul_xp": "+{xp} XP",
+  "chest_more_below": "아래에 {count}개 더",
+  "chest_nice": "좋아요.",
+  "chest_nothing_waiting": "기다리는 게 없어요. 하루치 스토어 판매가 상자 하나로 도착해요.",
+  "chest_of_date": "{date} 상자",
+  "chest_open": "열기",
+  "chest_open_all": "전부 열기 · 상자 {count}개",
+  "chest_open_all_sub": "드롭 {count}개를 한 번에",
+  "chest_open_oldest": "가장 오래된 상자 열기",
+  "chest_opening": "{what} 여는 중…",
+  "chest_opening_all": "모든 상자를 여는 중…",
+  "chest_progress": "{revealed} / {total}",
+  "chest_progress_drops": "드롭 {revealed} / {total}",
+  "chest_row_drops": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "드롭 {count}개"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "chest_row_xp": "+{xp} XP",
+  "chest_skip": "건너뛰기",
+  "chest_the_chest": "상자",
+  "chest_title": "일일 상자",
+  "chest_waiting": [
+    {
+      "declarations": [
+        "input drops",
+        "input chests",
+        "local dropsPlural = drops: plural",
+        "local chestsPlural = chests: plural",
+        "local dropsFmt = drops: number maximumFractionDigits=0"
+      ],
+      "match": {
+        "dropsPlural=other, chestsPlural=other": "상자 {chests}개에 드롭 {dropsFmt}개가 기다리고 있어요."
+      },
+      "selectors": [
+        "dropsPlural",
+        "chestsPlural"
+      ]
+    }
+  ],
+  "codex_counter_title": "업적 {total}개 중 {unlocked}개 달성",
+  "codex_days": "{count}일",
+  "codex_filter_all": "전체",
+  "codex_filter_empty": "이 필터로는 보여줄 게 없어요.",
+  "codex_filter_label": "업적 필터",
+  "codex_filter_locked": "미달성",
+  "codex_filter_unlocked": "달성",
+  "codex_loading": "도감을 여는 중…",
+  "codex_recap_loading": "정리하는 중…",
+  "codex_recap_period_label": "요약 기간",
+  "codex_record_best_day_source": "최고의 날 · {source}",
+  "codex_record_best_install_day": "최고 설치일",
+  "codex_record_best_revenue_day": "최고 매출일",
+  "codex_record_best_units_day": "최고 판매일",
+  "codex_record_biggest_drop": "가장 큰 단일 드롭",
+  "codex_record_biggest_drop_note": "{title} · {day}",
+  "codex_record_first_event": "최초의 이벤트",
+  "codex_record_first_event_note": "기록 {count}일치",
+  "codex_record_longest_run": "최장 연속 수익일",
+  "codex_record_longest_run_note": "{day}에 끝남",
+  "codex_record_most_countries_day": "하루 최다 정착 국가",
+  "codex_record_most_drops_day": "하루 최다 드롭",
+  "codex_record_most_xp_day": "하루 최다 XP",
+  "codex_records": "기록",
+  "codex_records_empty": "아직 기록이 없어요. 이전 날을 처음으로 넘어서는 날에 생겨요.",
+  "codex_records_lede": "저장하지 않고 매번 새로 계산해요. 그래서 보고서가 정정되면 낡은 기록이 남는 대신 기록이 갱신되고, 기록은 오르기만 해요.",
+  "codex_season_recap": "시즌 요약",
+  "codex_sub": "지금까지 일어난 모든 일 · 트로피는 사라지지 않아요",
+  "codex_this_year": "올해",
+  "codex_title": "도감",
+  "codex_total_chests_opened": "열어 본 상자",
+  "codex_total_continents": "6개 대륙 중 {count}개",
+  "codex_total_countries_settled": "정착 국가",
+  "codex_total_currencies": "받은 통화",
+  "codex_total_drops": "드롭",
+  "codex_total_era": "{era} 시대",
+  "codex_total_github_stars": "GitHub 스타",
+  "codex_total_installs": "설치",
+  "codex_total_lifetime_revenue": "누적 매출",
+  "codex_total_mysteries": "설명한 미스터리",
+  "codex_total_quests_completed": "완료한 퀘스트",
+  "codex_total_record_days": "기록 경신일",
+  "codex_total_refunded": "환불 {count}건",
+  "codex_total_units_sold": "판매 수량",
+  "codex_total_xp": "XP",
+  "codex_trophy_lede": "업적은 달성만 돼요. 여기 있는 건 닳거나 만료되거나 회수되지 않아요. 끝난 연속 기록도 있었던 일이에요. 달성할 때마다 실제 드롭을 줘요. 브론즈는 고급, 실버는 희귀, 골드는 영웅, 전설은 전설 드롭이에요.",
+  "codex_trophy_wall": "트로피 벽",
+  "codex_xp": "{xp} XP",
+  "delta_new": "신규",
+  "dev_clear_country": "국가 지우기",
+  "dev_country_aria": "가짜 드롭의 국가 코드",
+  "dev_country_placeholder": "국가 (선택)",
+  "dev_fake_chest": "가짜 상자 (드롭 5개)",
+  "dev_fake_sales_day": "가짜 판매일 (EUR 250)",
+  "dev_hint": "실제 파이프라인으로 합성 드롭을 쏴 봐요.",
+  "dev_random_country": "무작위 국가 고르기",
+  "dev_toggle": "dev",
+  "drop_aria_label": "{rarity} 드롭: {title}",
+  "drop_chest_title": "{date} 상자에서 나왔어요",
+  "drop_xp": "+{xp} XP",
+  "era_camp": "야영지",
+  "era_city": "도시",
+  "era_dynasty": "왕조",
+  "era_empire": "제국",
+  "era_kingdom": "왕국",
+  "era_town": "소도시",
+  "era_village": "마을",
+  "feed_empty_body": "RevenueCat 웹훅을 {hook}으로 보내거나, 설정에 Flathub 앱을 추가하거나, {dev}로 실행해 테스트 드롭을 쏴 봐요.",
+  "feed_empty_title": "아직 전리품이 없어요.",
+  "feed_end": "여기까지가 전부예요.",
+  "feed_label": "드롭 피드",
+  "feed_loading": "금고를 여는 중…",
+  "feed_loading_more": "더 깊이 파는 중…",
+  "globe_aboard": "승선 중",
+  "globe_aria_label": "판매한 모든 국가와 바다 위 선단을 보여주는 지구본",
+  "globe_drops": "드롭",
+  "globe_first_customer": "첫 고객",
+  "globe_new_settlement": "새 정착지",
+  "globe_population": "인구",
+  "globe_revenue": "매출",
+  "globe_sailing_since": "항해 시작",
+  "header_boss_fights_title": "보스전 {count}개 진행 중",
+  "header_chest_aria": "일일 상자 열기: 드롭 {count}개 대기 중",
+  "header_chest_title": "상자 {chests}개에 드롭 {drops}개 대기 중",
+  "header_demo": "데모",
+  "header_demo_title": "합성 데이터 — 실제 스토어 연결은 README를 보세요",
+  "header_level": "LV {level}",
+  "header_live": "실시간",
+  "header_live_title": "실시간",
+  "header_mute": "드롭 사운드 음소거",
+  "header_muted": "음소거됨",
+  "header_nav_label": "섹션",
+  "header_no_sources": "소스 없음",
+  "header_no_sources_configured": "설정된 소스 없음",
+  "header_offline": "오프라인",
+  "header_open_mysteries_title": "미해결 미스터리 {count}개",
+  "header_rarity_title": "{rarity} 드롭 {count}개",
+  "header_reconnecting_title": "다시 연결하는 중…",
+  "header_scoped_to_title": "모든 패널이 {app} 기준이에요",
+  "header_sound": "사운드",
+  "header_source_webhook": "웹훅",
+  "header_sources_count": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "소스 {count}개"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "header_sources_in_error": "오류 {count}개",
+  "header_status_error": "오류",
+  "header_status_listening": "수신 대기",
+  "header_status_ok": "정상",
+  "header_status_waiting": "대기 중",
+  "header_unmute": "드롭 사운드 음소거 해제",
+  "header_xp_sub": [
+    {
+      "declarations": [
+        "input countries",
+        "local countriesPlural = countries: plural"
+      ],
+      "match": {
+        "countriesPlural=other": "드롭 {drops}개 · {countries}개국"
+      },
+      "selectors": [
+        "countriesPlural"
+      ]
+    }
+  ],
+  "header_xp_total": "{xp} XP",
+  "hearth_ambient": "앰비언트",
+  "hearth_ambient_label": "화로, 앰비언트",
+  "hearth_ambient_leave": "앰비언트 모드 종료 (Esc)",
+  "hearth_ambient_mute": "음소거",
+  "hearth_ambient_unmute": "음소거 해제",
+  "hearth_arrivals": "최근 도착",
+  "hearth_arrivals_empty": "아직 국가가 붙은 드롭이 없어요.",
+  "hearth_capital": "수도 {flag} {name}",
+  "hearth_civilization": "문명",
+  "hearth_era_to_next": "{era}까지 {xp} XP",
+  "hearth_era_to_next_short": "{era}까지 {xp}",
+  "hearth_era_top": "맨 꼭대기예요. 더 될 것이 없어요.",
+  "hearth_fleet": "선단",
+  "hearth_fleet_fine": "스토어가 어디 사람인지 알려주지 않는 이들이에요. 그래서 바다 위에 있어요.",
+  "hearth_hint_pointer": "드래그로 회전 · 스크롤로 확대 · 더블 클릭으로 중앙 정렬",
+  "hearth_hint_touch": "드래그로 회전 · 마커 탭 · 더블 탭으로 중앙 정렬",
+  "hearth_loading": "불을 피우는 중…",
+  "hearth_population": "인구",
+  "hearth_revenue": "매출",
+  "hearth_settlements": "정착지",
+  "hearth_settlements_empty": "아직 어느 나라도 구매하지 않았어요. 지구본이 어두워요.",
+  "hearth_ticker_empty": "세상이 깨어나길 기다리는 중…",
+  "hearth_title": "화로",
+  "hearth_xp": "{xp} XP",
+  "metric_drops": "드롭",
+  "metric_installs": "설치",
+  "metric_revenue": "매출",
+  "metric_settlements": "새 국가",
+  "metric_stars": "스타",
+  "metric_subscribers": "구독자",
+  "metric_units": "판매 수량",
+  "metric_xp": "XP",
+  "mystery_day": "{weekday} {date}",
+  "mystery_dismiss": "넘기기",
+  "mystery_expected": "예상",
+  "mystery_kind_dip": "하락",
+  "mystery_kind_new_country_cluster": "새 국가",
+  "mystery_kind_record": "기록",
+  "mystery_kind_refund_spike": "환불",
+  "mystery_kind_silence": "침묵",
+  "mystery_kind_spike": "급증",
+  "mystery_note_aria": "{title}에 대한 설명",
+  "mystery_note_placeholder": "무슨 일이 있었던 것 같나요?",
+  "mystery_observed": "관측",
+  "mystery_phrase_appeared": "갑자기 등장",
+  "mystery_phrase_changed": "변화",
+  "mystery_phrase_doubled": "두 배 증가",
+  "mystery_phrase_dropped": "{pct}% 하락",
+  "mystery_phrase_held_still": "변동 없음",
+  "mystery_phrase_jumped": "{pct}% 급증",
+  "mystery_phrase_quadrupled": "네 배 증가",
+  "mystery_phrase_tripled": "세 배 증가",
+  "mystery_ratio": "비율",
+  "mystery_series_cancellations": "해지",
+  "mystery_series_installs": "설치",
+  "mystery_series_refunds": "환불",
+  "mystery_series_revenue": "매출",
+  "mystery_series_units": "판매 수량",
+  "mystery_solve": "설명하기",
+  "mystery_title_dip": "{day} {source} {series} {phrase}",
+  "mystery_title_new_country_cluster": [
+    {
+      "declarations": [
+        "input count",
+        "input countText",
+        "input day",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "{day}에 새 국가 {countText}곳 정착 — 무슨 일이 있었나요?"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "mystery_title_plain": "{day} {source} {series}",
+  "mystery_title_record": "기록 경신: {day} {source} {series} {value}",
+  "mystery_title_refund_spike": "{day} {source} 환불 {count}건 — 평소 {usual}건",
+  "mystery_title_silence": "{day} 이후 {source}가 조용해요",
+  "mystery_title_spike": "{day} {source} {series} {phrase} — 왜일까요?",
+  "mystery_why_measured": "{days}일 중앙값 {expected} 대비 {observed} (z {z})",
+  "mystery_why_new_country_cluster": [
+    {
+      "declarations": [
+        "input count",
+        "input countText",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "같은 날 {countText}개국이 처음으로 구매했어요"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "mystery_why_record": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "지난 {count}일 중 어느 날보다 높아요"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "mystery_why_refund_spike": "평소 {usual}건인데 환불이 {count}건이에요",
+  "mystery_why_silence": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "지난 7일 중 {reported}일은 보고했는데, 완료된 {count}일 동안 데이터가 하나도 없어요"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "mystery_why_silence_lag": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "지난 7일 중 {reported}일은 보고했는데, 완료된 {count}일 동안 데이터가 하나도 없어요 — 이 스토어의 {lag}일 정산 지연을 이미 감안한 거예요"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "quest_auto_installs_week": "설치: 지난주 넘기 · {target}",
+  "quest_auto_revenue_month": "지난달 매출 넘기 · {target}",
+  "quest_auto_revenue_week": "지난주 매출 넘기 · {target}",
+  "quest_auto_settlements_month": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "이번 달에 새 국가 {count}곳 정착하기"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "quest_auto_stars_week": "지난주 스타 넘기 · {target}",
+  "quest_auto_units_week": "판매: 지난주 넘기 · {target}",
+  "quest_auto_xp_week": "이번 주에 {target} XP 벌기",
+  "quest_completed": "완료",
+  "quest_completed_xp": "완료 · +{xp} XP",
+  "quest_custom": "직접 설정",
+  "quest_days_left": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "{count}일 남음"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "quest_ended": "종료 · {pct}",
+  "quest_error_bad_window_json": "window 값은 \"week\", \"month\" 또는 \\{\"start\":\"…\",\"end\":\"…\"\\} 여야 해요",
+  "quest_error_custom_only": "직접 만든 퀘스트만 삭제할 수 있어요",
+  "quest_error_not_found": "그런 퀘스트가 없어요",
+  "quest_error_quests_disabled": "퀘스트가 켜져 있지 않아요",
+  "quest_error_target_positive": "목표는 0보다 커야 해요",
+  "quest_error_unknown_metric": "알 수 없는 지표 \"{value}\"",
+  "quest_error_unknown_window": "알 수 없는 기간 \"{value}\" (week, month 또는 날짜를 직접 지정하세요)",
+  "quest_error_window_end_format": "기간 종료일은 YYYY-MM-DD 형식이어야 해요",
+  "quest_error_window_order": "기간 종료일이 시작일보다 빨라요",
+  "quest_error_window_start_format": "기간 시작일은 YYYY-MM-DD 형식이어야 해요",
+  "quest_last_day": "마지막 날",
+  "quest_remove_aria": "{title} 퀘스트 삭제",
+  "quest_remove_title": "이 퀘스트 삭제",
+  "quest_window_days": "{count}일",
+  "quest_window_month": "이번 달",
+  "quest_window_week": "이번 주",
+  "quests_active": "진행 중",
+  "quests_active_empty": "진행 중인 게 없어요. Loot가 내 기록을 보고 한 주치 퀘스트를 써 줘요. 데이터가 있는 한 주면 충분해요. {newQuest}로 직접 만들 수도 있어요.",
+  "quests_boss_empty": "보스가 없어요. 왕국은 평화로워요. 크래시 소스를 Loot에 연결하면 — Android vitals, Sentry, 또는 {hook}으로 POST할 수 있는 무엇이든 — 다음 크래시 급증이 체력 바를 단 괴물이 돼요. {docs}를 보세요.",
+  "quests_boss_fights": "보스전",
+  "quests_boss_lede": "자기 기준선에서 벗어난 크래시 무리에 이름과 체력 바를 붙인 거예요. HP는 가장 최근 완료된 날의 수치라, 수정 버전을 내보내면 체력이 줄고 처치하면 영웅 드롭을 줘요. 여기서는 실패란 없어요. 아직 서 있는 보스는 그냥 아직 서 있는 것뿐이에요.",
+  "quests_boss_recent": "이겼거나 자취를 감춘 보스",
+  "quests_cancel": "취소",
+  "quests_every_app": "모든 앱",
+  "quests_every_source": "모든 소스",
+  "quests_form_app": "앱",
+  "quests_form_metric": "지표",
+  "quests_form_optional": "선택",
+  "quests_form_source": "소스",
+  "quests_form_target": "목표",
+  "quests_form_target_error": "0보다 큰 목표를 넣어 주세요.",
+  "quests_form_title": "제목",
+  "quests_form_title_placeholder": "지난주 매출 넘기",
+  "quests_form_window": "기간",
+  "quests_loading": "게시판을 읽는 중…",
+  "quests_mysteries": "미스터리",
+  "quests_mysteries_empty": "설명되지 않은 게 없어요. Loot는 매시간 지난 2주를 다시 읽고, 자기 28일 기준선에서 벗어난 날만 표시해요.",
+  "quests_mysteries_lede": "주변 날들로는 설명되지 않는 일이 일어난 날이에요. 선택 과제예요. 무슨 일이 있었다고 생각하는지 적으면 풀린 거고, 드롭을 받고, 숫자를 실제로 움직이는 게 무엇인지 적힌 노트가 남아요.",
+  "quests_new": "+ 새 퀘스트",
+  "quests_notebook": "노트",
+  "quests_notebook_dismissed": "메모 없이 넘김",
+  "quests_notebook_note": "“{note}”",
+  "quests_recent": "최근",
+  "quests_save": "퀘스트 등록",
+  "quests_saving": "등록하는 중…",
+  "quests_sub": "내 기록에서 뽑은 목표 · 여기서는 실패란 없어요",
+  "quests_title": "퀘스트",
+  "quests_window_month": "이번 달",
+  "quests_window_week": "이번 주",
+  "rarity_common": "일반",
+  "rarity_cursed": "저주",
+  "rarity_epic": "영웅",
+  "rarity_legendary": "전설",
+  "rarity_rare": "희귀",
+  "rarity_uncommon": "고급",
+  "recap_achievements": "업적",
+  "recap_chests": "상자",
+  "recap_copied": "복사됨",
+  "recap_copy": "요약 복사",
+  "recap_copy_error": "이 브라우저가 Loot의 클립보드 사용을 막았어요.",
+  "recap_copy_title": "이 요약을 일반 텍스트로 복사",
+  "recap_country_title": "{country} · {day}",
+  "recap_delta_line": "{sign}{pct} · 이전 {unit}에는 {previous}",
+  "recap_drops": "드롭",
+  "recap_empty": "{period}에는 아무것도 도착하지 않았어요. Loot는 그것에 대해 아무 말도 하지 않아요. 숫자가 없는 {unit}일 뿐이에요. 위 목록에서 다른 걸 골라 보세요.",
+  "recap_first_with_revenue": "매출이 있은 첫 {unit}",
+  "recap_footer_era_changed": "{from} → {to} · 레벨 {levelFrom} → {levelTo}",
+  "recap_footer_era_same": "{era} 시대 · 레벨 {level}",
+  "recap_highlight_best_day": "최고의 날 {day}: {value}",
+  "recap_highlight_chests_opened": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "상자 {count}개 열었어요"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "recap_highlight_epic_drops": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "영웅 드롭 {count}개"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "recap_highlight_era_reached": "{era} 시대에 도달했어요",
+  "recap_highlight_legendary_drops": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "전설 드롭 {count}개"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "recap_highlight_level_up": "레벨 {from} → {to}",
+  "recap_highlight_most_countries": [
+    {
+      "declarations": [
+        "input count",
+        "input day",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "{day} 하루에만 새 국가 {count}곳"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "recap_highlight_mysteries_solved": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "미스터리 {count}개를 설명했어요"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "recap_highlight_quests_completed": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "퀘스트 {count}개를 완료했어요"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "recap_highlight_settled": "{day}에 {flag} {country} 정착",
+  "recap_highlight_settled_more": [
+    {
+      "declarations": [
+        "input count",
+        "input flag",
+        "input country",
+        "input day",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "{day}에 {flag} {country} 정착 (외 {count}개국)"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "recap_highlight_top_country": "가장 큰 시장은 {flag} {country}였어요",
+  "recap_highlight_unlocked": "{title} 달성",
+  "recap_highlight_unlocked_more": [
+    {
+      "declarations": [
+        "input count",
+        "input title",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=other": "{title} 외 업적 {count}개 달성"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "recap_installs": "설치",
+  "recap_new_settlements": "새 정착지",
+  "recap_partial": "· 현재까지",
+  "recap_refunds": "환불",
+  "recap_revenue": "매출",
+  "recap_share_achievements": "업적: {titles}",
+  "recap_share_bullet": "• {line}",
+  "recap_share_drops": "드롭    {drops} · {xp} XP",
+  "recap_share_era": "시대    {from} → {to}",
+  "recap_share_header": "◆ Loot — {period}",
+  "recap_share_header_partial": "◆ Loot — {period} (현재까지)",
+  "recap_share_installs": "설치    {installs}",
+  "recap_share_level": "레벨    {level}",
+  "recap_share_level_up": "레벨    {from} → {to}",
+  "recap_share_revenue": "매출    {amount}",
+  "recap_share_revenue_note": "매출    {amount}  ({note})",
+  "recap_share_settled": "정착    {countries}",
+  "recap_share_units": "판매    {units}",
+  "recap_share_units_refunds": "판매    {units} · 환불 {refunds}건",
+  "recap_sub": "전리품으로 본 한 {unit}",
+  "recap_unit_month": "달",
+  "recap_unit_year": "해",
+  "recap_units": "판매 수량",
+  "recap_xp": "XP",
+  "scope_all_apps": "모든 앱",
+  "scope_all_apps_meta": "출시한 모든 것",
+  "scope_elsewhere": "다른 곳 +{count}",
+  "scope_elsewhere_title": "다른 앱에 드롭 {count}개가 도착했어요",
+  "scope_events": "이벤트 {count}개",
+  "scope_menu_label": "앱 범위",
+  "scope_title_all": "모든 앱 표시 중",
+  "scope_title_scoped": "{app}만 표시 중 — 클릭해서 변경",
+  "scope_unmapped": "미매핑",
+  "spark_label": "{day}까지 {days}일, 마지막 값 {value}",
+  "spark_no_history": "기록 없음",
+  "spark_usual": "평소 {value}",
+  "stat_vs_prev": "이전 대비",
+  "tab_codex": "도감",
+  "tab_feed": "피드",
+  "tab_hearth": "화로",
+  "tab_quests": "퀘스트",
+  "tab_vault": "금고",
+  "tier_city": "도시",
+  "tier_hamlet": "작은 마을",
+  "tier_metropolis": "대도시",
+  "tier_outpost": "전초기지",
+  "tier_town": "소도시",
+  "tier_village": "마을",
+  "time_days": "{count}일",
+  "time_hours": "{count}시간",
+  "time_just_now": "방금",
+  "time_minutes": "{count}분",
+  "time_seconds": "{count}초",
+  "vault_by_app": "앱별",
+  "vault_by_country": "국가별",
+  "vault_by_source": "소스별",
+  "vault_chart_aria": "일별 매출과 판매 수량",
+  "vault_chart_hint": "{code} 기준 · 아래는 수량",
+  "vault_chart_title": "일별 매출",
+  "vault_chart_units": "수량",
+  "vault_countries_note": "이 기간에 확인됨",
+  "vault_country_empty": "이 기간의 금액에는 국가가 붙어 있지 않아요.",
+  "vault_empty_body": "매출은 {ledger}만 세요. 스토어 정산 보고서에 잡힌 확정 금액이에요. 금고를 채우려면 {file}에 {stores}를 설정하고 하루가 정산되길 기다려요.",
+  "vault_empty_fine": "RevenueCat 웹훅은 여전히 피드에 바로 도착하지만, 그 금액은 세금과 스토어 수수료를 빼기 전의 {sightings}이에요. 위 타일에는 보이지만 매출에는 절대 더하지 않아요. 전체 규칙은 {vault}와 {chest}를 보세요.",
+  "vault_empty_fine_chest": "일일 상자",
+  "vault_empty_fine_sightings": "포착 기록",
+  "vault_empty_fine_vault": "금고",
+  "vault_empty_ledger_rows": "장부 항목",
+  "vault_empty_stores": "App Store Connect와 Google Play",
+  "vault_empty_title": "이 기간에는 장부 금액이 없어요.",
+  "vault_loading": "동전을 세는 중…",
+  "vault_no_app": "(앱 없음)",
+  "vault_other_countries": "기타 국가",
+  "vault_range_label": "기간",
+  "vault_sighted_note": "구매 {count}건 · 추정치, 장부 매출 아님",
+  "vault_subs_as_of": "{date} 기준",
+  "vault_subs_none": "구독을 보고하는 소스가 없어요",
+  "vault_tile_active_subs": "활성 구독",
+  "vault_tile_countries": "국가",
+  "vault_tile_refunds": "환불",
+  "vault_tile_revenue": "매출",
+  "vault_tile_sighted": "오늘 포착 (RevenueCat)",
+  "vault_tile_units": "판매 수량",
+  "vault_tip_units": "{count}개",
+  "vault_title": "금고",
+  "vault_unknown_country": "알 수 없음",
+  "vessel_appstore": "쿠퍼티노 쾌속선",
+  "vessel_flathub": "Flathub 화물선",
+  "vessel_generic": "{source} 선박",
+  "vessel_github": "옥토캣 쇄빙선",
+  "vessel_googleplay": "Play 저인망선",
+  "vessel_microsoftstore": "레드먼드 바지선",
+  "vessel_revenuecat": "RevenueCat 커터선",
+  "vessel_snapcraft": "Snapcraft 9번 승강장",
+  "vessel_why": "바다 어딘가에 있어요 — {source}는 사람들이 어느 나라 출신인지 알려주지 않아요"
+}

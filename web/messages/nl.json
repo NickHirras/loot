@@ -1,0 +1,1090 @@
+{
+  "$schema": "https://inlang.com/schema/inlang-message-format",
+  "ach_backfilled": "achteraf",
+  "ach_backfilled_title": "Verdiend voordat Loot meekeek; gedateerd op de dag zelf",
+  "ach_cartographer_desc": "Een nederzetting op elk bewoond continent.",
+  "ach_cartographer_title": "Cartograaf",
+  "ach_cursed_but_unbowed_desc": "Een vervloekte drop, en nog dezelfde dag iets zeldzaams of beter. Het keerde.",
+  "ach_cursed_but_unbowed_title": "Vervloekt maar ongebroken",
+  "ach_era_city_desc": "Bereik het tijdperk Stad.",
+  "ach_era_city_title": "Stad",
+  "ach_era_empire_desc": "Bereik het tijdperk Keizerrijk.",
+  "ach_era_empire_title": "Keizerrijk",
+  "ach_era_kingdom_desc": "Bereik het tijdperk Koninkrijk.",
+  "ach_era_kingdom_title": "Koninkrijk",
+  "ach_era_town_desc": "Bereik het tijdperk Stadje.",
+  "ach_era_town_title": "Stadje",
+  "ach_first_blood_desc": "Je allereerste drop — het moment dat Loot iets te melden had.",
+  "ach_first_blood_title": "Eerste bloed",
+  "ach_first_sale_desc": "De eerste verrekende verkoop in het financiële rapport van een store.",
+  "ach_first_sale_title": "Eerste verkoop",
+  "ach_first_subscriber_desc": "Iemand besloot je te blijven betalen.",
+  "ach_first_subscriber_title": "Eerste abonnee",
+  "ach_hoarder_1_desc": "Open 10 dagelijkse kisten.",
+  "ach_hoarder_1_title": "Hamsteraar",
+  "ach_hoarder_2_desc": "Open 50 dagelijkse kisten.",
+  "ach_hoarder_2_title": "Grote hamsteraar",
+  "ach_hoarder_3_desc": "Open 200 dagelijkse kisten.",
+  "ach_hoarder_3_title": "Drakenhamsteraar",
+  "ach_installs_100k_desc": "100.000 installaties in totaal.",
+  "ach_installs_100k_title": "Overal",
+  "ach_installs_10k_desc": "10.000 installaties in totaal.",
+  "ach_installs_10k_title": "Het gaat rond",
+  "ach_installs_1k_desc": "1.000 installaties in totaal.",
+  "ach_installs_1k_title": "Mond-tot-mond",
+  "ach_legendary_hunter_desc": "Je eerste legendarische drop.",
+  "ach_legendary_hunter_title": "Legendarische jager",
+  "ach_merchant_2_desc": "Grootboekomzet uit 2 verschillende stores.",
+  "ach_merchant_2_title": "Twee werelden",
+  "ach_merchant_3_desc": "Grootboekomzet uit 3 verschillende stores.",
+  "ach_merchant_3_title": "Drie werelden",
+  "ach_merchant_5_desc": "Grootboekomzet uit 5 verschillende stores.",
+  "ach_merchant_5_title": "Koopman van vele werelden",
+  "ach_mysteries_10_desc": "Verklaar 10 mysteries.",
+  "ach_mysteries_10_title": "Labjournaal",
+  "ach_mysteries_1_desc": "Verklaar een mysterie.",
+  "ach_mysteries_1_title": "Detective",
+  "ach_not_yet": "nog niet",
+  "ach_polyglot_1_desc": "Ontvang geld in 5 verschillende valuta.",
+  "ach_polyglot_1_title": "Polyglot",
+  "ach_polyglot_2_desc": "Ontvang geld in 10 verschillende valuta.",
+  "ach_polyglot_2_title": "Geldwisselaar",
+  "ach_progress": "{value} / {target}",
+  "ach_progress_unit": "{value} / {target} {unit}",
+  "ach_quests_10_desc": "Voltooi 10 quests.",
+  "ach_quests_10_title": "Avonturier",
+  "ach_quests_1_desc": "Voltooi een quest.",
+  "ach_quests_1_title": "Op pad",
+  "ach_quests_50_desc": "Voltooi 50 quests.",
+  "ach_quests_50_title": "Held van het rijk",
+  "ach_record_1_desc": "Een dag die elke dag ervoor versloeg.",
+  "ach_record_1_title": "Beste dag ooit",
+  "ach_record_25_desc": "Vijfentwintig recorddagen.",
+  "ach_record_25_title": "Beste dag ooit ×25",
+  "ach_record_5_desc": "Vijf dagen die elk alles ervoor versloegen.",
+  "ach_record_5_title": "Beste dag ooit ×5",
+  "ach_revenue_100_desc": "$100 aan totale omzet.",
+  "ach_revenue_100_title": "Eerste honderd",
+  "ach_revenue_100k_desc": "$100.000 aan totale omzet.",
+  "ach_revenue_100k_title": "Zes cijfers",
+  "ach_revenue_10k_desc": "$10.000 aan totale omzet.",
+  "ach_revenue_10k_title": "Vijf cijfers",
+  "ach_revenue_1k_desc": "$1.000 aan totale omzet.",
+  "ach_revenue_1k_title": "Vier cijfers",
+  "ach_settler_1_desc": "Klanten in 5 landen.",
+  "ach_settler_1_title": "Kolonist I",
+  "ach_settler_2_desc": "Klanten in 10 landen.",
+  "ach_settler_2_title": "Kolonist II",
+  "ach_settler_3_desc": "Klanten in 25 landen.",
+  "ach_settler_3_title": "Kolonist III",
+  "ach_settler_4_desc": "Klanten in 50 landen.",
+  "ach_settler_4_title": "Kolonist IV",
+  "ach_stars_1000_desc": "1.000 GitHub-sterren.",
+  "ach_stars_1000_title": "Sterrenstelsel",
+  "ach_stars_100_desc": "100 GitHub-sterren.",
+  "ach_stars_100_title": "Sterrenbeeld",
+  "ach_stars_10_desc": "10 GitHub-sterren.",
+  "ach_stars_10_title": "Sterrenkijker",
+  "ach_steady_30_desc": "Grootboekomzet op 30 opeenvolgende dagen.",
+  "ach_steady_30_title": "Recht zo die gaat",
+  "ach_steady_7_desc": "Grootboekomzet op 7 opeenvolgende dagen.",
+  "ach_steady_7_title": "Stabiel",
+  "ach_subscribers_1000_desc": "1.000 actieve abonnees.",
+  "ach_subscribers_1000_title": "Een beweging",
+  "ach_subscribers_100_desc": "100 actieve abonnees.",
+  "ach_subscribers_100_title": "Een aanhang",
+  "ach_subscribers_10_desc": "10 actieve abonnees.",
+  "ach_subscribers_10_title": "Een schare",
+  "ach_tier_bronze": "brons",
+  "ach_tier_gold": "goud",
+  "ach_tier_legendary": "legendarisch",
+  "ach_tier_silver": "zilver",
+  "ach_tier_title": "{tier} · levert een {rarity} drop van {xp} XP op",
+  "ach_unit_chests": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "kist",
+        "countPlural=other": "kisten"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_continents": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "continent",
+        "countPlural=other": "continenten"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_countries": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "land",
+        "countPlural=other": "landen"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_currencies": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "valuta",
+        "countPlural=other": "valuta's"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_days": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "dag",
+        "countPlural=other": "dagen"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_installs": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "installatie",
+        "countPlural=other": "installaties"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_mysteries": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "mysterie",
+        "countPlural=other": "mysteries"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_quests": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "quest",
+        "countPlural=other": "quests"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_record_days": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "recorddag",
+        "countPlural=other": "recorddagen"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_revenue": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "omzet",
+        "countPlural=other": "omzet"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_stars": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "ster",
+        "countPlural=other": "sterren"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_stores": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "store",
+        "countPlural=other": "stores"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_subscribers": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "abonnee",
+        "countPlural=other": "abonnees"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_units": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "eenheid",
+        "countPlural=other": "eenheden"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_unit_xp": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "XP",
+        "countPlural=other": "XP"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "ach_units_100_desc": "100 betaalde eenheden in totaal.",
+  "ach_units_100_title": "Honderd verkocht",
+  "ach_units_100k_desc": "100.000 betaalde eenheden in totaal.",
+  "ach_units_100k_title": "Honderdduizend verkocht",
+  "ach_units_10k_desc": "10.000 betaalde eenheden in totaal.",
+  "ach_units_10k_title": "Tienduizend verkocht",
+  "ach_units_1k_desc": "1.000 betaalde eenheden in totaal.",
+  "ach_units_1k_title": "Duizend verkocht",
+  "app_enable_sounds": "Klik om dropgeluiden aan te zetten",
+  "app_enable_sounds_dismiss": "nee, bedankt",
+  "app_footer_mute_hint": "druk op {key} om te dempen",
+  "app_footer_tagline": "Loot · self-hosted loot bijhouden voor indie-devs",
+  "boss_anr": "ANR",
+  "boss_appeared": "verscheen",
+  "boss_confirm": "Opgelost?",
+  "boss_days": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "{count} dag",
+        "countPlural=other": "{count} dagen"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "boss_down_pct": "−{pct} sinds hij verscheen",
+  "boss_enraged": "razend",
+  "boss_enraged_line": "sterker dan toen hij verscheen",
+  "boss_enraged_title": "Het werd erger voordat het beter werd",
+  "boss_faded": "vervaagd na {days} — de bron rapporteert niet meer",
+  "boss_fighting_for": "vecht al",
+  "boss_holding": "houdt stand op volle kracht",
+  "boss_hp_aria": "levenspunten van {name}",
+  "boss_lasted": "duurde",
+  "boss_mark_slain": "Markeer als verslagen",
+  "boss_not_yet": "Nog niet",
+  "boss_open_issue": "Open de issue ↗",
+  "boss_people_hit": "getroffen mensen",
+  "boss_slain": "verslagen in {days}",
+  "boss_slain_xp": "verslagen in {days} · +{xp} XP",
+  "boss_slay_yes": "Ja, versla hem",
+  "boss_slaying": "De genadeslag…",
+  "boss_title_anrs": "ANR's",
+  "boss_title_anrs_in": "ANR's in {version}",
+  "boss_title_crashes": "Crashes",
+  "boss_title_crashes_in": "Crashes in {version}",
+  "boss_unit_crashes": "crashes",
+  "boss_unit_users": "gebruikers",
+  "breakdown_empty": "Hier nog niets.",
+  "breakdown_units": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural",
+        "local countFmt = count: number maximumFractionDigits=0"
+      ],
+      "match": {
+        "countPlural=one": "{countFmt} eenheid",
+        "countPlural=other": "{countFmt} eenheden"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "chest_all_already_open": "Die kisten zijn al open.",
+  "chest_already_open": "Die kist is al open.",
+  "chest_best": "beste · {rarity}",
+  "chest_bulk_every": "Alle kisten",
+  "chest_bulk_label": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "{count} kist · {span}",
+        "countPlural=other": "{count} kisten · {span}"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "chest_cell_title": "{title} · +{xp} XP",
+  "chest_close": "Sluiten",
+  "chest_dot_title": "{count} {rarity}",
+  "chest_haul_xp": "+{xp} XP",
+  "chest_more_below": "en {count} meer hieronder",
+  "chest_nice": "Mooi.",
+  "chest_nothing_waiting": "Niets in de wacht. Een dag aan storeverkopen landt hier als één kist.",
+  "chest_of_date": "Kist van {date}",
+  "chest_open": "Openen",
+  "chest_open_all": "Alles openen · {count} kisten",
+  "chest_open_all_sub": "{count} drops in één keer",
+  "chest_open_oldest": "Open de oudste kist",
+  "chest_opening": "{what} openen…",
+  "chest_opening_all": "Alle kisten openen…",
+  "chest_progress": "{revealed} / {total}",
+  "chest_progress_drops": "{revealed} / {total} drops",
+  "chest_row_drops": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "{count} drop",
+        "countPlural=other": "{count} drops"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "chest_row_xp": "+{xp} XP",
+  "chest_skip": "Overslaan",
+  "chest_the_chest": "de kist",
+  "chest_title": "Dagelijkse kist",
+  "chest_waiting": [
+    {
+      "declarations": [
+        "input drops",
+        "input chests",
+        "local dropsPlural = drops: plural",
+        "local chestsPlural = chests: plural",
+        "local dropsFmt = drops: number maximumFractionDigits=0"
+      ],
+      "match": {
+        "dropsPlural=one, chestsPlural=one": "{dropsFmt} drop wacht in {chests} kist.",
+        "dropsPlural=one, chestsPlural=other": "{dropsFmt} drop wacht in {chests} kisten.",
+        "dropsPlural=other, chestsPlural=one": "{dropsFmt} drops wachten in {chests} kist.",
+        "dropsPlural=other, chestsPlural=other": "{dropsFmt} drops wachten in {chests} kisten."
+      },
+      "selectors": [
+        "dropsPlural",
+        "chestsPlural"
+      ]
+    }
+  ],
+  "codex_counter_title": "{unlocked} van {total} prestaties ontgrendeld",
+  "codex_days": "{count} dagen",
+  "codex_filter_all": "Alles",
+  "codex_filter_empty": "Niets te tonen met dit filter.",
+  "codex_filter_label": "Prestaties filteren",
+  "codex_filter_locked": "Te winnen",
+  "codex_filter_unlocked": "Ontgrendeld",
+  "codex_loading": "De codex openen…",
+  "codex_recap_loading": "Aan het opschrijven…",
+  "codex_recap_period_label": "Terugblikperiode",
+  "codex_record_best_day_source": "Beste dag · {source}",
+  "codex_record_best_install_day": "Beste installatiedag",
+  "codex_record_best_revenue_day": "Beste omzetdag",
+  "codex_record_best_units_day": "Beste dag in eenheden",
+  "codex_record_biggest_drop": "Grootste enkele drop",
+  "codex_record_biggest_drop_note": "{title} · {day}",
+  "codex_record_first_event": "Allereerste gebeurtenis",
+  "codex_record_first_event_note": "{count} dagen geschiedenis",
+  "codex_record_longest_run": "Langste reeks dagen met omzet",
+  "codex_record_longest_run_note": "eindigde {day}",
+  "codex_record_most_countries_day": "Meeste landen gevestigd op één dag",
+  "codex_record_most_drops_day": "Meeste drops op één dag",
+  "codex_record_most_xp_day": "Meeste XP op één dag",
+  "codex_records": "Records",
+  "codex_records_empty": "Nog geen records — ze komen met de eerste dag die de vorige verslaat.",
+  "codex_records_lede": "Elke keer opnieuw berekend, nooit opgeslagen — zo verbetert een gecorrigeerd rapport een record in plaats van een verouderd record achter te laten, en kan een record alleen maar omhoog.",
+  "codex_season_recap": "Seizoensterugblik",
+  "codex_sub": "alles wat ooit gebeurd is · trofeeën zijn permanent",
+  "codex_this_year": "Dit jaar",
+  "codex_title": "Codex",
+  "codex_total_chests_opened": "Kisten geopend",
+  "codex_total_continents": "{count} van 6 continenten",
+  "codex_total_countries_settled": "Landen gevestigd",
+  "codex_total_currencies": "Valuta ontvangen",
+  "codex_total_drops": "Drops",
+  "codex_total_era": "tijdperk {era}",
+  "codex_total_github_stars": "GitHub-sterren",
+  "codex_total_installs": "Installaties",
+  "codex_total_lifetime_revenue": "Totale omzet",
+  "codex_total_mysteries": "Mysteries verklaard",
+  "codex_total_quests_completed": "Quests voltooid",
+  "codex_total_record_days": "Recorddagen",
+  "codex_total_refunded": "{count} terugbetaald",
+  "codex_total_units_sold": "Eenheden verkocht",
+  "codex_total_xp": "XP",
+  "codex_trophy_lede": "Prestaties gaan alleen maar open. Niets hier vervalt, verloopt of kan worden afgenomen — een reeks die eindigde is nog steeds gebeurd. Elke ontgrendeling levert een echte drop op: ongewoon voor brons, zeldzaam voor zilver, episch voor goud, legendarisch voor legendarisch.",
+  "codex_trophy_wall": "Trofeeënwand",
+  "codex_xp": "{xp} XP",
+  "delta_new": "nieuw",
+  "dev_clear_country": "Land wissen",
+  "dev_country_aria": "Landcode voor de nepdrop",
+  "dev_country_placeholder": "land (optioneel)",
+  "dev_fake_chest": "Nepkist (5 drops)",
+  "dev_fake_sales_day": "Nepverkoopdag (EUR 250)",
+  "dev_hint": "Vuur een synthetische drop door de echte pipeline.",
+  "dev_random_country": "Kies een willekeurig land",
+  "dev_toggle": "dev",
+  "drop_aria_label": "{rarity} drop: {title}",
+  "drop_chest_title": "Kwam uit de kist van {date}",
+  "drop_xp": "+{xp} XP",
+  "era_camp": "Kamp",
+  "era_city": "Stad",
+  "era_dynasty": "Dynastie",
+  "era_empire": "Keizerrijk",
+  "era_kingdom": "Koninkrijk",
+  "era_town": "Stadje",
+  "era_village": "Dorp",
+  "feed_empty_body": "Richt een RevenueCat-webhook op {hook}, voeg Flathub-apps toe aan je config, of draai met {dev} en vuur een testdrop af.",
+  "feed_empty_title": "Nog geen loot.",
+  "feed_end": "Dat is de hele schat.",
+  "feed_label": "Dropfeed",
+  "feed_loading": "De schatkamer openen…",
+  "feed_loading_more": "Dieper graven…",
+  "globe_aboard": "Aan boord",
+  "globe_aria_label": "Een wereldbol met elk land waar je hebt verkocht, en de vloot op zee",
+  "globe_drops": "Drops",
+  "globe_first_customer": "Eerste klant",
+  "globe_new_settlement": "Nieuwe nederzetting",
+  "globe_population": "Bevolking",
+  "globe_revenue": "Omzet",
+  "globe_sailing_since": "Vaart sinds",
+  "header_boss_fights_title": "{count} bossgevecht(en) bezig",
+  "header_chest_aria": "Open de dagelijkse kist: {count} drops wachten",
+  "header_chest_title": "{drops} drops wachten in {chests} kist(en)",
+  "header_demo": "demo",
+  "header_demo_title": "Synthetische data — zie de README om echte stores te koppelen",
+  "header_level": "LVL {level}",
+  "header_live": "live",
+  "header_live_title": "Live",
+  "header_mute": "Dropgeluiden dempen",
+  "header_muted": "Gedempt",
+  "header_nav_label": "Secties",
+  "header_no_sources": "geen bronnen",
+  "header_no_sources_configured": "geen bronnen ingesteld",
+  "header_offline": "offline",
+  "header_open_mysteries_title": "{count} open mysteries",
+  "header_rarity_title": "{count} {rarity} drops",
+  "header_reconnecting_title": "Opnieuw verbinden…",
+  "header_scoped_to_title": "Elk paneel toont alleen {app}",
+  "header_sound": "Geluid",
+  "header_source_webhook": "webhook",
+  "header_sources_count": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "{count} bron",
+        "countPlural=other": "{count} bronnen"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "header_sources_in_error": "{count} met fout",
+  "header_status_error": "fout",
+  "header_status_listening": "luistert",
+  "header_status_ok": "ok",
+  "header_status_waiting": "wacht",
+  "header_unmute": "Dropgeluiden aanzetten",
+  "header_xp_sub": [
+    {
+      "declarations": [
+        "input countries",
+        "local countriesPlural = countries: plural"
+      ],
+      "match": {
+        "countriesPlural=one": "{drops} drops · {countries} land",
+        "countriesPlural=other": "{drops} drops · {countries} landen"
+      },
+      "selectors": [
+        "countriesPlural"
+      ]
+    }
+  ],
+  "header_xp_total": "{xp} XP",
+  "hearth_ambient": "Ambient",
+  "hearth_ambient_label": "De Haard, ambient",
+  "hearth_ambient_leave": "Ambient-modus verlaten (Esc)",
+  "hearth_ambient_mute": "Dempen",
+  "hearth_ambient_unmute": "Geluid aan",
+  "hearth_arrivals": "Recente aankomsten",
+  "hearth_arrivals_empty": "Er is nog niets geland met een land erbij.",
+  "hearth_capital": "hoofdstad {flag} {name}",
+  "hearth_civilization": "Beschaving",
+  "hearth_era_to_next": "{xp} XP tot {era}",
+  "hearth_era_to_next_short": "{xp} tot {era}",
+  "hearth_era_top": "De top van de ladder. Niets meer om te worden.",
+  "hearth_fleet": "De vloot",
+  "hearth_fleet_fine": "Mensen van wie de store nooit zegt waar ze zijn. Zij varen.",
+  "hearth_hint_pointer": "Sleep om te draaien · scroll om te zoomen · dubbelklik om te centreren",
+  "hearth_hint_touch": "Sleep om te draaien · tik op een marker · dubbeltik om te centreren",
+  "hearth_loading": "Het vuur aansteken…",
+  "hearth_population": "Bevolking",
+  "hearth_revenue": "Omzet",
+  "hearth_settlements": "Nederzettingen",
+  "hearth_settlements_empty": "Nog geen land heeft iets gekocht. De wereldbol is donker.",
+  "hearth_ticker_empty": "Wachten tot de wereld wakker wordt…",
+  "hearth_title": "Haard",
+  "hearth_xp": "{xp} XP",
+  "metric_drops": "drops",
+  "metric_installs": "installaties",
+  "metric_revenue": "omzet",
+  "metric_settlements": "nieuwe landen",
+  "metric_stars": "sterren",
+  "metric_subscribers": "abonnees",
+  "metric_units": "eenheden",
+  "metric_xp": "XP",
+  "mystery_day": "{weekday} {date}",
+  "mystery_dismiss": "Negeren",
+  "mystery_expected": "verwacht",
+  "mystery_kind_dip": "dip",
+  "mystery_kind_new_country_cluster": "nieuwe landen",
+  "mystery_kind_record": "record",
+  "mystery_kind_refund_spike": "terugbetalingen",
+  "mystery_kind_silence": "stilte",
+  "mystery_kind_spike": "piek",
+  "mystery_note_aria": "Jouw verklaring voor: {title}",
+  "mystery_note_placeholder": "Wat denk je dat er gebeurd is?",
+  "mystery_observed": "gemeten",
+  "mystery_phrase_appeared": "kwam uit het niets",
+  "mystery_phrase_changed": "veranderde",
+  "mystery_phrase_doubled": "verdubbelde",
+  "mystery_phrase_dropped": "daalde {pct}%",
+  "mystery_phrase_held_still": "bleef gelijk",
+  "mystery_phrase_jumped": "steeg {pct}%",
+  "mystery_phrase_quadrupled": "verviervoudigde",
+  "mystery_phrase_tripled": "verdrievoudigde",
+  "mystery_ratio": "verhouding",
+  "mystery_series_cancellations": "opzeggingen",
+  "mystery_series_installs": "installaties",
+  "mystery_series_refunds": "terugbetalingen",
+  "mystery_series_revenue": "omzet",
+  "mystery_series_units": "verkochte eenheden",
+  "mystery_solve": "Oplossen",
+  "mystery_title_dip": "{source} {series} {phrase} op {day}",
+  "mystery_title_new_country_cluster": [
+    {
+      "declarations": [
+        "input count",
+        "input countText",
+        "input day",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "{countText} nieuw land gevestigd op {day} — wat gebeurde er?",
+        "countPlural=other": "{countText} nieuwe landen gevestigd op {day} — wat gebeurde er?"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "mystery_title_plain": "{source} {series} op {day}",
+  "mystery_title_record": "Recorddag: {value} {series} op {source}, {day}",
+  "mystery_title_refund_spike": "{count} terugbetalingen op {source} op {day} — meestal {usual}",
+  "mystery_title_silence": "{source} is stil sinds {day}",
+  "mystery_title_spike": "{source} {series} {phrase} op {day} — waarom?",
+  "mystery_why_measured": "{observed} tegen een mediaan van {expected} over {days} dagen (z {z})",
+  "mystery_why_new_country_cluster": [
+    {
+      "declarations": [
+        "input count",
+        "input countText",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "{countText} land kocht voor het eerst op dezelfde dag",
+        "countPlural=other": "{countText} landen kochten voor het eerst op dezelfde dag"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "mystery_why_record": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "hoger dan elk van de vorige {count} dag",
+        "countPlural=other": "hoger dan elk van de vorige {count} dagen"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "mystery_why_refund_spike": "{count} terugbetalingen tegen normaal {usual}",
+  "mystery_why_silence": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "{count} voltooide dag zonder ook maar één regel, na rapportage op {reported} van de vorige 7",
+        "countPlural=other": "{count} voltooide dagen zonder ook maar één regel, na rapportage op {reported} van de vorige 7"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "mystery_why_silence_lag": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "{count} voltooide dag zonder ook maar één regel, na rapportage op {reported} van de vorige 7 — en dat is al met de verrekeningsvertraging van {lag} dagen van deze store meegerekend",
+        "countPlural=other": "{count} voltooide dagen zonder ook maar één regel, na rapportage op {reported} van de vorige 7 — en dat is al met de verrekeningsvertraging van {lag} dagen van deze store meegerekend"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "quest_auto_installs_week": "Installaties: versla vorige week · {target}",
+  "quest_auto_revenue_month": "Versla de omzet van vorige maand · {target}",
+  "quest_auto_revenue_week": "Versla de omzet van vorige week · {target}",
+  "quest_auto_settlements_month": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "Vestig {count} nieuw land deze maand",
+        "countPlural=other": "Vestig {count} nieuwe landen deze maand"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "quest_auto_stars_week": "Versla de sterren van vorige week · {target}",
+  "quest_auto_units_week": "Eenheden: versla vorige week · {target}",
+  "quest_auto_xp_week": "Verdien {target} XP deze week",
+  "quest_completed": "voltooid",
+  "quest_completed_xp": "voltooid · +{xp} XP",
+  "quest_custom": "eigen",
+  "quest_days_left": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "nog {count} dag",
+        "countPlural=other": "nog {count} dagen"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "quest_ended": "afgelopen · {pct}",
+  "quest_error_bad_window_json": "venster moet \"week\", \"month\" of \\{\"start\":\"…\",\"end\":\"…\"\\} zijn",
+  "quest_error_custom_only": "alleen eigen quests kunnen worden verwijderd",
+  "quest_error_not_found": "quest bestaat niet",
+  "quest_error_quests_disabled": "quests staan niet aan",
+  "quest_error_target_positive": "doel moet groter zijn dan nul",
+  "quest_error_unknown_metric": "onbekende metriek \"{value}\"",
+  "quest_error_unknown_window": "onbekend venster \"{value}\" (gebruik week, month of expliciete dagen)",
+  "quest_error_window_end_format": "einde van venster moet YYYY-MM-DD zijn",
+  "quest_error_window_order": "venster eindigt voordat het begint",
+  "quest_error_window_start_format": "begin van venster moet YYYY-MM-DD zijn",
+  "quest_last_day": "laatste dag",
+  "quest_remove_aria": "Quest {title} verwijderen",
+  "quest_remove_title": "Deze quest verwijderen",
+  "quest_window_days": "{count} dagen",
+  "quest_window_month": "deze maand",
+  "quest_window_week": "deze week",
+  "quests_active": "Actief",
+  "quests_active_empty": "Niets actief. Loot schrijft de quests van een week uit je eigen geschiedenis — één week met data erin is genoeg — en met {newQuest} stel je je eigen quest in.",
+  "quests_boss_empty": "Geen bosses. Vrede in het rijk. Richt een crashbron op Loot — Android vitals, Sentry, of alles wat kan POSTen naar {hook} — en de volgende crashpiek wordt een monster met een levensbalk die je kunt leegmaken. Zie {docs}.",
+  "quests_boss_fights": "Bossgevechten",
+  "quests_boss_lede": "Een crashcluster dat uit zijn eigen basislijn brak, met een naam en een levensbalk. HP is wat het deed op de laatste voltooide dag, dus een fix uitbrengen leegt de balk en de kill levert een epische drop op. Hier kun je niets verliezen — een boss die nog staat, staat gewoon nog.",
+  "quests_boss_recent": "Gewonnen, en uit het oog verloren",
+  "quests_cancel": "Annuleren",
+  "quests_every_app": "elke app",
+  "quests_every_source": "elke bron",
+  "quests_form_app": "App",
+  "quests_form_metric": "Metriek",
+  "quests_form_optional": "optioneel",
+  "quests_form_source": "Bron",
+  "quests_form_target": "Doel",
+  "quests_form_target_error": "Geef het een doel boven nul.",
+  "quests_form_title": "Titel",
+  "quests_form_title_placeholder": "Versla de omzet van vorige week",
+  "quests_form_window": "Venster",
+  "quests_loading": "Het bord lezen…",
+  "quests_mysteries": "Mysteries",
+  "quests_mysteries_empty": "Niets onverklaards. Loot leest elk uur de laatste twee weken opnieuw en markeert een dag alleen als die uit zijn eigen basislijn van 28 dagen breekt.",
+  "quests_mysteries_lede": "Dagen waarop je cijfers iets deden dat de dagen eromheen niet verklaren. Het zijn optionele puzzels: er een oplossen betekent opschrijven wat je denkt dat er gebeurde — dat levert een drop op, en laat je een notitieboek na van wat je cijfers echt beweegt.",
+  "quests_new": "+ Nieuwe quest",
+  "quests_notebook": "Notitieboek",
+  "quests_notebook_dismissed": "genegeerd zonder notitie",
+  "quests_notebook_note": "“{note}”",
+  "quests_recent": "Recent",
+  "quests_save": "Quest instellen",
+  "quests_saving": "Instellen…",
+  "quests_sub": "doelen uit je eigen geschiedenis · hier kun je niets verliezen",
+  "quests_title": "Quests",
+  "quests_window_month": "deze maand",
+  "quests_window_week": "deze week",
+  "rarity_common": "gewoon",
+  "rarity_cursed": "vervloekt",
+  "rarity_epic": "episch",
+  "rarity_legendary": "legendarisch",
+  "rarity_rare": "zeldzaam",
+  "rarity_uncommon": "ongewoon",
+  "recap_achievements": "Prestaties",
+  "recap_chests": "kisten",
+  "recap_copied": "Gekopieerd",
+  "recap_copy": "Samenvatting kopiëren",
+  "recap_copy_error": "Deze browser liet Loot het klembord niet gebruiken.",
+  "recap_copy_title": "Deze terugblik als platte tekst kopiëren",
+  "recap_country_title": "{country} · {day}",
+  "recap_delta_line": "{sign}{pct} · {previous} de {unit} ervoor",
+  "recap_drops": "drops",
+  "recap_empty": "Er landde niets in {period}. Loot heeft daar geen mening over — het is simpelweg een {unit} zonder cijfers erin. Kies er hierboven een andere.",
+  "recap_first_with_revenue": "eerste {unit} met omzet",
+  "recap_footer_era_changed": "{from} → {to} · level {levelFrom} → {levelTo}",
+  "recap_footer_era_same": "tijdperk {era} · level {level}",
+  "recap_highlight_best_day": "Beste dag op {day}: {value}",
+  "recap_highlight_chests_opened": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "{count} kist geopend",
+        "countPlural=other": "{count} kisten geopend"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "recap_highlight_epic_drops": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "{count} epische drop",
+        "countPlural=other": "{count} epische drops"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "recap_highlight_era_reached": "Tijdperk {era} bereikt",
+  "recap_highlight_legendary_drops": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "{count} legendarische drop",
+        "countPlural=other": "{count} legendarische drops"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "recap_highlight_level_up": "Level {from} → {to}",
+  "recap_highlight_most_countries": [
+    {
+      "declarations": [
+        "input count",
+        "input day",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "{count} nieuw land op {day} alleen al",
+        "countPlural=other": "{count} nieuwe landen op {day} alleen al"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "recap_highlight_mysteries_solved": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "{count} mysterie verklaard",
+        "countPlural=other": "{count} mysteries verklaard"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "recap_highlight_quests_completed": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "{count} quest voltooid",
+        "countPlural=other": "{count} quests voltooid"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "recap_highlight_settled": "{flag} {country} gevestigd op {day}",
+  "recap_highlight_settled_more": [
+    {
+      "declarations": [
+        "input count",
+        "input flag",
+        "input country",
+        "input day",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "{flag} {country} gevestigd op {day} (en nog {count} land)",
+        "countPlural=other": "{flag} {country} gevestigd op {day} (en nog {count} landen)"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "recap_highlight_top_country": "{flag} {country} was je grootste markt",
+  "recap_highlight_unlocked": "{title} ontgrendeld",
+  "recap_highlight_unlocked_more": [
+    {
+      "declarations": [
+        "input count",
+        "input title",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "{title} en nog {count} prestatie ontgrendeld",
+        "countPlural=other": "{title} en nog {count} prestaties ontgrendeld"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "recap_installs": "installaties",
+  "recap_new_settlements": "Nieuwe nederzettingen",
+  "recap_partial": "· tot nu toe",
+  "recap_refunds": "terugbetalingen",
+  "recap_revenue": "omzet",
+  "recap_share_achievements": "Prestaties: {titles}",
+  "recap_share_bullet": "• {line}",
+  "recap_share_drops": "Drops        {drops} · {xp} XP",
+  "recap_share_era": "Tijdperk     {from} → {to}",
+  "recap_share_header": "◆ Loot — {period}",
+  "recap_share_header_partial": "◆ Loot — {period} (tot nu toe)",
+  "recap_share_installs": "Installaties {installs}",
+  "recap_share_level": "Level        {level}",
+  "recap_share_level_up": "Level        {from} → {to}",
+  "recap_share_revenue": "Omzet        {amount}",
+  "recap_share_revenue_note": "Omzet        {amount}  ({note})",
+  "recap_share_settled": "Gevestigd    {countries}",
+  "recap_share_units": "Eenheden     {units}",
+  "recap_share_units_refunds": "Eenheden     {units} · {refunds} terugbetalingen",
+  "recap_sub": "de {unit} in loot",
+  "recap_unit_month": "maand",
+  "recap_unit_year": "jaar",
+  "recap_units": "eenheden",
+  "recap_xp": "XP",
+  "scope_all_apps": "Alle apps",
+  "scope_all_apps_meta": "alles wat je uitbrengt",
+  "scope_elsewhere": "+{count} elders",
+  "scope_elsewhere_title": "{count} drop(s) geland voor andere apps",
+  "scope_events": "{count} gebeurtenissen",
+  "scope_menu_label": "App-bereik",
+  "scope_title_all": "Alle apps worden getoond",
+  "scope_title_scoped": "Alleen {app} — klik om te wijzigen",
+  "scope_unmapped": "niet toegewezen",
+  "spark_label": "{days} dagen tot {day}, eindigend op {value}",
+  "spark_no_history": "geen geschiedenis",
+  "spark_usual": "normaal {value}",
+  "stat_vs_prev": "vs vorige",
+  "tab_codex": "Codex",
+  "tab_feed": "Feed",
+  "tab_hearth": "Haard",
+  "tab_quests": "Quests",
+  "tab_vault": "Schatkamer",
+  "tier_city": "stad",
+  "tier_hamlet": "gehucht",
+  "tier_metropolis": "metropool",
+  "tier_outpost": "buitenpost",
+  "tier_town": "stadje",
+  "tier_village": "dorp",
+  "time_days": "{count}d",
+  "time_hours": "{count}u",
+  "time_just_now": "zojuist",
+  "time_minutes": "{count}m",
+  "time_seconds": "{count}s",
+  "vault_by_app": "Per app",
+  "vault_by_country": "Per land",
+  "vault_by_source": "Per bron",
+  "vault_chart_aria": "Omzet en eenheden per dag",
+  "vault_chart_hint": "in {code} · eenheden eronder",
+  "vault_chart_title": "Omzet per dag",
+  "vault_chart_units": "eenheden",
+  "vault_countries_note": "gezien in dit venster",
+  "vault_country_empty": "Aan het geld in dit venster zat geen land.",
+  "vault_empty_body": "Omzet telt alleen {ledger} — verrekend geld uit de eigen financiële rapporten van de stores. Stel {stores} in je {file} in om de schatkamer te vullen, en laat een dag verrekenen.",
+  "vault_empty_fine": "RevenueCat-webhooks landen nog steeds direct in de feed, maar hun bedragen zijn {sightings} vóór belasting en vóór de storemarge: ze verschijnen in de tegel hierboven en worden nooit bij de omzet opgeteld. Zie {vault} en {chest} voor de hele regel.",
+  "vault_empty_fine_chest": "de dagelijkse kist",
+  "vault_empty_fine_sightings": "waarnemingen",
+  "vault_empty_fine_vault": "de schatkamer",
+  "vault_empty_ledger_rows": "grootboekregels",
+  "vault_empty_stores": "App Store Connect en Google Play",
+  "vault_empty_title": "Geen grootboekgeld in dit venster.",
+  "vault_loading": "De munten tellen…",
+  "vault_no_app": "(geen app)",
+  "vault_other_countries": "andere landen",
+  "vault_range_label": "Tijdsbereik",
+  "vault_sighted_note": "{count} aankopen · schatting, geen grootboekomzet",
+  "vault_subs_as_of": "per {date}",
+  "vault_subs_none": "geen bron rapporteert abonnementen",
+  "vault_tile_active_subs": "Actieve abo's",
+  "vault_tile_countries": "Landen",
+  "vault_tile_refunds": "Terugbetalingen",
+  "vault_tile_revenue": "Omzet",
+  "vault_tile_sighted": "Vandaag gezien (RevenueCat)",
+  "vault_tile_units": "Eenheden",
+  "vault_tip_units": "{count} eenheden",
+  "vault_title": "Schatkamer",
+  "vault_unknown_country": "onbekend",
+  "vessel_appstore": "De Cupertino Clipper",
+  "vessel_flathub": "Het Flathub Fregat",
+  "vessel_generic": "Het {source} Vaartuig",
+  "vessel_github": "De Octocat IJsbreker",
+  "vessel_googleplay": "De Play Trawler",
+  "vessel_microsoftstore": "De Redmond Rijnaak",
+  "vessel_revenuecat": "De RevenueCat Kotter",
+  "vessel_snapcraft": "Snapcraft Platform Negen",
+  "vessel_why": "ergens op zee — {source} zegt niet uit welk land zijn mensen komen"
+}

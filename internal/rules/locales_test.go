@@ -2,10 +2,12 @@ package rules_test
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/nickhirras/loot/internal/core"
+	"github.com/nickhirras/loot/internal/i18n"
 	"github.com/nickhirras/loot/internal/rules"
 )
 
@@ -313,7 +315,7 @@ func TestLocalizeDeclines(t *testing.T) {
 	}{
 		{"english", drop, "en"},
 		{"no language", drop, ""},
-		{"a language with no overlay", drop, "fr"},
+		{"a language with no overlay", drop, "xx"},
 		{"already in that language", core.Drop{
 			Title: "Verlängerung", Rule: "revenuecat-renewal", Lang: "de",
 		}, "de"},
@@ -408,14 +410,19 @@ func TestLocalizeAchievementPayload(t *testing.T) {
 	if !ok {
 		t.Fatal("Localize declined an achievement drop")
 	}
-	// The catalog has no German yet, so the trophy's own name falls back to
-	// English inside a German sentence — which is what a half-translated
-	// catalog should look like, rather than a blank.
-	if title != "Errungenschaft: Cartographer" {
-		t.Fatalf("german title = %q", title)
+	// The trophy's own name and description come from the German message
+	// catalog, whatever it currently says — and English, were the catalog
+	// ever missing them, which is what a half-translated catalog should look
+	// like rather than a blank.
+	wantTitle, _ := i18n.Lookup("de", "ach_cartographer_title")
+	wantDesc, _ := i18n.Lookup("de", "ach_cartographer_desc")
+	// The frame around the name ("Erfolg: …") is the overlay's to choose and
+	// may change with every regeneration; the name inside it may not.
+	if !strings.HasSuffix(title, ": "+wantTitle) || strings.HasPrefix(title, "Achievement:") {
+		t.Fatalf("german title = %q, want a German frame around %q", title, wantTitle)
 	}
-	if subtitle != "A settlement on every inhabited continent." {
-		t.Fatalf("german subtitle = %q", subtitle)
+	if subtitle != wantDesc {
+		t.Fatalf("german subtitle = %q, want %q", subtitle, wantDesc)
 	}
 }
 

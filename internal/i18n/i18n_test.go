@@ -19,15 +19,13 @@ func TestLookupPlainMessage(t *testing.T) {
 // A language with no catalog — or with a catalog that has not been translated
 // this far — answers in English rather than in blanks.
 func TestLookupFallsBackToEnglish(t *testing.T) {
-	got, ok := i18n.Lookup("de", "ach_cartographer_title")
+	// "xx" is a tag no catalog will ever ship under.
+	got, ok := i18n.Lookup("xx", "ach_cartographer_title")
 	if !ok {
 		t.Fatal("no fallback for a language without a catalog")
 	}
 	if got != "Cartographer" {
 		t.Fatalf("lookup = %q, want the English fallback", got)
-	}
-	if i18n.Has("de") {
-		t.Skip("a German catalog now exists; this test asserted the fallback path")
 	}
 }
 
