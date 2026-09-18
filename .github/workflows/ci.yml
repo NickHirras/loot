@@ -5,6 +5,9 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  # The Translate workflow starts this by hand on its pull request branch,
+  # because a PR opened with GITHUB_TOKEN never triggers CI on its own.
+  workflow_dispatch:
 
 permissions:
   contents: read

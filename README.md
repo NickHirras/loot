@@ -520,10 +520,11 @@ make translate          # do it (needs ANTHROPIC_API_KEY)
 
 **To add a language**, add its BCP-47 tag to `web/project.inlang/settings.json` — that list is the single source of truth for both catalogs — and run the `Translate` workflow from the Actions tab with **Run workflow**. It takes an optional `languages` box, so you can translate just the new one, and a `force` checkbox that retranslates everything from scratch.
 
-Two repository secrets:
+One repository secret:
 
 - **`ANTHROPIC_API_KEY`** — required. Nothing translates without it.
-- **`TRANSLATE_PR_TOKEN`** — recommended. A pull request opened with the default `GITHUB_TOKEN` does not trigger workflows, so CI would never run on the translations. A fine-grained personal access token scoped to this repository (Contents: read/write, Pull requests: read/write) fixes that. Without it the workflow still works; you just have to push the branch again to get CI.
+
+No token beyond the default `GITHUB_TOKEN` is needed. A pull request opened with it does not trigger workflows on its own, so the Translate workflow dispatches CI on the branch itself; the checks attach to the commit and show up on the PR as usual.
 
 **CI validates the translations on every pull request** with `go -C tools/translate run . -check`, which never calls the API. It fails on a dropped or invented `{placeholder}`, a rewritten `{{…}}` expression, a plural message whose arms are not the categories its language actually uses (Russian needs four, Japanese one), a translation more than four times the length of its English, or an overlay naming a rule that does not exist.
 

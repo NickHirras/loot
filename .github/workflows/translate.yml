@@ -27,6 +27,8 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  # To dispatch CI on the translation branch (see the last step).
+  actions: write
 
 # Two runs would translate the same keys twice and race for the same branch.
 # Never cancel one in flight: it has already paid for its tokens.
@@ -71,17 +73,11 @@ jobs:
         if: steps.translate.outputs.changed != 'true'
         run: echo "Every translation is already current with the English source."
 
-      # A pull request opened with GITHUB_TOKEN does not trigger workflows, so
-      # CI would never run on it and the -check step that validates these very
-      # files would be skipped. Set TRANSLATE_PR_TOKEN to a fine-grained
-      # personal access token scoped to this repository with Contents:
-      # read/write and Pull requests: read/write, and the PR arrives with CI
-      # green or red like any other.
       - name: Open a pull request
+        id: pr
         if: steps.translate.outputs.changed == 'true'
         uses: peter-evans/create-pull-request@v8
         with:
-          token: ${{ secrets.TRANSLATE_PR_TOKEN || secrets.GITHUB_TOKEN }}
           branch: translations/update
           delete-branch: true
           commit-message: "i18n: update generated translations"
@@ -94,3 +90,15 @@ jobs:
             web/messages/*.json
             internal/rules/locales/*.yaml
             i18n.lock.json
+
+      # A pull request opened with GITHUB_TOKEN does not trigger workflows on
+      # its own, so CI — and the -check step that validates these very files —
+      # would never run on it. workflow_dispatch is GitHub's one exception to
+      # that rule, so CI is kicked off here by hand on the branch the PR was
+      # opened from. Check runs attach to the commit, so they show up on the PR
+      # exactly as if a push had started them. No personal access token needed.
+      - name: Run CI on the pull request
+        if: steps.pr.outputs.pull-request-operation == 'created' || steps.pr.outputs.pull-request-operation == 'updated'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh workflow run ci.yml --ref translations/update
