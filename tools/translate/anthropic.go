@@ -11,15 +11,29 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/anthropics/anthropic-sdk-go"
 	"github.com/anthropics/anthropic-sdk-go/option"
 )
 
-// model is what does the translating. A plain string id: the SDK's typed
-// constants lag model launches, and the id works on every SDK version.
-const model = "claude-opus-5"
+// defaultModel is what does the translating unless LOOT_TRANSLATE_MODEL says
+// otherwise. Sonnet: this is short UI copy with a strong brief, and a run
+// happens on every English edit, so the cost of the routine case matters
+// more than the last few per cent of nuance. Set LOOT_TRANSLATE_MODEL to
+// "claude-opus-5" for a one-off -force run when quality is the point. A
+// plain string id: the SDK's typed constants lag model launches, and the id
+// works on every SDK version.
+const defaultModel = "claude-sonnet-5"
+
+// modelID is the model a run uses.
+func modelID() string {
+	if m := strings.TrimSpace(os.Getenv("LOOT_TRANSLATE_MODEL")); m != "" {
+		return m
+	}
+	return defaultModel
+}
 
 // maxTokens is the ceiling for one batch's reply. Forty short UI strings and
 // their plural arms come nowhere near it; the headroom is for thinking, which
@@ -74,7 +88,7 @@ func (t *APITranslator) Translate(req BatchRequest) (map[string]Value, error) {
 	// Structured outputs: the reply is constrained to this schema, so there is
 	// no prose to strip and no half-written JSON to guess at.
 	params := anthropic.MessageNewParams{
-		Model:     model,
+		Model:     modelID(),
 		MaxTokens: maxTokens,
 		System:    t.system,
 		Messages: []anthropic.MessageParam{

@@ -528,7 +528,7 @@ No token beyond the default `GITHUB_TOKEN` is needed. A pull request opened with
 
 **CI validates the translations on every pull request** with `go -C tools/translate run . -check`, which never calls the API. It fails on a dropped or invented `{placeholder}`, a rewritten `{{…}}` expression, a plural message whose arms are not the categories its language actually uses (Russian needs four, Japanese one), a translation more than four times the length of its English, or an overlay naming a rule that does not exist.
 
-**Cost.** A full first run — about 554 messages and 96 rule templates into ten languages — is a few dollars, once. After that a run costs whatever the day's English edits cost, which is usually cents: the system prompt and glossary are one cached prefix shared by every batch, and untouched keys are never sent at all.
+**Cost.** The workflow uses Claude Sonnet (`claude-sonnet-5`); the `model` input on a manual run, or `LOOT_TRANSLATE_MODEL` locally, switches to Opus for a one-off pass where quality is the point. A full first run — about 554 messages and 96 rule templates into ten languages — is a couple of dollars, once. After that a run costs whatever the day's English edits cost, which is usually cents: the system prompt and glossary are one cached prefix shared by every batch, and untouched keys are never sent at all.
 
 ## The vault
 
