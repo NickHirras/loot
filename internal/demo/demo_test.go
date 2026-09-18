@@ -292,11 +292,16 @@ func TestSeededWorldFillsTheVaultAndTheHearth(t *testing.T) {
 		t.Fatalf("seed: %v", err)
 	}
 	// Seeding is one transaction over ~20k events; on a laptop it lands around
-	// a second. The bound is loose enough for a busy CI box and tight enough
-	// to catch a query that has gone quadratic — but the race detector costs
-	// roughly ten times the CPU, so under it the number measures the detector
-	// rather than the code.
+	// a second. The bound is tight enough to catch a query that has gone
+	// quadratic (that shows up as ten times slower, not twenty per cent) and
+	// loose enough for a shared GitHub runner, which has been measured at
+	// three times a laptop and flaked against a five-second bound. The race
+	// detector costs roughly ten times the CPU, so under it the number
+	// measures the detector rather than the code.
 	budget := 5 * time.Second
+	if os.Getenv("GITHUB_ACTIONS") != "" {
+		budget = 15 * time.Second
+	}
 	if raceEnabled {
 		budget = 60 * time.Second
 	}
