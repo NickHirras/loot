@@ -30,6 +30,9 @@ type Report struct {
 	Changed bool
 	// DryRun notes that nothing was written because nothing was meant to be.
 	DryRun bool
+	// Notes are remarks about the run's inputs rather than about any one key:
+	// offline mode puts an unreadable or duplicated reply file here.
+	Notes []string
 }
 
 // Add records one language's outcome.
@@ -64,6 +67,9 @@ func (r *Report) Text() string {
 		for _, p := range res.Problems {
 			fmt.Fprintf(&b, "  %s\n", p)
 		}
+	}
+	for _, n := range r.Notes {
+		fmt.Fprintf(&b, "  note: %s\n", n)
 	}
 	fmt.Fprintf(&b, "\ntranslated %d · failed %d · changed %v\n",
 		r.TranslatedCount(), r.FailedCount(), r.Changed)
@@ -113,6 +119,14 @@ func (r *Report) Markdown() string {
 			}
 			b.WriteString("\n")
 		}
+	}
+
+	if len(r.Notes) > 0 {
+		fmt.Fprintf(&b, "\n### %d note(s) about the imported replies\n\n", len(r.Notes))
+		for _, n := range r.Notes {
+			fmt.Fprintf(&b, "- %s\n", n)
+		}
+		b.WriteString("\n")
 	}
 
 	var warnings []Problem

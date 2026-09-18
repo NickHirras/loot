@@ -26,6 +26,10 @@ coverage.out
 # `go build ./...` inside the translation tool's module leaves its binary here.
 /tools/translate/translate
 
+# Offline translation: the request and reply files `make translate-export`
+# writes and `make translate-import` reads back.
+/.i18n/
+
 # Editors / OS
 .DS_Store
 .idea/

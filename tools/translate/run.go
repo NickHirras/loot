@@ -354,6 +354,13 @@ func (r *Runner) runOne(kind Kind, locale string, english Catalog, rep *Report) 
 			got[k] = v
 		}
 		failed = append(failed, missed...)
+		// A translator that knows why a key came back empty says so against
+		// the key, rather than leaving the report to guess at it.
+		for _, key := range missed {
+			if why := missingReason(r.translate, kind, locale, key); why != "" {
+				res.Problems = append(res.Problems, Problem{Kind: kind, Locale: locale, Key: key, Message: why})
+			}
+		}
 	}
 
 	for _, key := range sortedKeys(got) {
@@ -435,6 +442,19 @@ func (r *Runner) request(kind Kind, locale string, cats []string, english Catalo
 		req.Items = append(req.Items, it)
 	}
 	return req
+}
+
+// AllItems is every key of one catalog, as the Item the model would have been
+// handed for it. Offline mode decodes a reply file against this rather than
+// against one batch's items, because a file may answer keys from any batch.
+func (r *Runner) AllItems(kind Kind, locale string) (map[string]Item, error) {
+	cats, err := PluralCategories(locale)
+	if err != nil {
+		return nil, err
+	}
+	english := r.english(kind)
+	req := r.request(kind, locale, cats, english, english.Keys())
+	return ItemsByKey(req.Items), nil
 }
 
 // writeTarget puts a language's catalog back on disk.
