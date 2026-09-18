@@ -24,9 +24,9 @@ go -C tools/translate run .                   # translate everything stale
 go -C tools/translate run . -languages de,fr  # …in two languages only
 ```
 
-Needs `ANTHROPIC_API_KEY`, except for `-dry-run` and `-check`, which never
-reach the network. `make translate` and `make translate-plan` are the same
-thing.
+Needs `ANTHROPIC_API_KEY`, except for `-dry-run`, `-check` and the two offline
+flags, which never reach the network. `make translate` and `make translate-plan`
+are the same thing.
 
 ## Flags
 
@@ -38,9 +38,61 @@ thing.
 | `-languages de,fr` | Restrict to these locales. They must be in `settings.json`. |
 | `-only-messages` | Only `web/messages/<locale>.json`. |
 | `-only-rules` | Only `internal/rules/locales/default.<lang>.yaml`. |
+| `-export DIR` | Write the plan to `DIR` as request files and exit, instead of calling the API. See *Offline mode*. |
+| `-import DIR` | Translate from the reply files in `DIR` instead of calling the API. See *Offline mode*. |
 | `-summary FILE` | Also write the Markdown summary here, for a pull request body. |
 | `-root DIR` | The checkout to work on. Found by walking up from the working directory by default. |
 | `-v` | List every key in the plan, and print token usage per batch. |
+
+## Offline mode
+
+The first full run is the expensive one: every key of every language at once,
+which is most of what this tool will ever translate. It is also the run you are
+most likely to be doing while sitting in front of Claude Code with a
+subscription rather than an API key. `-export` and `-import` let Claude Code
+subagents do that run instead of the API, through the same pipeline.
+
+```bash
+go -C tools/translate run . -export /tmp/i18n      # write the requests
+#   …a subagent answers each one…
+go -C tools/translate run . -import /tmp/i18n      # validate, write, lock
+```
+
+`-export` builds exactly the plan `Run` would — `-languages`, `-force`,
+`-only-messages` and `-only-rules` all apply — and writes one file per batch,
+`<kind>-<locale>-<NN>.request.json`, plus a `README.md` explaining the job. Each
+request holds the API call verbatim: the `system` prompt with the glossary in
+it, the `user` turn, the reply `schema`, and the batch's `keys`. It writes
+nothing else, touches no target file and never writes the lock.
+
+The answer to `foo.request.json` is `foo.reply.json` beside it, containing only
+a JSON object of the shape the API returns:
+
+```json
+{"translations": [
+  {"key": "feed_empty_title", "text": "Noch keine Beute.", "variants": []},
+  {"key": "chest_row_drops", "text": "", "variants": [
+    {"match": "countPlural=one", "text": "{count} Fund"},
+    {"match": "countPlural=other", "text": "{count} Funde"}
+  ]}
+]}
+```
+
+`-import` then runs the whole ordinary pipeline — plan, validate, write sorted
+catalogs, update the lock, report — with those files where the API would be.
+Nothing downstream knows the difference, so an offline translation is validated
+by exactly the same rules as a real one.
+
+Replies are matched to requests **by key**, never by file name or batch index,
+so answering half the files and importing works, and so does re-exporting
+afterwards even though the batches regroup. A key nothing answered is reported
+as failed with *no reply for key* and left for the next round. A reply file that
+will not parse is named in the report and its readable entries are still used; a
+key answered by two files takes the later one, with a note.
+
+The point of all this is the lock file `-import` leaves behind: from then on the
+nightly workflow only translates what the English has actually changed, which is
+a handful of keys and well within an API budget.
 
 ## What makes a run incremental
 

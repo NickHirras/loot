@@ -6,6 +6,7 @@ CONFIG      ?= configs/loot.example.yaml
 NPM         ?= npm
 DIST        := dist
 PLATFORMS   ?= darwin/arm64 darwin/amd64 linux/amd64 linux/arm64 windows/amd64
+I18N_DIR    ?= .i18n
 SHA256      := $(shell command -v sha256sum >/dev/null 2>&1 && echo sha256sum || echo "shasum -a 256")
 
 .DEFAULT_GOAL := help
@@ -84,6 +85,14 @@ translate: ## Regenerate the translations (needs ANTHROPIC_API_KEY)
 .PHONY: translate-plan
 translate-plan: ## Show what a translation run would do, without calling the API
 	go -C tools/translate run . -dry-run
+
+.PHONY: translate-export
+translate-export: ## Write the translation requests to $(I18N_DIR) for Claude Code to answer
+	go -C tools/translate run . -export $(abspath $(I18N_DIR))
+
+.PHONY: translate-import
+translate-import: ## Translate from the replies in $(I18N_DIR), no API key needed
+	go -C tools/translate run . -import $(abspath $(I18N_DIR))
 
 .PHONY: ci
 ci: check test build ## Everything CI should run

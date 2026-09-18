@@ -48,7 +48,7 @@ func NewAPITranslator(ctx context.Context, apiKey string, g *Glossary, verbose b
 		client: anthropic.NewClient(opts...),
 		ctx:    ctx,
 		system: []anthropic.TextBlockParam{{
-			Text: systemPrompt + "\n\n" + g.Prompt(),
+			Text: SystemPrompt(g),
 			// One breakpoint at the end of the stable prefix. Every batch in
 			// the run reads the same cache entry instead of re-paying for the
 			// prompt and the glossary.
@@ -57,6 +57,12 @@ func NewAPITranslator(ctx context.Context, apiKey string, g *Glossary, verbose b
 		verbose: verbose,
 	}
 }
+
+// SystemPrompt is the cached prefix every request in a run shares: the stable
+// prompt and the whole glossary. Offline mode writes the same string into each
+// exported request, so a subagent answering one is told exactly what the API
+// would have been told.
+func SystemPrompt(g *Glossary) string { return systemPrompt + "\n\n" + g.Prompt() }
 
 // errRefused is returned when the model declined rather than answered. The
 // caller retries the batch smaller once; a refusal that survives that is
@@ -108,16 +114,22 @@ func (t *APITranslator) Translate(req BatchRequest) (map[string]Value, error) {
 	return DecodeReply(text.String(), req)
 }
 
-// reply is the shape the schema constrains the model to.
+// reply is the shape the schema constrains the model to. The entries are held
+// raw so that one malformed entry costs only itself: a hand-written reply file
+// in offline mode is likelier to have a typo in it than a constrained one from
+// the API, and the rest of the file is still worth having.
 type reply struct {
-	Translations []struct {
-		Key      string `json:"key"`
-		Text     string `json:"text"`
-		Variants []struct {
-			Match string `json:"match"`
-			Text  string `json:"text"`
-		} `json:"variants"`
-	} `json:"translations"`
+	Translations []json.RawMessage `json:"translations"`
+}
+
+// translation is one entry of that array.
+type translation struct {
+	Key      string `json:"key"`
+	Text     string `json:"text"`
+	Variants []struct {
+		Match string `json:"match"`
+		Text  string `json:"text"`
+	} `json:"variants"`
 }
 
 // replySchema is that shape as JSON Schema. Every property is required and
@@ -179,22 +191,47 @@ func replySchema() map[string]any {
 // nothing to translate about them, and not asking is one fewer way to be
 // wrong.
 func DecodeReply(body string, req BatchRequest) (map[string]Value, error) {
+	out, _, err := DecodeReplyFor(body, ItemsByKey(req.Items))
+	return out, err
+}
+
+// ItemsByKey indexes a batch's items by the key they translate.
+func ItemsByKey(items []Item) map[string]Item {
+	out := make(map[string]Item, len(items))
+	for _, it := range items {
+		out[it.Key] = it
+	}
+	return out
+}
+
+// DecodeReplyFor is DecodeReply against an arbitrary set of wanted items
+// rather than one batch's. Offline mode decodes a reply file against every key
+// of a catalog, because a file written by hand may answer keys from any batch
+// — or from several.
+//
+// It returns the values it understood, a complaint per entry it could not read,
+// and an error only when the reply as a whole was unusable.
+func DecodeReplyFor(body string, wanted map[string]Item) (map[string]Value, []string, error) {
 	obj, err := extractJSONObject(body)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	var r reply
 	if err := json.Unmarshal([]byte(obj), &r); err != nil {
-		return nil, fmt.Errorf("decode reply: %w", err)
+		return nil, nil, fmt.Errorf("decode reply: %w", err)
+	}
+	if r.Translations == nil {
+		return nil, nil, fmt.Errorf(`reply has no "translations" array`)
 	}
 
-	wanted := make(map[string]Item, len(req.Items))
-	for _, it := range req.Items {
-		wanted[it.Key] = it
-	}
-
+	var complaints []string
 	out := map[string]Value{}
-	for _, tr := range r.Translations {
+	for i, raw := range r.Translations {
+		var tr translation
+		if err := json.Unmarshal(raw, &tr); err != nil {
+			complaints = append(complaints, fmt.Sprintf("entry #%d does not match the schema: %v", i+1, err))
+			continue
+		}
 		it, ok := wanted[tr.Key]
 		if !ok {
 			// A key nobody asked about. Dropping it is safer than writing it:
@@ -216,9 +253,9 @@ func DecodeReply(body string, req BatchRequest) (map[string]Value, error) {
 		}}
 	}
 	if len(out) == 0 {
-		return nil, fmt.Errorf("reply named none of the %d requested key(s)", len(req.Items))
+		return nil, complaints, fmt.Errorf("reply named none of the %d requested key(s)", len(wanted))
 	}
-	return out, nil
+	return out, complaints, nil
 }
 
 // extractJSONObject returns the first balanced {…} in a body.

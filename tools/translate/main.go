@@ -47,6 +47,8 @@ func run() error {
 		onlyRules = flag.Bool("only-rules", false, "only internal/rules/locales/default.<lang>.yaml")
 		dryRun    = flag.Bool("dry-run", false, "print the plan and exit without calling the API")
 		check     = flag.Bool("check", false, "validate the existing translations and exit non-zero on any problem; never calls the API")
+		exportDir = flag.String("export", "", "write the plan to this directory as request files instead of calling the API (offline mode)")
+		importDir = flag.String("import", "", "answer the plan from the reply files in this directory instead of calling the API (offline mode)")
 		summary   = flag.String("summary", "", "also write the Markdown summary to this file")
 		verbose   = flag.Bool("v", false, "list every key in the plan, and print token usage per batch")
 	)
@@ -54,6 +56,25 @@ func run() error {
 
 	if *onlyMsgs && *onlyRules {
 		return fmt.Errorf("-only-messages and -only-rules are mutually exclusive")
+	}
+	// The four modes each replace the API with something else; asking for two
+	// of them at once has no sensible reading.
+	var modes []string
+	for _, m := range []struct {
+		name string
+		on   bool
+	}{
+		{"-dry-run", *dryRun},
+		{"-check", *check},
+		{"-export", *exportDir != ""},
+		{"-import", *importDir != ""},
+	} {
+		if m.on {
+			modes = append(modes, m.name)
+		}
+	}
+	if len(modes) > 1 {
+		return fmt.Errorf("%s are mutually exclusive", strings.Join(modes, " and "))
 	}
 
 	dir := *root
@@ -100,29 +121,64 @@ func run() error {
 		return err
 	}
 
-	key := os.Getenv("ANTHROPIC_API_KEY")
-	if key == "" {
-		return fmt.Errorf("ANTHROPIC_API_KEY is not set (use -dry-run to see the plan, or -check to validate what is there)")
+	// -export builds the same plan and writes it out for a subagent to answer.
+	// It calls nothing and writes nothing else.
+	if *exportDir != "" {
+		r, err := NewRunner(opts, nil)
+		if err != nil {
+			return err
+		}
+		return r.Export(*exportDir)
 	}
 
-	// Ctrl-C stops after the request in flight rather than half-writing a
-	// catalog: everything is written per language, after validation.
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
+	// -import runs the whole pipeline against a directory of replies, so it
+	// needs no key either.
+	var files *FileTranslator
+	var translator Translator
+	if *importDir != "" {
+		if info, err := os.Stat(*importDir); err != nil || !info.IsDir() {
+			return fmt.Errorf("-import: %q is not a directory (run -export first)", *importDir)
+		}
+		files = NewFileTranslator(*importDir)
+		translator = files
+	} else {
+		key := os.Getenv("ANTHROPIC_API_KEY")
+		if key == "" {
+			return fmt.Errorf("ANTHROPIC_API_KEY is not set (use -dry-run to see the plan, -check to validate what is there, or -export/-import to translate offline)")
+		}
 
-	glossary, err := LoadGlossary()
+		// Ctrl-C stops after the request in flight rather than half-writing a
+		// catalog: everything is written per language, after validation.
+		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+		defer stop()
+
+		glossary, err := LoadGlossary()
+		if err != nil {
+			return err
+		}
+		translator = NewAPITranslator(ctx, key, glossary, *verbose)
+	}
+
+	r, err := NewRunner(opts, translator)
 	if err != nil {
 		return err
 	}
-	r, err := NewRunner(opts, NewAPITranslator(ctx, key, glossary, *verbose))
-	if err != nil {
-		return err
+	if files != nil {
+		files.Items = r.AllItems
 	}
 
 	rep, runErr := r.Run()
 	if rep != nil {
-		if err := r.SaveLock(); err != nil {
-			return err
+		if files != nil {
+			rep.Notes = files.Notes()
+		}
+		// Only when something actually moved: a run that changed nothing has
+		// nothing new to remember, and writing the lock anyway would create one
+		// out of a no-op.
+		if rep.Changed {
+			if err := r.SaveLock(); err != nil {
+				return err
+			}
 		}
 		fmt.Print(rep.Text())
 		if err := rep.WriteSummary(opts.SummaryPath); err != nil {
