@@ -61,7 +61,9 @@ func (s *Server) handleWS(w http.ResponseWriter, r *http.Request) {
 			if !ok {
 				return
 			}
-			if err := s.writeMsg(ctx, conn, s.localizeMsg(ctx, lang, msg)); err != nil {
+			// Two passes over the same message, both of which copy the drop
+			// before touching it: where it came from, then what it says.
+			if err := s.writeMsg(ctx, conn, s.localizeMsg(ctx, lang, s.linkMsg(msg))); err != nil {
 				return
 			}
 		case <-ping.C:

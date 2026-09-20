@@ -529,6 +529,8 @@
   "dev_toggle": "dev",
   "drop_aria_label": "{rarity} drop: {title}",
   "drop_chest_title": "Came out of the chest for {date}",
+  "drop_open_in_loot": "Show this in Loot",
+  "drop_open_source": "Open at the source",
   "drop_xp": "+{xp} XP",
   "era_camp": "Camp",
   "era_city": "City",

@@ -20,6 +20,18 @@
   const amount = $derived(money(drop.amount, drop.currency))
   const flag = $derived(flagEmoji(drop.country))
 
+  // Where the card points. The server derives this per drop and already
+  // refuses anything that is not http(s) or one of Loot's own hash routes,
+  // but the shape is checked again here: part of a drop's link can come from
+  // a payload someone POSTed to /hooks/webhook, and a `javascript:` href one
+  // layer of validation away from the DOM is one layer too few. Anything that
+  // passes neither test is ignored and the card renders exactly as it always
+  // did, unlinked.
+  const link = $derived(drop.link ?? '')
+  const external = $derived(/^https?:\/\//i.test(link))
+  const internal = $derived(link.startsWith('#/'))
+  const href = $derived(external || internal ? link : '')
+
   // Particles are only worth their DOM cost on a genuinely notable drop.
   const particles = $derived(flashy && drop.fresh ? Array.from({ length: 10 }, (_, i) => i) : [])
 </script>
@@ -54,9 +66,26 @@
       <time class="ago" datetime={drop.created_at} title={new Date(drop.created_at).toLocaleString()}>
         {ago}
       </time>
+      <!-- The affordance: faint until the card is hovered or focused, so a
+           feed of linked drops does not read as a column of arrows. -->
+      {#if external}<span class="out" aria-hidden="true">↗</span>{/if}
     </div>
 
-    <h3 class="title">{drop.title}</h3>
+    <h3 class="title">
+      {#if href}
+        <!-- The "stretched link": one ordinary link, named by the title, whose
+             ::after covers the whole card. Screen readers get a single sensible
+             link instead of a clickable <article>, and the mouse gets the card. -->
+        <a
+          class="title-link"
+          {href}
+          target={external ? '_blank' : null}
+          rel={external ? 'noopener noreferrer' : null}
+          title={external ? m.drop_open_source() : m.drop_open_in_loot()}>{drop.title}</a>
+      {:else}
+        {drop.title}
+      {/if}
+    </h3>
 
     {#if drop.subtitle}
       <p class="subtitle">{drop.subtitle}</p>
@@ -87,6 +116,14 @@
   .card:hover {
     border-color: color-mix(in oklab, var(--r) 45%, var(--border));
     transform: translateX(2px);
+  }
+
+  /* Keyboard parity with the hover state: the ring goes on the card rather
+     than on the title text, because the card is what the link actually is. */
+  .card:has(.title-link:focus-visible) {
+    outline: 2px solid color-mix(in oklab, var(--r) 70%, var(--text));
+    outline-offset: 2px;
+    border-color: color-mix(in oklab, var(--r) 45%, var(--border));
   }
 
   .stripe {
@@ -161,6 +198,22 @@
     text-align: right;
   }
 
+  .out {
+    color: var(--text-faint);
+    font-size: 0.72rem;
+    line-height: 1;
+    opacity: 0.4;
+    transition:
+      opacity 0.2s ease,
+      color 0.2s ease;
+  }
+
+  .card:hover .out,
+  .card:focus-within .out {
+    opacity: 1;
+    color: color-mix(in oklab, var(--r) 65%, var(--text-dim));
+  }
+
   .title {
     margin: 0.35rem 0 0;
     font-size: 1rem;
@@ -168,6 +221,41 @@
     line-height: 1.3;
     color: var(--text);
     overflow-wrap: anywhere;
+  }
+
+  /* A linked title is still just the title: same colour, no underline until
+     you are actually pointing at it. */
+  .title-link {
+    color: inherit;
+    text-decoration: none;
+    cursor: pointer;
+  }
+
+  .title-link:hover {
+    text-decoration: underline;
+  }
+
+  /* The ring is drawn on the card instead; see .card:has(…) above. */
+  .title-link:focus-visible {
+    outline: none;
+  }
+
+  /* This is the whole stretched-link trick: an empty box over the entire card,
+     belonging to the anchor, so a click anywhere on the card follows it. */
+  .title-link::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+  }
+
+  /* …and these are the exceptions that have to stay on top of it, because a
+     `title` tooltip only appears for the element the pointer is really over.
+     They are small, so the card stays clickable everywhere that matters. */
+  .chest,
+  .ago,
+  .chip.app {
+    position: relative;
+    z-index: 1;
   }
 
   .subtitle {

@@ -45,6 +45,14 @@ export interface Drop {
   floor_rule?: string
   /** The language `title` and `subtitle` are written in. */
   lang?: string
+  /**
+   * Where this drop's event lives, derived by the server on the way out and
+   * absent whenever it could not work one out. Either an absolute `http(s)`
+   * URL to the GitHub issue, store page or Sentry issue the event came from —
+   * opened in a new tab — or one of Loot's own hash routes (`#/quests`) for
+   * its own news. Demo mode omits the external ones: its repos are fictional.
+   */
+  link?: string
 
   source: string
   kind: string

@@ -13,7 +13,9 @@
 // The body is one object, or an array of them for a batch. Only `kind` is
 // required; everything else has a defensible default. `rarity`, `title` and
 // `subtitle` are stored at the top level of the event payload because that is
-// where the default rules look for them.
+// where the default rules look for them, and an optional `url` goes there too
+// because that is where internal/links looks for it — it is what makes the
+// drop clickable through to whatever the drop is about.
 package webhook
 
 import (
@@ -33,6 +35,7 @@ import (
 
 	"github.com/nickhirras/loot/internal/config"
 	"github.com/nickhirras/loot/internal/core"
+	"github.com/nickhirras/loot/internal/links"
 )
 
 // Name is the source identifier, also the URL segment: /hooks/webhook.
@@ -113,6 +116,11 @@ type Drop struct {
 	// Title and Subtitle are what the rarity rules render into the drop.
 	Title    string `json:"title"`
 	Subtitle string `json:"subtitle"`
+	// URL is where this thing actually lives — the build, the invoice, the
+	// ticket — and makes the drop clickable in the feed. It must be an
+	// absolute http(s) URL; anything else is dropped the way a bad Country is,
+	// because a link is a nicety and the event is the point.
+	URL string `json:"url"`
 	// Ledger marks this as settled money, so the vault sums it into revenue.
 	// Leave it false for estimates and signals.
 	Ledger bool `json:"ledger"`
@@ -220,6 +228,13 @@ func (d Drop) ToEvent(raw []byte, now time.Time) (core.Event, error) {
 	}
 	if d.Subtitle != "" {
 		payload["subtitle"] = d.Subtitle
+	}
+	// `url` is the key internal/links looks for on every source, so a webhook
+	// drop becomes clickable through exactly the same rule a GitHub issue
+	// does. Validating it here rather than at render time means the one thing
+	// the browser will put in an href is checked before it is ever stored.
+	if u := links.HTTPURL(d.URL); u != "" {
+		payload["url"] = u
 	}
 	encoded, err := json.Marshal(payload)
 	if err != nil {

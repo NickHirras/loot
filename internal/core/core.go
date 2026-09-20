@@ -158,6 +158,18 @@ type Drop struct {
 	// fixed `language` was configured at ingest), or "" for a drop from before
 	// Loot recorded it.
 	Lang string `json:"lang,omitempty"`
+	// Link is where this drop's event actually lives: the GitHub issue, the
+	// store page, the Sentry issue — or an in-app hash route like "#/quests"
+	// for Loot's own news. It is *derived on the way out* by internal/links
+	// from the originating event, never stored and never read back: no column
+	// holds it, and nothing in the write path sets it. That is deliberate, and
+	// it is the whole point of doing it this way — every drop Loot has ever
+	// minted becomes clickable the moment the rules improve, including the
+	// ones from before this field existed.
+	//
+	// It is "" whenever no trustworthy link can be built, which is the normal
+	// case for plenty of drops; the feed simply renders those unlinked.
+	Link string `json:"link,omitempty"`
 }
 
 // ChestSummary describes one unopened daily chest. It is what the chest API
