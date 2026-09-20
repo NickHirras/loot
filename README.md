@@ -4,13 +4,13 @@
 
 **A self-hosted, gamified dashboard for indie app developers.**
 
-Every install, subscription and cancellation becomes a *drop* — with a rarity, a colour and a sound.
+Every install, subscription and cancellation becomes a *drop*, with a rarity, a colour and a sound.
 
 [![CI](https://github.com/NickHirras/loot/actions/workflows/ci.yml/badge.svg)](https://github.com/NickHirras/loot/actions/workflows/ci.yml) [![Release](https://img.shields.io/github/v/release/NickHirras/loot?label=release&color=a855f7)](https://github.com/NickHirras/loot/releases/latest) [![Image](https://img.shields.io/badge/ghcr.io-nickhirras%2Floot-3b82f6?logo=docker&logoColor=white)](https://github.com/NickHirras/loot/pkgs/container/loot) [![License](https://img.shields.io/github/license/NickHirras/loot?color=64748b)](LICENSE)
 
 <img src="docs/screenshots/hearth.png" alt="The Hearth: a turning globe with a lit settlement for every country you have sold in, beside an era ladder and a settlement list" width="100%">
 
-<sub>The Hearth, on demo data. Every screenshot here is `loot serve --demo` — see below.</sub>
+<sub>The Hearth, on demo data. Every screenshot here is `loot serve --demo` (see below).</sub>
 
 </div>
 
@@ -18,11 +18,11 @@ Every install, subscription and cancellation becomes a *drop* — with a rarity,
 
 Shipping an indie app means watching numbers scattered across half a dozen dashboards that all look like accounting software. Loot collects those numbers into one place and treats them like what they actually feel like: loot. A new subscriber is an **uncommon** drop. Their first annual plan is **rare**. Your best install day ever on Flathub is **epic**. The first sale from a country you have never sold in before is a **new settlement**. A cancellation is **cursed**, and it sounds like it.
 
-Money that arrives a whole day at a time — App Store and Play sales reports — does not interrupt the feed. It goes into a **daily chest** that you open when you are ready, and the drops cascade out one by one, quietest first, so the day ends on its best news. Every amount is also converted into one display currency, so the **vault** can answer "how did this month go?" in a single number.
+Money that arrives a whole day at a time (App Store and Play sales reports) does not interrupt the feed. It goes into a **daily chest** that you open when you are ready, and the drops cascade out one by one, quietest first, so the day ends on its best news. Every amount is also converted into one display currency, so the **vault** can answer "how did this month go?" in a single number.
 
-Every country you sell in becomes a settlement on a slowly turning globe — the **Hearth** — that grows from an outpost to a metropolis as customers arrive, and flies each new drop home to your capital as an arc of light. Leave it full screen on a spare monitor and it will tell you how the day is going without you reading a single number.
+Every country you sell in becomes a settlement on a slowly turning globe (the **Hearth**) that grows from an outpost to a metropolis as customers arrive, and flies each new drop home to your capital as an arc of light. Leave it full screen on a spare monitor and it will tell you how the day is going without you reading a single number.
 
-Loot is a single Go binary with an embedded Svelte dashboard and a SQLite database. There is no cloud service, no account, and no telemetry — you run it on a VPS, a Raspberry Pi or your laptop, point your webhooks at it, and leave the feed open on a second monitor. Sources push or poll into one pipeline: every event is deduplicated, stored, classified into a rarity by a YAML rules engine, and streamed live to every connected browser over a websocket. `loot tail` does the same thing in your terminal, and rings the bell when something good lands.
+Loot is a single Go binary with an embedded Svelte dashboard and a SQLite database. There is no cloud service, no account, and no telemetry. You run it on a VPS, a Raspberry Pi or your laptop, point your webhooks at it, and leave the feed open on a second monitor. Sources push or poll into one pipeline: every event is deduplicated, stored, classified into a rarity by a YAML rules engine, and streamed live to every connected browser over a websocket. `loot tail` does the same thing in your terminal, and rings the bell when something good lands.
 
 <div align="center">
 
@@ -39,7 +39,7 @@ Loot is a single Go binary with an embedded Svelte dashboard and a SQLite databa
 
 ## Try it in 10 seconds (demo mode)
 
-Loot ships with a whole fictional business inside it. `--demo` fills a **separate** database with four months of plausible history for three invented apps — an App Store subscription business, a weather app that spikes at weekends, a Linux tide clock on Flathub — and then keeps emitting live events while you watch.
+Loot ships with a whole fictional business inside it. `--demo` fills a **separate** database with four months of plausible history for three invented apps (an App Store subscription business, a weather app that spikes at weekends, a Linux tide clock on Flathub) and then keeps emitting live events while you watch.
 
 ```bash
 docker run --rm -p 8080:8080 -e LOOT_DEMO=1 ghcr.io/nickhirras/loot:latest
@@ -51,7 +51,7 @@ Then open <http://localhost:8080>. You get a feed with a few thousand drops behi
 
 What you are looking at:
 
-- **Nothing real is touched.** Demo mode writes to `<data_dir>/demo.db` and never opens `loot.db`. It configures no sources, so it never polls a store, never reads a credential and never accepts a webhook. Every event it stores it invented — but it invented them in the shape the real App Store, Google Play, Flathub and RevenueCat sources emit, and pushed them through the same pipeline, so the drops, chests, settlements and XP are all genuinely Loot's.
+- **Nothing real is touched.** Demo mode writes to `<data_dir>/demo.db` and never opens `loot.db`. It configures no sources, so it never polls a store, never reads a credential and never accepts a webhook. Every event it stores it invented, but it invented them in the shape the real App Store, Google Play, Flathub and RevenueCat sources emit, and pushed them through the same pipeline, so the drops, chests, settlements and XP are all genuinely Loot's.
 - **The same binary and the same image.** There is no separate demo build; `LOOT_DEMO=1` (or `demo.enabled: true`) is all it takes, and the container needs no volume.
 - **It is reproducible.** The world is generated from a fixed seed (`demo.seed`), so the same seed always produces the same history and the same screenshots.
 - **It keeps up.** Leave it a week and the next start quietly generates the days you missed, up to yesterday.
@@ -74,31 +74,31 @@ Six screens, all of them demo data at 1400×900. Because the demo world comes fr
 <tr>
 <td width="50%">
 <img src="docs/screenshots/feed.png" alt="The live feed: drops stacked newest first, each with a rarity badge, an amount and a country">
-<b>Feed</b> — every drop as it lands, rarest colours loudest. Cards whose event lives somewhere (the GitHub issue, the store page, the Sentry ticket) click through to it. The chest in the top right is yesterday, still shut, with 8 drops in it.
+<b>Feed</b>: every drop as it lands, rarest colours loudest. Cards whose event lives somewhere (the GitHub issue, the store page, the Sentry ticket) click through to it. The chest in the top right is yesterday, still shut, with 8 drops in it.
 </td>
 <td width="50%">
 <img src="docs/screenshots/chest.png" alt="The chest cascade: a rare drop revealed on top of the drops already opened">
-<b>The cascade</b> — a chest opens one drop at a time, 600 ms apart, quietest first, so the day ends on its best news. (A backlog of chests can be emptied in one go instead; see <a href="#the-daily-chest">the daily chest</a>.)
+<b>The cascade</b>: a chest opens one drop at a time, 600 ms apart, quietest first, so the day ends on its best news. (A backlog of chests can be emptied in one go instead; see <a href="#the-daily-chest">the daily chest</a>.)
 </td>
 </tr>
 <tr>
 <td width="50%">
 <img src="docs/screenshots/vault.png" alt="The vault: revenue, units and refunds over ninety days, with a stacked area chart and breakdowns">
-<b>Vault</b> — ninety days of settled revenue in one display currency, stacked by source, with units underneath and the change against the window before it.
+<b>Vault</b>: ninety days of settled revenue in one display currency, stacked by source, with units underneath and the change against the window before it.
 </td>
 <td width="50%">
 <img src="docs/screenshots/quests.png" alt="The quests tab: weekly and monthly goals with progress bars, and mysteries with sparklines">
-<b>Quests</b> — goals generated from your own history, and the anomalies Loot could not explain, waiting for you to write down why.
+<b>Quests</b>: goals generated from your own history, and the anomalies Loot could not explain, waiting for you to write down why.
 </td>
 </tr>
 <tr>
 <td width="50%">
 <img src="docs/screenshots/ambient.png" alt="Ambient mode: a full-bleed globe on a starfield with an era label and a ticker of arrivals">
-<b>Ambient</b> — the Hearth with everything else taken away, for the spare monitor. <kbd>Esc</kbd> leaves.
+<b>Ambient</b>: the Hearth with everything else taken away, for the spare monitor. <kbd>Esc</kbd> leaves.
 </td>
 <td width="50%">
 <img src="docs/screenshots/chest-haul.png" alt="The end of a chest: total XP, the best drop of the day, and the full haul listed underneath">
-<b>The haul</b> — what the chest was worth, the best thing in it, and then it settles into the feed tagged 📦.
+<b>The haul</b>: what the chest was worth, the best thing in it, and then it settles into the feed tagged 📦.
 </td>
 </tr>
 </table>
@@ -107,7 +107,7 @@ Six screens, all of them demo data at 1400×900. Because the demo world comes fr
 
 ### A release binary
 
-Every tag publishes one static binary per platform — macOS (Apple silicon and Intel), Linux (x86-64 and arm64) and Windows — each with the dashboard already embedded in it. Nothing else needs installing; there is no runtime and no cgo.
+Every tag publishes one static binary per platform: macOS (Apple silicon and Intel), Linux (x86-64 and arm64) and Windows. Each has the dashboard already embedded in it. Nothing else needs installing; there is no runtime and no cgo.
 
 ```bash
 VERSION=v0.1.0                  # or whatever the latest release says
@@ -164,7 +164,7 @@ docker run -d --name loot \
 |---|---|
 | `latest` | the newest release |
 | `1.2.3`, `1.2` | that exact release, and the newest patch of that minor |
-| `edge` | the tip of `main`, rebuilt on every push — newer than `latest`, and less careful |
+| `edge` | the tip of `main`, rebuilt on every push; newer than `latest`, and less careful |
 
 Building it yourself is `docker build -t loot .`, or `make docker`.
 
@@ -173,11 +173,11 @@ The image is a distroless static binary (~14 MB). Mount a volume at `/data` to k
 ### Install it as an app
 
 The dashboard is a PWA, so it can live outside the browser. Open it and use your browser's install
-control — the ⊕ or "Install" button in Chrome/Edge's address bar, **File → Add to Dock** in Safari on
+control: the ⊕ or "Install" button in Chrome/Edge's address bar, **File → Add to Dock** in Safari on
 macOS, or **Share → Add to Home Screen** on iOS and Android. You get a standalone window with the Loot
 gem as its icon, no tab bar, and the app's own dark background behind the status bar.
 
-Loot's service worker caches the shell only — HTML, JavaScript, CSS and icons. It never caches
+Loot's service worker caches the shell only: HTML, JavaScript, CSS and icons. It never caches
 `/api`, `/ws` or `/hooks`, so a number on screen is always a number the server just sent; open the app
 with no connection and you get an honest "offline" screen rather than yesterday's revenue. Updates
 need no action: each navigation fetches fresh HTML when you're online, so one reload after a deploy
@@ -214,7 +214,7 @@ Rare and above ring the terminal bell. Use `--no-bell` if your coworkers object,
 1 of 2 sources ready
 ```
 
-`loot check` builds every configured source, calls its `Check` (Flathub fetches one app's stats, RevenueCat reports whether the webhook is protected) and exits non-zero if anything is wrong — which makes it a usable container healthcheck or post-deploy smoke test.
+`loot check` builds every configured source, calls its `Check` (Flathub fetches one app's stats, RevenueCat reports whether the webhook is protected) and exits non-zero if anything is wrong. That makes it a usable container healthcheck or post-deploy smoke test.
 
 ## Configuring sources
 
@@ -279,7 +279,7 @@ sources:
     backfill_days: 7
 ```
 
-Loot polls `https://flathub.org/api/v2/stats/{app_id}` once an hour and, for each app and each **completed** day (today is still accumulating, so it is never emitted — its count would be frozen at a partial value), stores a silent `install` row (`flathub:<app>:<date>`) and mints one chest-bound `installs_day` drop (`flathub:installs_day:<app>:<date>`) — the same shape as Google Play and Snapcraft, so a day's installs land in that day's chest instead of the live feed. Re-polling is free.
+Loot polls `https://flathub.org/api/v2/stats/{app_id}` once an hour and, for each app and each **completed** day (today is still accumulating, so it is never emitted; its count would be frozen at a partial value), stores a silent `install` row (`flathub:<app>:<date>`) and mints one chest-bound `installs_day` drop (`flathub:installs_day:<app>:<date>`). That is the same shape as Google Play and Snapcraft, so a day's installs land in that day's chest instead of the live feed. Re-polling is free.
 
 `backfill_days` limits what the *first* poll emits. The API returns roughly 180 days of history, and replaying all of it would bury you in drops; the default of 7 gives the feed some history and gives the "best day ever" rule a baseline to beat. Set it to `0` to emit nothing on the first run and only report days from here on. For a one-off bootstrap from a specific date:
 
@@ -293,7 +293,7 @@ The Flathub API also returns `installs_per_country`, but those figures are cumul
 
 The App Store source reads Apple's own Sales and Trends reports, so its figures are settled developer proceeds rather than estimates.
 
-**1. Create an API key.** In App Store Connect go to **Users and Access → Integrations → App Store Connect API**, stay on **Team Keys**, and generate a key with the **Sales and Reports** role (older accounts show this role as **Sales**; Finance and Admin also work). Download the `AuthKey_<KEY_ID>.p8` file — Apple lets you download it exactly once — and note the **Key ID** and the **Issuer ID** shown at the top of the same page.
+**1. Create an API key.** In App Store Connect go to **Users and Access → Integrations → App Store Connect API**, stay on **Team Keys**, and generate a key with the **Sales and Reports** role (older accounts show this role as **Sales**; Finance and Admin also work). Download the `AuthKey_<KEY_ID>.p8` file (Apple lets you download it exactly once) and note the **Key ID** and the **Issuer ID** shown at the top of the same page.
 
 **2. Find your vendor number.** It is on **Payments and Financial Reports**, beside your legal entity name: an eight digit number, usually starting with `8`. It is not your team ID and not your Apple ID.
 
@@ -324,7 +324,7 @@ Then check it before you wait an hour for the first poll:
 ✓ appstore     vendor 80123456
 ```
 
-`check` signs a real ES256 token (no JWT library — `crypto/ecdsa` and 40 lines) and asks Apple for a real report. A wrong key, issuer or vendor number fails immediately with Apple's own explanation; a day Apple has not published yet counts as a pass, because it proves the credentials were accepted.
+`check` signs a real ES256 token (no JWT library, just `crypto/ecdsa` and 40 lines) and asks Apple for a real report. A wrong key, issuer or vendor number fails immediately with Apple's own explanation; a day Apple has not published yet counts as a pass, because it proves the credentials were accepted.
 
 **What it reads.** Two daily reports, both keyed on a **Pacific** calendar day:
 
@@ -333,11 +333,11 @@ Then check it before you wait an hour for the first poll:
 | `SALES` / `SUMMARY` | `1_1` | every unit sold, refunded or downloaded |
 | `SUBSCRIPTION` / `SUMMARY` | `1_3` | how many subscriptions were active that day |
 
-Loot polls hourly and walks forward one day at a time, oldest first. Apple publishes a day's report a few hours after that day closes in Pacific time — usually between 05:00 and 08:00 PT — and until then the endpoint answers `404`. That is **not** an error and never lights up `last_error`: the cursor simply stays put and the next poll tries again. Columns are addressed by name rather than by position, so Apple inserting a column (it does) cannot silently shift every value one place to the left.
+Loot polls hourly and walks forward one day at a time, oldest first. Apple publishes a day's report a few hours after that day closes in Pacific time (usually between 05:00 and 08:00 PT), and until then the endpoint answers `404`. That is **not** an error and never lights up `last_error`: the cursor simply stays put and the next poll tries again. Columns are addressed by name rather than by position, so Apple inserting a column (it does) cannot silently shift every value one place to the left.
 
-**What it emits.** One **silent ledger row event** per report row — `sale`, `iap`, `subscription`, `refund` or `download` — carrying that row's country, units and developer proceeds in the row's own proceeds currency. Update rows are counted but never emitted; an update is not a sale. On top of those sits one **`sales_day` summary per app per day**, whose drop goes into that day's chest.
+**What it emits.** One **silent ledger row event** per report row (`sale`, `iap`, `subscription`, `refund` or `download`), carrying that row's country, units and developer proceeds in the row's own proceeds currency. Update rows are counted but never emitted; an update is not a sale. On top of those sits one **`sales_day` summary per app per day**, whose drop goes into that day's chest.
 
-The first poll backfills `backfill_days` (30 by default) of history. Those days land as chests, not as a live-feed flood — one chest per day, oldest first, each opening into its own cascade. Set it lower if you would rather not spend an evening opening chests; `loot serve --since 2026-01-01` overrides it once for a one-off bootstrap.
+The first poll backfills `backfill_days` (30 by default) of history. Those days land as chests, not as a live-feed flood: one chest per day, oldest first, each opening into its own cascade. Set it lower if you would rather not spend an evening opening chests; `loot serve --since 2026-01-01` overrides it once for a one-off bootstrap.
 
 Because Apple pays euros for the euro zone and yen for Japan, one day usually contains several proceeds currencies. Each row keeps its own currency and the vault converts every one of them into your `display_currency`, so revenue is always right. The single-currency `sales_day` headline reports the day's **dominant** proceeds currency and marks itself `proceeds_mixed`, with the full split in `payload.by_currency`.
 
@@ -347,12 +347,12 @@ Subscription counts arrive as one `subscription_snapshot` event per app per day,
 
 Play has no sales API. It writes its reports as files into a private Cloud Storage bucket that belongs to your developer account, and a service account with read access is how anything else gets at them. Setting it up is three steps in two consoles.
 
-**1. Make a service account.** In the [Google Cloud console](https://console.cloud.google.com/iam-admin/serviceaccounts), pick or create any project, create a service account (no project roles are needed — the grant that matters is the Play one), then open it, go to **Keys → Add key → Create new key → JSON**, and save the file somewhere Loot can read it. That file is a credential: `chmod 600` it and keep it out of your repo.
+**1. Make a service account.** In the [Google Cloud console](https://console.cloud.google.com/iam-admin/serviceaccounts), pick or create any project, create a service account (no project roles are needed, since the grant that matters is the Play one), then open it, go to **Keys → Add key → Create new key → JSON**, and save the file somewhere Loot can read it. That file is a credential: `chmod 600` it and keep it out of your repo.
 
 **2. Grant it access in Play Console.** Go to **Play Console → Users and permissions → Invite new users** and invite the service account's email address (the long `…@….iam.gserviceaccount.com` one from the key file). Under **Account permissions**, tick:
 
-- **View app information and download bulk reports** — the statistics files
-- **View financial data, orders, and cancellation survey responses** — the sales files
+- **View app information and download bulk reports**: the statistics files
+- **View financial data, orders, and cancellation survey responses**: the sales files
 
 Play can take up to 24 hours to propagate a new grant to the bucket, so a `403` right after inviting is usually patience rather than a mistake.
 
@@ -385,16 +385,16 @@ A failure says which of the two things went wrong: a `403` prints the exact Play
 
 | file | becomes |
 |---|---|
-| `sales/salesreport_YYYYMM.zip` | one **silent ledger row** per order line — `sale`, `iap`, `subscription` or `refund` — plus one `sales_day` chest summary per app per day |
+| `sales/salesreport_YYYYMM.zip` | one **silent ledger row** per order line (`sale`, `iap`, `subscription` or `refund`), plus one `sales_day` chest summary per app per day |
 | `stats/installs/installs_<package>_YYYYMM_overview.csv` | silent `install` and `active_devices` counters, plus one `installs_day` chest drop per day |
 | `stats/installs/installs_<package>_YYYYMM_country.csv` | silent per-country `install` events, which is what founds **settlements** |
 
 The other statistics dimensions (device, os_version, carrier, language, app_version…) are ignored. Buyer city, state and postal code are columns of the sales report and are deliberately never stored.
 
 > [!IMPORTANT]
-> **Estimated sales are gross.** `Charged Amount` is what the customer paid — Play's 15–30% service fee and any withheld tax are still in it, so the vault will read high against your bank statement. Every Play payload carries `"gross": true` and says so. The monthly **earnings** report is the net truth; ingesting it is a later quest.
+> **Estimated sales are gross.** `Charged Amount` is what the customer paid. Play's 15–30% service fee and any withheld tax are still in it, so the vault will read high against your bank statement. Every Play payload carries `"gross": true` and says so. The monthly **earnings** report is the net truth; ingesting it is a later quest.
 
-Because the current month's file is still being rewritten and late rows genuinely arrive, a day only gets its `sales_day` summary once it is older than yesterday in Pacific Time (the timezone Play states financial reports in; statistics are UTC). Rows for an unsettled day are still stored the moment they appear — the vault sums rows, not summaries — they just do not mint a chest yet. If a row for an already-summarized day turns up later, it is stored and the summary is *not* re-emitted, so a day can never be counted twice.
+Because the current month's file is still being rewritten and late rows genuinely arrive, a day only gets its `sales_day` summary once it is older than yesterday in Pacific Time (the timezone Play states financial reports in; statistics are UTC). Rows for an unsettled day are still stored the moment they appear (the vault sums rows, not summaries). They just do not mint a chest yet. If a row for an already-summarized day turns up later, it is stored and the summary is *not* re-emitted, so a day can never be counted twice.
 
 The first poll reads `backfill_months` months (the current one and last, by default) and turns every settled day in them into a chest. That is roughly six weeks of history waiting to be opened, and it gives the "best day ever" rules a baseline to beat. Afterwards each poll re-lists the bucket but only downloads a file whose `md5Hash` has changed, so a quiet day costs two listings and nothing else.
 
@@ -408,7 +408,7 @@ Each has its own guide with setup steps, config (YAML + env), what it emits, and
 | Snapcraft (Snap Store metrics, 6h) | [docs/sources/snapcraft.md](docs/sources/snapcraft.md) | new/active/lost devices per snap/day, derived per-country installs (settlements), `installs_day` chests |
 | GitHub (poll 10 min + `POST /hooks/github`) | [docs/sources/github.md](docs/sources/github.md) | stars, star milestones, forks, issues opened/closed ("a quest appears"), PRs, releases |
 | Generic webhook (`POST /hooks/webhook`) | [docs/sources/webhook.md](docs/sources/webhook.md) | anything: name your kind, rarity, title; batch posts; optional ledger amounts |
-| Play Vitals (Developer Reporting API, 6h) | [docs/sources/crashes.md](docs/sources/crashes.md) | daily crashes/ANRs per version — reuses the Play service account; feeds boss fights |
+| Play Vitals (Developer Reporting API, 6h) | [docs/sources/crashes.md](docs/sources/crashes.md) | daily crashes/ANRs per version (reuses the Play service account); feeds boss fights |
 | Sentry (`POST /hooks/sentry`) | [docs/sources/crashes.md](docs/sources/crashes.md) | issue created/regressed → crashes; resolved → slays the boss |
 | Crash webhook (`POST /hooks/crash`) | [docs/sources/crashes.md](docs/sources/crashes.md) | any crash reporter; includes a Firebase Cloud Function relaying Crashlytics velocity alerts |
 
@@ -416,7 +416,7 @@ Each has its own guide with setup steps, config (YAML + env), what it emits, and
 
 ## Apps and the scope filter
 
-Every store names your app differently — App Store Connect by title, RevenueCat by app id, Google Play by package name. An `apps:` block in your config maps them onto one **product** so the whole dashboard can be scoped to it:
+Every store names your app differently: App Store Connect by title, RevenueCat by app id, Google Play by package name. An `apps:` block in your config maps them onto one **product** so the whole dashboard can be scoped to it:
 
 ```yaml
 apps:
@@ -433,10 +433,10 @@ The header's **All apps ▾** selector (and `?app=<product>` on every read endpo
 
 A ledger source does not report a sale when it happens; it reports yesterday, all at once, as hundreds of rows. Loot handles that with two kinds of event:
 
-- **silent row events** — stored, counted in the vault and in stats, but they produce no drop at all. This is where the money lives.
+- **silent row events**: stored, counted in the vault and in stats, but they produce no drop at all. This is where the money lives.
 - **one summary event per app per day** (`kind: sales_day`), whose drop is filed into that day's **chest** instead of being published.
 
-A chest is opened from the dashboard, by `loot chest open`, or by itself once its day is `chest.auto_open_after_hours` old (36 by default, measured from midnight UTC of the chest's own day — so yesterday's chest springs open around noon). Opening it cascades the drops onto the websocket 600 ms apart, ordered cursed → common → … → legendary, so the reveal builds instead of dumping.
+A chest is opened from the dashboard, by `loot chest open`, or by itself once its day is `chest.auto_open_after_hours` old (36 by default, measured from midnight UTC of the chest's own day, so yesterday's chest springs open around noon). Opening it cascades the drops onto the websocket 600 ms apart, ordered cursed → common → … → legendary, so the reveal builds instead of dumping.
 
 ```bash
 ./bin/loot chest                      # what is waiting
@@ -455,9 +455,9 @@ A chest is opened from the dashboard, by `loot chest open`, or by itself once it
    total +1265 xp
 ```
 
-In the dashboard a chest icon appears in the header with the number of drops waiting. Clicking it opens the chest overlay: the chests by date with their counts, XP and rarity dots, and an **Open** button per chest (or one for the oldest). The lid swings open, the drops cascade in one at a time as they arrive over the websocket — each with its rarity sound — and settle into a growing haul, ending on the total XP and the best drop. The haul then sits in the feed, tagged 📦.
+In the dashboard a chest icon appears in the header with the number of drops waiting. Clicking it opens the chest overlay: the chests by date with their counts, XP and rarity dots, and an **Open** button per chest (or one for the oldest). The lid swings open, the drops cascade in one at a time as they arrive over the websocket (each with its rarity sound) and settle into a growing haul, ending on the total XP and the best drop. The haul then sits in the feed, tagged 📦.
 
-**Opening all of them.** Come back from a holiday, or wire up a source that backfills a month, and there are thirty chests waiting — at 600 ms a drop that is a quarter of an hour of clicking. With two or more waiting the overlay offers a second button, **Open all · N chests**, and `POST /api/chest/open` takes `{"all": true}` (as does `loot chest open --all`). Every chest is claimed atomically on its own, oldest day first, drops still ordered cursed → common → … → legendary inside each one; the reply is one flat haul in that order, with `opened_dates` naming each day and `opened` still the oldest for anything that only reads one date. A bulk open is a *fill* rather than a cascade, and deliberately so: the bus gets the whole haul roughly 60 ms a drop, squeezed tighter if that would run past four seconds, followed by one chest update — thirty seconds of bells in `loot tail` is exactly the tedium the button exists to remove. The dashboard fills a compact grid in about six seconds however many drops there are, plays a sound only for rare and above, and ends on a combined haul screen: total XP, the six rarity counters, the best drop, and any settlements and trophies listed by name, because those are the ones worth reading. Opening one chest is untouched — that ritual is the point, and it stays a ritual.
+**Opening all of them.** Come back from a holiday, or wire up a source that backfills a month, and there are thirty chests waiting. At 600 ms a drop, that is a quarter of an hour of clicking. With two or more waiting the overlay offers a second button, **Open all · N chests**, and `POST /api/chest/open` takes `{"all": true}` (as does `loot chest open --all`). Every chest is claimed atomically on its own, oldest day first, drops still ordered cursed → common → … → legendary inside each one; the reply is one flat haul in that order, with `opened_dates` naming each day and `opened` still the oldest for anything that only reads one date. A bulk open is a *fill* rather than a cascade, and deliberately so: the bus gets the whole haul roughly 60 ms a drop, squeezed tighter if that would run past four seconds, followed by one chest update. Thirty seconds of bells in `loot tail` is exactly the tedium the button exists to remove. The dashboard fills a compact grid in about six seconds however many drops there are, plays a sound only for rare and above, and ends on a combined haul screen: total XP, the six rarity counters, the best drop, and any settlements and trophies listed by name, because those are the ones worth reading. Opening one chest is untouched: that ritual is the point, and it stays a ritual.
 
 Everything an unopened chest holds is invisible until it is opened: `GET /api/drops` excludes it, `GET /api/stats` does not count its XP, and the vault does not count its drops. Set `chest.enabled: false` to publish everything the moment it is ingested.
 
@@ -471,7 +471,7 @@ fx:
   enabled: true
 ```
 
-Rates are the ECB daily reference rates, fetched from [frankfurter.app](https://frankfurter.app) (no API key) every 12 hours and cached in the database. A snapshot of ~30 currencies is embedded in the binary, so conversion works offline, on the first run, and with `fx.enabled: false`. A currency with no known rate leaves `amount_base` at 0 and logs once — it is never silently guessed at.
+Rates are the ECB daily reference rates, fetched from [frankfurter.app](https://frankfurter.app) (no API key) every 12 hours and cached in the database. A snapshot of ~30 currencies is embedded in the binary, so conversion works offline, on the first run, and with `fx.enabled: false`. A currency with no known rate leaves `amount_base` at 0 and logs once; it is never silently guessed at.
 
 ```bash
 ./bin/loot fx rates       # which rates would be used, and how old they are
@@ -486,7 +486,7 @@ The dashboard picks a language for itself, and `language` says whether you get a
 language: "auto"   # or a BCP-47 tag: "de", "pt-BR", "zh-Hans"
 ```
 
-`auto` (the default, and what an empty value means) lets each reader's browser decide, negotiated against the languages Loot ships: `en`, `de`, `es`, `fr`, `it`, `pt-BR`, `ja`, `ko`, `zh-Hans`, `ru`, `nl`. A tag names one of those instead, for everybody who opens this Loot. Either way `?lang=xx` on the URL wins — `http://localhost:8080/?lang=de` — and is remembered in that browser afterwards, which makes it the quick way to check a translation or to read your own dashboard in a different language from the household's.
+`auto` (the default, and what an empty value means) lets each reader's browser decide, negotiated against the languages Loot ships: `en`, `de`, `es`, `fr`, `it`, `pt-BR`, `ja`, `ko`, `zh-Hans`, `ru`, `nl`. A tag names one of those instead, for everybody who opens this Loot. Either way `?lang=xx` on the URL wins (`http://localhost:8080/?lang=de`) and is remembered in that browser afterwards, which makes it the quick way to check a translation or to read your own dashboard in a different language from the household's.
 
 Numbers, currencies and dates follow the chosen language too, through `Intl`, so the same revenue figure reads `$1,234.00` or `1.234,00 $` without a second setting.
 
@@ -516,26 +516,26 @@ make translate-plan     # what a run would do, without calling the API
 make translate          # do it (needs ANTHROPIC_API_KEY)
 ```
 
-**To fix a wrong translation, just fix it.** Edit the string in `web/messages/de.json`, or the entry in `internal/rules/locales/default.de.yaml`, and commit. Your version stays exactly as you wrote it until the *English* it translates changes — the tool compares a hash of the English source recorded in `i18n.lock.json`, and never looks at the translation itself. To fix a word everywhere rather than one string, pin it in `tools/translate/glossary.yaml`: Loot's own vocabulary lives there (drop, chest, vault, hearth, codex, settlement, quest, mystery, boss, era, the rarity names, XP, level, streak, record), each with a slot per language that ships empty and is honoured once filled.
+**To fix a wrong translation, just fix it.** Edit the string in `web/messages/de.json`, or the entry in `internal/rules/locales/default.de.yaml`, and commit. Your version stays exactly as you wrote it until the *English* it translates changes. The tool compares a hash of the English source recorded in `i18n.lock.json`, and never looks at the translation itself. To fix a word everywhere rather than one string, pin it in `tools/translate/glossary.yaml`: Loot's own vocabulary lives there (drop, chest, vault, hearth, codex, settlement, quest, mystery, boss, era, the rarity names, XP, level, streak, record), each with a slot per language that ships empty and is honoured once filled.
 
-**To add a language**, add its BCP-47 tag to `web/project.inlang/settings.json` — that list is the single source of truth for both catalogs — and run the `Translate` workflow from the Actions tab with **Run workflow**. It takes an optional `languages` box, so you can translate just the new one, and a `force` checkbox that retranslates everything from scratch.
+**To add a language**, add its BCP-47 tag to `web/project.inlang/settings.json` (that list is the single source of truth for both catalogs) and run the `Translate` workflow from the Actions tab with **Run workflow**. It takes an optional `languages` box, so you can translate just the new one, and a `force` checkbox that retranslates everything from scratch.
 
 One repository secret:
 
-- **`ANTHROPIC_API_KEY`** — required. Nothing translates without it.
+- **`ANTHROPIC_API_KEY`**: required. Nothing translates without it.
 
 No token beyond the default `GITHUB_TOKEN` is needed. A pull request opened with it does not trigger workflows on its own, so the Translate workflow dispatches CI on the branch itself; the checks attach to the commit and show up on the PR as usual.
 
 **CI validates the translations on every pull request** with `go -C tools/translate run . -check`, which never calls the API. It fails on a dropped or invented `{placeholder}`, a rewritten `{{…}}` expression, a plural message whose arms are not the categories its language actually uses (Russian needs four, Japanese one), a translation more than four times the length of its English, or an overlay naming a rule that does not exist.
 
-**Cost.** The workflow uses Claude Sonnet (`claude-sonnet-5`); the `model` input on a manual run, or `LOOT_TRANSLATE_MODEL` locally, switches to Opus for a one-off pass where quality is the point. A full first run — about 554 messages and 96 rule templates into ten languages — is a couple of dollars, once. After that a run costs whatever the day's English edits cost, which is usually cents: the system prompt and glossary are one cached prefix shared by every batch, and untouched keys are never sent at all.
+**Cost.** The workflow uses Claude Sonnet (`claude-sonnet-5`); the `model` input on a manual run, or `LOOT_TRANSLATE_MODEL` locally, switches to Opus for a one-off pass where quality is the point. A full first run (about 554 messages and 96 rule templates into ten languages) is a couple of dollars, once. After that a run costs whatever the day's English edits cost, which is usually cents: the system prompt and glossary are one cached prefix shared by every batch, and untouched keys are never sent at all.
 
 ## The vault
 
 The dashboard's **Vault** tab draws this: a range picker (7d/30d/90d/365d, remembered), stat tiles with a change against the preceding window, revenue per day as an area chart stacked by source with units underneath, and breakdowns by source, app and country. `GET /api/vault/summary?range=7d|30d|90d|365d` is the money view behind it. Its cardinal rule is that **only ledger rows count as revenue**:
 
 - RevenueCat amounts are pre-tax, pre-store-cut estimates. They are reported separately, as `realtime`, and never added to revenue.
-- `sales_day` summaries are a rollup of the rows beside them, so they are excluded too — otherwise every ledger day would count twice.
+- `sales_day` summaries are a rollup of the rows beside them, so they are excluded too. Otherwise every ledger day would count twice.
 - A refund is a ledger row whose kind is `refund` or whose quantity is negative, stored with a negative amount. Revenue nets out; `units` and `refunds` are reported as two positive counts, so a day with 10 sales and 2 refunds reads as "10 / 2", not "8".
 
 ```jsonc
@@ -559,9 +559,9 @@ The dashboard's **Vault** tab draws this: a range picker (7d/30d/90d/365d, remem
 
 ## The Hearth
 
-The **Hearth** tab is the map of what you have built: a slowly turning globe where every country you have ever sold in has a settlement, lit up like a city seen from orbit. The night side of the planet is real — the terminator is computed from the sun's actual position — and settlements on the dark side glow brighter, because that is when city lights show. Drag to turn the world, scroll to zoom, double click to go home, hover a city for its numbers.
+The **Hearth** tab is the map of what you have built: a slowly turning globe where every country you have ever sold in has a settlement, lit up like a city seen from orbit. The night side of the planet is real (the terminator is computed from the sun's actual position), and settlements on the dark side glow brighter, because that is when city lights show. Drag to turn the world, scroll to zoom, double click to go home, hover a city for its numbers.
 
-When a drop lands, it *arrives*: an arc leaves its country and flies to your capital in its rarity's colour, bursting on impact while the origin pulses. A country's first ever customer founds a settlement, with an expanding ring and a label. A cancellation does not fly anywhere — it flashes red where it happened, and stays there.
+When a drop lands, it *arrives*: an arc leaves its country and flies to your capital in its rarity's colour, bursting on impact while the origin pulses. A country's first ever customer founds a settlement, with an expanding ring and a label. A cancellation does not fly anywhere. It flashes red where it happened, and stays there.
 
 ### Population
 
@@ -577,7 +577,7 @@ Only positive quantities count, so **a settlement never shrinks**: a refund nets
 
 ### Tiers
 
-A settlement's tier is **relative to your biggest country**, not an absolute headcount — so the map looks the same whether you have 300 customers or three million, and growth shows up as a changing skyline instead of everything maxing out at once.
+A settlement's tier is **relative to your biggest country**, not an absolute headcount, so the map looks the same whether you have 300 customers or three million, and growth shows up as a changing skyline instead of everything maxing out at once.
 
 | tier | share of the largest settlement |
 |---|---|
@@ -586,7 +586,7 @@ A settlement's tier is **relative to your biggest country**, not an absolute hea
 | **town** | ≥ 5% |
 | **village** | ≥ 1% |
 | **hamlet** | ≥ 0.2% |
-| **outpost** | anything else — one customer is still a place on the map |
+| **outpost** | anything else; one customer is still a place on the map |
 
 ### Eras
 
@@ -609,36 +609,36 @@ Every arc flies to your **capital**. By default that is your biggest settlement,
 home_country: "NZ"   # ISO 3166-1 alpha-2, or "" for the biggest settlement
 ```
 
-`LOOT_HOME_COUNTRY` overrides it. A country you have never sold in is still a valid capital — it is where you are, not where your customers are.
+`LOOT_HOME_COUNTRY` overrides it. A country you have never sold in is still a valid capital: it is where you are, not where your customers are.
 
-Events with no country at all are counted apart, as **the fleet**. Flathub reports how many people installed but never says from where, and every store's per-country file lags its overview file by a poll or two — those people should not be invented into a country or silently dropped, so each source that has them gets a ship, anchored in open ocean, sized on the same tier ladder as a settlement: *The Flathub Freighter*, *Snapcraft Platform Nine* (a rig, off Ubuntu's homeland), *The Cupertino Clipper*, *The Play Trawler*.
+Events with no country at all are counted apart, as **the fleet**. Flathub reports how many people installed but never says from where, and every store's per-country file lags its overview file by a poll or two. Those people should not be invented into a country or silently dropped, so each source that has them gets a ship, anchored in open ocean, sized on the same tier ladder as a settlement: *The Flathub Freighter*, *Snapcraft Platform Nine* (a rig, off Ubuntu's homeland), *The Cupertino Clipper*, *The Play Trawler*.
 
-Be clear about what the ships are: **a visualization, not a location**. These people have no position at all — the anchorage says only which source could not place them. A vessel is never a country: it does not count toward your settlements, your continents, the Cartographer and Settler trophies, or any quest that counts countries, and it is drawn cold and hull-shaped precisely so it cannot be mistaken for a city. `GET /api/hearth` returns them as `fleet`, one entry per source, with the scalar `unknown` bucket kept beside it as their sum. The tables live in [`web/src/lib/sea.ts`](web/src/lib/sea.ts).
+Be clear about what the ships are: **a visualization, not a location**. These people have no position at all. The anchorage says only which source could not place them. A vessel is never a country: it does not count toward your settlements, your continents, the Cartographer and Settler trophies, or any quest that counts countries, and it is drawn cold and hull-shaped precisely so it cannot be mistaken for a city. `GET /api/hearth` returns them as `fleet`, one entry per source, with the scalar `unknown` bucket kept beside it as their sum. The tables live in [`web/src/lib/sea.ts`](web/src/lib/sea.ts).
 
 ### Ambient mode
 
 <http://localhost:8080/#/ambient> (or the **⤢ Ambient** button, or `#/hearth?ambient=1`) is the Hearth with everything else taken away: full-bleed globe on a starfield, the era and its progress in one corner, a ticker of recent arrivals along the bottom, and a cursor that gets out of the way after three seconds. <kbd>Esc</kbd> leaves. It is meant to be left running on a spare monitor or an iPad all day, so the globe idles at 30fps, pauses its own rotation for five seconds after you touch it, and honours `prefers-reduced-motion` by not spinning at all.
 
-`GET /api/hearth` is the aggregate behind all of it — settlements, the fleet, capital, era, tier ladder and the last 30 country-bearing drops. It is cached for five seconds server-side; the page refetches once a minute and merges live websocket drops in between, so a new country appears the instant its first customer does.
+`GET /api/hearth` is the aggregate behind all of it: settlements, the fleet, capital, era, tier ladder and the last 30 country-bearing drops. It is cached for five seconds server-side; the page refetches once a minute and merges live websocket drops in between, so a new country appears the instant its first customer does.
 
 ## Quests & mysteries
 
-The **Quests** tab gives you goals worth chasing and puzzles worth poking at — see [docs/quests.md](docs/quests.md) for the full design and API.
+The **Quests** tab gives you goals worth chasing and puzzles worth poking at (see [docs/quests.md](docs/quests.md) for the full design and API).
 
-- **Quests** are generated from your own history each week and month (after the sources' first poll, and only for metrics with at least a week of data) ("Beat last week's revenue · $1,240", "Settle 2 new countries this month", "Earn 10,900 XP this week"), plus custom ones you create. Completing one mints a rare (weekly) or epic (monthly) drop. An unmet quest quietly ends as "ended · 62%" — never red, never a broken streak.
-- **Mysteries** are anomalies Loot noticed in your data and turned into open questions: "Google Play installs tripled on Fri Aug 14 — why?", refund spikes, a cluster of new countries, or a source that has gone quiet (usually broken credentials — Loot allows for each store's normal reporting lag, asks once, and dismisses the question itself when data resumes). Each card has a 28-day sparkline; write a one-line explanation and **Solve** it for a drop, or dismiss it. Solved mysteries become a notebook of your own explanations.
+- **Quests** are generated from your own history each week and month (after the sources' first poll, and only for metrics with at least a week of data) ("Beat last week's revenue · $1,240", "Settle 2 new countries this month", "Earn 10,900 XP this week"), plus custom ones you create. Completing one mints a rare (weekly) or epic (monthly) drop. An unmet quest quietly ends as "ended · 62%", never red, never a broken streak.
+- **Mysteries** are anomalies Loot noticed in your data and turned into open questions: "Google Play installs tripled on Fri Aug 14. Why?", refund spikes, a cluster of new countries, or a source that has gone quiet (usually broken credentials; Loot allows for each store's normal reporting lag, asks once, and dismisses the question itself when data resumes). Each card has a 28-day sparkline; write a one-line explanation and **Solve** it for a drop, or dismiss it. Solved mysteries become a notebook of your own explanations.
 
 ## Boss fights
 
-Crashes are the least fun data you have, so Loot makes them a fight you can win — see [docs/bosses.md](docs/bosses.md). When a day's crashes spike past 3× your baseline (or a Crashlytics velocity alert relays in), a named boss appears — *Torbrak the Off-By-One Gargoyle*, *The Segfault Hydra of v2.3.1* — as a cursed drop, with HP equal to that day's crashes. Every completed day the HP tracks the crash count for that version/issue, so it drains as your fix rolls out (and enrages if it gets worse). Two quiet days, a Sentry "resolved", or **Mark slain** ends it with an epic drop — legendary if it was big or lasted a week. A boss that just goes silent fades quietly; nothing is ever framed as your failure. Bosses live at the top of the **Quests** tab with a red badge while one is alive.
+Crashes are the least fun data you have, so Loot makes them a fight you can win. See [docs/bosses.md](docs/bosses.md). When a day's crashes spike past 3× your baseline (or a Crashlytics velocity alert relays in), a named boss appears (*Torbrak the Off-By-One Gargoyle*, *The Segfault Hydra of v2.3.1*) as a cursed drop, with HP equal to that day's crashes. Every completed day the HP tracks the crash count for that version/issue, so it drains as your fix rolls out (and enrages if it gets worse). Two quiet days, a Sentry "resolved", or **Mark slain** ends it with an epic drop, legendary if it was big or lasted a week. A boss that just goes silent fades quietly; nothing is ever framed as your failure. Bosses live at the top of the **Quests** tab with a red badge while one is alive.
 
 ## Codex & season recap
 
-The **Codex** tab is the permanent record — see [docs/codex.md](docs/codex.md).
+The **Codex** tab is the permanent record; see [docs/codex.md](docs/codex.md).
 
-- **Trophy wall**: 49 achievements in bronze/silver/gold/legendary tiers (first sale, Settler I–IV, Cartographer — a settlement on every inhabited continent — lifetime revenue and install milestones, Steady 7/30 earning days, quests and mysteries, GitHub stars, era achievements…). Each unlock is a drop with a sound. On an existing database the first pass dates every trophy to the day you actually earned it and files the drops into today's chest instead of blasting them live.
+- **Trophy wall**: 49 achievements in bronze/silver/gold/legendary tiers (first sale, Settler I–IV, Cartographer for a settlement on every inhabited continent, lifetime revenue and install milestones, Steady 7/30 earning days, quests and mysteries, GitHub stars, era achievements…). Each unlock is a drop with a sound. On an existing database the first pass dates every trophy to the day you actually earned it and files the drops into today's chest instead of blasting them live.
 - **Records & totals**: best revenue/units/install day (overall and per source), longest run of earning days, biggest drop, lifetime totals.
-- **Season recap**: a poster-shaped summary of any month (or the year so far) — revenue with a neutral delta, best day, new countries, top app/country/source, drops by rarity, achievements unlocked, and highlights in plain words. **Copy summary** puts a text version on your clipboard.
+- **Season recap**: a poster-shaped summary of any month (or the year so far), listing revenue with a neutral delta, best day, new countries, top app/country/source, drops by rarity, achievements unlocked, and highlights in plain words. **Copy summary** puts a text version on your clipboard.
 
 ## Rarity rules
 
@@ -672,17 +672,17 @@ fallback:
   title: "{{.Source}} · {{.Kind}}"
 ```
 
-The first non-floor rule that matches wins. Then every matching floor rule may raise the rarity — which is how "anything over $500 is *at least* epic" works without repeating the condition in every rule. Because `cursed` outranks `legendary`, a floor rule can never relabel a cancellation as a celebration.
+The first non-floor rule that matches wins. Then every matching floor rule may raise the rarity, which is how "anything over $500 is *at least* epic" works without repeating the condition in every rule. Because `cursed` outranks `legendary`, a floor rule can never relabel a cancellation as a celebration.
 
-The first sale from a country Loot has never seen does not use a floor rule. The pipeline synthesizes a second event for it — `{source: loot, kind: settlement}`, carrying the country and `payload.via` — so the settlement gets its own **rare** drop and the event that revealed it keeps its own headline. Silent ledger rows found settlements too: the country is the news, not the row.
+The first sale from a country Loot has never seen does not use a floor rule. The pipeline synthesizes a second event for it (`{source: loot, kind: settlement}`, carrying the country and `payload.via`), so the settlement gets its own **rare** drop and the event that revealed it keeps its own headline. Silent ledger rows found settlements too: the country is the news, not the row.
 
 **Match fields**: `source`/`sources`, `kind`/`kinds`, `app`, `min_amount`, `max_amount`, `min_quantity`, `is_ledger`, `has_country`, `country_first`, `record_high`, `payload_match` (dotted JSON paths into the raw source payload).
 
-`country_first` and `record_high` are answered by the database — the first is true when no earlier event carries that country, the second when the event's quantity beats every previous event for the same source, app and kind.
+`country_first` and `record_high` are answered by the database: the first is true when no earlier event carries that country, the second when the event's quantity beats every previous event for the same source, app and kind.
 
 **Template fields** for `title` and `subtitle`: `.Source .Kind .App .Day .Country .Flag .Amount .AmountFmt .AmountBase .AmountBaseFmt .Currency .Quantity .QuantityFmt .Payload`, plus `.BaseTitle` in floor rules. `.AmountBaseFmt` is the amount in your display currency.
 
-**Translations** live beside the defaults, in [`internal/rules/locales/`](internal/rules/locales/), one `default.<lang>.yaml` per language. An overlay carries nothing but titles and subtitles, keyed by rule name — rarity, XP and matching are decisions rather than words, and stay in `default.yaml` alone:
+**Translations** live beside the defaults, in [`internal/rules/locales/`](internal/rules/locales/), one `default.<lang>.yaml` per language. An overlay carries nothing but titles and subtitles, keyed by rule name. Rarity, XP and matching are decisions rather than words, and stay in `default.yaml` alone:
 
 ```yaml
 rules:
@@ -707,7 +707,7 @@ make help     # everything else
 
 Prefer two terminals? `go run ./cmd/loot serve --config configs/loot.example.yaml --dev` in one, `cd web && npm run dev` in the other, then open <http://localhost:5173>.
 
-The dashboard synthesizes all of its sounds with the Web Audio API — no audio files ship with Loot. Browsers block audio until a user gesture, so the UI shows a "click to enable drop sounds" banner until you do. Press <kbd>m</kbd> to mute; the setting persists in `localStorage`.
+The dashboard synthesizes all of its sounds with the Web Audio API. No audio files ship with Loot. Browsers block audio until a user gesture, so the UI shows a "click to enable drop sounds" banner until you do. Press <kbd>m</kbd> to mute; the setting persists in `localStorage`.
 
 ### CI and releases
 
@@ -725,7 +725,7 @@ Cutting a release is one command:
 git tag v0.1.0 && git push origin v0.1.0
 ```
 
-To see exactly what the tag will produce, build it locally first — same cross-compile, same archive layout, published nowhere:
+To see exactly what the tag will produce, build it locally first (same cross-compile, same archive layout, published nowhere):
 
 ```bash
 make dist                 # dist/loot_<version>_<os>_<arch>.tar.gz|.zip + checksums.txt
@@ -733,7 +733,7 @@ make dist VERSION=v0.1.0  # with the version string the tag would stamp in
 ```
 
 > [!NOTE]
-> **One manual step, once.** A package GHCR creates from a workflow starts out private, and `GITHUB_TOKEN` cannot change that — there is no API for it. After the first successful push, go to the [package page](https://github.com/NickHirras/loot/pkgs/container/loot) → **Package settings** → **Danger Zone** → **Change visibility** → **Public**, and while you are there, **Manage Actions access** → add the `loot` repository with **Write** so later runs keep the permission. Until that is done, `docker pull ghcr.io/nickhirras/loot:edge` asks strangers for a login.
+> **One manual step, once.** A package GHCR creates from a workflow starts out private, and `GITHUB_TOKEN` cannot change that. There is no API for it. After the first successful push, go to the [package page](https://github.com/NickHirras/loot/pkgs/container/loot) → **Package settings** → **Danger Zone** → **Change visibility** → **Public**, and while you are there, **Manage Actions access** → add the `loot` repository with **Write** so later runs keep the permission. Until that is done, `docker pull ghcr.io/nickhirras/loot:edge` asks strangers for a login.
 
 ## Architecture
 
@@ -772,7 +772,7 @@ make dist VERSION=v0.1.0  # with the version string the tag would stamp in
 | `internal/server` | JSON API, websocket hub, embedded SPA with history fallback |
 | `web` | Svelte 5 + Vite + TypeScript, embedded via `go:embed` |
 
-Adding a source means implementing `core.Source` (and optionally `core.WebhookHandler`) and registering it in `cmd/loot/serve.go`. Everything downstream — dedupe, rarity, feed, sounds, tail — comes for free.
+Adding a source means implementing `core.Source` (and optionally `core.WebhookHandler`) and registering it in `cmd/loot/serve.go`. Everything downstream (dedupe, rarity, feed, sounds, tail) comes for free.
 
 ### HTTP API
 
@@ -784,14 +784,14 @@ Adding a source means implementing `core.Source` (and optionally `core.WebhookHa
 | `GET /api/vault/summary?range=30d` | revenue, units, series and breakdowns in the display currency |
 | `GET /api/hearth` | the globe: settlements with population and tier, capital, era, recent arrivals |
 | `GET /api/chest` | the chests waiting to be opened, oldest first |
-| `POST /api/chest/open` | `{"date":"2026-08-17"}` (or `{}` for the oldest, `{"all":true}` for every chest waiting) — reveals and returns the cascade |
+| `POST /api/chest/open` | `{"date":"2026-08-17"}` (or `{}` for the oldest, `{"all":true}` for every chest waiting); reveals and returns the cascade |
 | `GET /ws` | websocket stream, see below |
 | `POST /hooks/{source}` | source webhook receiver |
 | `POST /api/dev/fake` | synthetic drop, only when `dev.enabled` |
 
 `GET /api/stats` also carries `"demo": true` when the server is running on synthetic data, which is what puts the **demo** pill in the header.
 
-Every drop that leaves the server — the feed, a chest cascade, the websocket — carries an optional `link`: where that event actually lives. It is **derived on the way out** from the event's source, kind, app and payload rather than stored, so improving a rule makes every drop Loot has ever minted clickable, retroactively. It is either an absolute `http(s)` URL (a GitHub issue, a store page, a Sentry issue) or one of the dashboard's own routes (`#/quests`) for Loot's own news, and it is absent whenever no trustworthy link can be built — which includes every external link in demo mode, where the apps are fictional. Post a `url` to the generic webhook to give your own drops one; see [docs/sources/webhook.md](docs/sources/webhook.md).
+Every drop that leaves the server (the feed, a chest cascade, the websocket) carries an optional `link`: where that event actually lives. It is **derived on the way out** from the event's source, kind, app and payload rather than stored, so improving a rule makes every drop Loot has ever minted clickable, retroactively. It is either an absolute `http(s)` URL (a GitHub issue, a store page, a Sentry issue) or one of the dashboard's own routes (`#/quests`) for Loot's own news, and it is absent whenever no trustworthy link can be built, which includes every external link in demo mode, where the apps are fictional. Post a `url` to the generic webhook to give your own drops one; see [docs/sources/webhook.md](docs/sources/webhook.md).
 
 The websocket carries four kinds of message:
 
@@ -815,18 +815,18 @@ Loot has no authentication of its own. The RevenueCat webhook secret protects th
 
 Loot ships in quests.
 
-- **Quest 1 — First Blood** ✅ — the scaffold: event pipeline, SQLite store, rarity rules engine, RevenueCat webhooks, Flathub polling, live feed with synthesized sounds, `loot tail`.
-- **Quest 2 — The Vault Opens** ✅ — silent ledger events, the **daily chest** with its cascade, currency conversion and the vault API, settlement drops, `loot check` / `loot chest` / `loot fx`, and the dashboard's Vault page and chest-opening ritual.
-- **Quest 4 — The Hearth** ✅ — the globe: a settlement per country that grows with every customer, tiers from outpost to metropolis, eras from Camp to Dynasty, live arcs flying home to your capital, a real day/night terminator, and **ambient mode** for the spare monitor.
-- **Quest 3 — Know Thy Enemy** ✅ — Play Vitals, Sentry and a generic crash webhook (Crashlytics via a relay) as *boss fights*: a crash spike spawns a named boss whose HP drains as you ship the fix.
-- **Quest 5 — Quests & Mysteries** ✅ — auto-generated weekly/monthly goals from your own history plus custom quests, and anomaly detection surfaced as puzzles with a notebook of your explanations.
-- **Quest 6 — Codex & Season Recap** ✅ — the trophy wall, records, and a poster-style monthly/yearly recap with copyable summary.
-- **Quest 7 — More Worlds** ✅ — Microsoft Store, Snapcraft and GitHub as sources, plus a generic webhook so anything that can POST JSON can drop loot.
+- **Quest 1: First Blood** ✅ The scaffold: event pipeline, SQLite store, rarity rules engine, RevenueCat webhooks, Flathub polling, live feed with synthesized sounds, `loot tail`.
+- **Quest 2: The Vault Opens** ✅ Silent ledger events, the **daily chest** with its cascade, currency conversion and the vault API, settlement drops, `loot check` / `loot chest` / `loot fx`, and the dashboard's Vault page and chest-opening ritual.
+- **Quest 4: The Hearth** ✅ The globe: a settlement per country that grows with every customer, tiers from outpost to metropolis, eras from Camp to Dynasty, live arcs flying home to your capital, a real day/night terminator, and **ambient mode** for the spare monitor.
+- **Quest 3: Know Thy Enemy** ✅ Play Vitals, Sentry and a generic crash webhook (Crashlytics via a relay) as *boss fights*: a crash spike spawns a named boss whose HP drains as you ship the fix.
+- **Quest 5: Quests & Mysteries** ✅ Auto-generated weekly/monthly goals from your own history plus custom quests, and anomaly detection surfaced as puzzles with a notebook of your explanations.
+- **Quest 6: Codex & Season Recap** ✅ The trophy wall, records, and a poster-style monthly/yearly recap with copyable summary.
+- **Quest 7: More Worlds** ✅ Microsoft Store, Snapcraft and GitHub as sources, plus a generic webhook so anything that can POST JSON can drop loot.
 
-Along the way: **demo mode** (`loot serve --demo`) landed with Quest 4's polish — a seeded 120-day world plus a live emitter in a separate `demo.db`, so the project can be tried, screenshotted and recorded without an App Store account.
+Along the way, **demo mode** (`loot serve --demo`) landed with Quest 4's polish: a seeded 120-day world plus a live emitter in a separate `demo.db`, so the project can be tried, screenshotted and recorded without an App Store account.
 
 Further out: RevenueCat as an authoritative ledger for real revenue totals, achievements with permanent trophies, and a shareable read-only "hoard" page.
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE).
