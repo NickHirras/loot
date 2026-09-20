@@ -1,7 +1,12 @@
 # syntax=docker/dockerfile:1
 
 # ---------------------------------------------------------------- web build
-FROM node:26-alpine AS web
+# Built on the runner's own architecture, whatever the image is for. What
+# comes out is HTML, CSS and JavaScript, the same bytes on every platform, so
+# there is nothing to gain from emulating arm64 to produce it — and something
+# to lose: Paraglide's compiler does not survive QEMU, which broke every
+# multi-arch release build from the day the message catalog landed.
+FROM --platform=$BUILDPLATFORM node:26-alpine AS web
 
 WORKDIR /src/web
 COPY web/package.json web/package-lock.json* ./
