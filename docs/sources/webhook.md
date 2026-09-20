@@ -57,14 +57,33 @@ Only `kind` is required.
 | `rarity` | string | — | One of `common`, `uncommon`, `rare`, `epic`, `legendary`, `cursed`. Anything else is a `400`. |
 | `title` | string | `""` | The drop's headline. |
 | `subtitle` | string | `""` | The line under it. |
+| `url` | string | `""` | Where this thing actually lives — the build, the invoice, the ticket. Makes the drop's card clickable through to it. Must be an absolute `http`/`https` URL; anything else (a `javascript:` URI, a relative path) is quietly dropped, like a bad `country`. |
 | `ledger` | bool | `false` | `true` stores the event as settled money, so the **vault sums it into revenue**. Use it for real invoices; leave it false for estimates and signals. |
 | `chest` | bool | `false` | `true` holds the drop for the day's chest instead of the live feed. |
 | `payload` | object | `{}` | Anything else you want stored with the event. |
 
 `rarity`, `title` and `subtitle` are copied to the top level of the stored
 payload, because that is where the default rules look for them
-(`{{.Payload.title}}`). Keys in `payload` are merged underneath, so a
-`payload.title` never shadows the real one.
+(`{{.Payload.title}}`). `url` is copied there too, because that is where Loot
+looks when it works out where a drop's card should link to. Keys in `payload`
+are merged underneath, so a `payload.title` — or a `payload.url` that skipped
+the validation — never shadows the real one.
+
+### Linking out
+
+Send a `url` and the drop's card in the feed becomes a link to it, opening in
+a new tab:
+
+```bash
+curl -X POST http://localhost:8080/hooks/webhook \
+  -d '{"kind":"ci_green","title":"Build passed","url":"https://ci.example.com/runs/4181"}'
+```
+
+Only `http` and `https` are accepted, and only with a host: a `javascript:`
+URI, a `data:` URI or a bare path is discarded and the drop is stored and
+shown without a link. Nothing is rejected over it — a link is a nicety and
+the event is the point — so a sender that gets the URL wrong still gets its
+drop.
 
 ### Rarity
 

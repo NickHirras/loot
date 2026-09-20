@@ -74,7 +74,7 @@ Six screens, all of them demo data at 1400×900. Because the demo world comes fr
 <tr>
 <td width="50%">
 <img src="docs/screenshots/feed.png" alt="The live feed: drops stacked newest first, each with a rarity badge, an amount and a country">
-<b>Feed</b> — every drop as it lands, rarest colours loudest. The chest in the top right is yesterday, still shut, with 8 drops in it.
+<b>Feed</b> — every drop as it lands, rarest colours loudest. Cards whose event lives somewhere (the GitHub issue, the store page, the Sentry ticket) click through to it. The chest in the top right is yesterday, still shut, with 8 drops in it.
 </td>
 <td width="50%">
 <img src="docs/screenshots/chest.png" alt="The chest cascade: a rare drop revealed on top of the drops already opened">
@@ -790,6 +790,8 @@ Adding a source means implementing `core.Source` (and optionally `core.WebhookHa
 | `POST /api/dev/fake` | synthetic drop, only when `dev.enabled` |
 
 `GET /api/stats` also carries `"demo": true` when the server is running on synthetic data, which is what puts the **demo** pill in the header.
+
+Every drop that leaves the server — the feed, a chest cascade, the websocket — carries an optional `link`: where that event actually lives. It is **derived on the way out** from the event's source, kind, app and payload rather than stored, so improving a rule makes every drop Loot has ever minted clickable, retroactively. It is either an absolute `http(s)` URL (a GitHub issue, a store page, a Sentry issue) or one of the dashboard's own routes (`#/quests`) for Loot's own news, and it is absent whenever no trustworthy link can be built — which includes every external link in demo mode, where the apps are fictional. Post a `url` to the generic webhook to give your own drops one; see [docs/sources/webhook.md](docs/sources/webhook.md).
 
 The websocket carries four kinds of message:
 

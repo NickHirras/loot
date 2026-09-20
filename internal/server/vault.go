@@ -171,6 +171,8 @@ func (s *Server) handleChestOpen(w http.ResponseWriter, r *http.Request) {
 	// drops also go out on the bus, where each connection localizes them for
 	// itself — see handleWS.
 	s.localizeDrops(r, s.requestLang(r), drops)
+	// A chest drop links out like any other; see links.go.
+	s.linkDrops(drops)
 
 	writeJSON(w, http.StatusOK, map[string]any{
 		"opened":       opened,

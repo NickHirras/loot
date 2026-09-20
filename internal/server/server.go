@@ -145,6 +145,9 @@ func (s *Server) handleDrops(w http.ResponseWriter, r *http.Request) {
 	// Titles are stored in the language they were minted in and re-rendered
 	// per reader; nothing here is cached, so the page is rewritten in place.
 	s.localizeDrops(r, s.requestLang(r), drops)
+	// And where each drop came from, worked out from the event rather than
+	// read back from a column; see links.go.
+	s.linkDrops(drops)
 
 	next := ""
 	if len(drops) == limit && len(drops) > 0 {
@@ -435,6 +438,11 @@ func (s *Server) handleDevFake(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		s.fail(w, "dev fake", err)
 		return
+	}
+	// The echoed drop is the same shape the feed gets, link included — a
+	// silent event mints no drop at all, hence the nil check.
+	if drop != nil {
+		drop.Link = s.linkFor(ev)
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "drop": drop, "event": ev})
 }

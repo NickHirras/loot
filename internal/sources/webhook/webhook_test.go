@@ -336,6 +336,51 @@ func TestCountryIsNormalizedOrDropped(t *testing.T) {
 	}
 }
 
+// `url` follows `country`: a link is a nicety, so a bad one costs the caller
+// the link rather than the drop.
+func TestURLIsKeptOrDropped(t *testing.T) {
+	s := newSource(t, "")
+	for body, want := range map[string]string{
+		`{"kind":"ci_green","url":"https://ci.example.com/runs/41"}`:   "https://ci.example.com/runs/41",
+		`{"kind":"ci_green","url":"http://ci.internal/runs/41"}`:       "http://ci.internal/runs/41",
+		`{"kind":"ci_green","url":"  https://ci.example.com/x  "}`:     "https://ci.example.com/x",
+		`{"kind":"ci_green","url":"javascript:alert(1)"}`:              "",
+		`{"kind":"ci_green","url":"JavaScript:alert(1)"}`:              "",
+		`{"kind":"ci_green","url":"data:text/html,<script></script>"}`: "",
+		`{"kind":"ci_green","url":"mailto:me@example.com"}`:            "",
+		`{"kind":"ci_green","url":"/runs/41"}`:                         "",
+		`{"kind":"ci_green","url":"//evil.example.com/x"}`:             "",
+		`{"kind":"ci_green","url":""}`:                                 "",
+		`{"kind":"ci_green"}`:                                          "",
+	} {
+		rec, events := post(t, s, body, "")
+		if rec.Code != http.StatusOK {
+			t.Fatalf("%s: status %d (%s) — a bad url must not reject the drop", body, rec.Code, rec.Body)
+		}
+		p := payloadOf(t, events[0])
+		got, _ := p["url"].(string)
+		if got != want {
+			t.Errorf("%s: payload url = %q, want %q", body, got, want)
+		}
+		if want == "" {
+			if _, present := p["url"]; present {
+				t.Errorf("%s: payload carries an empty url key; it should be absent", body)
+			}
+		}
+	}
+}
+
+// A `url` inside `payload` must not shadow the validated top-level one, for
+// the same reason `title` does not.
+func TestPayloadURLDoesNotShadowTheValidatedOne(t *testing.T) {
+	s := newSource(t, "")
+	body := `{"kind":"ci_green","url":"https://ci.example.com/runs/41","payload":{"url":"javascript:alert(1)"}}`
+	_, events := post(t, s, body, "")
+	if p := payloadOf(t, events[0]); p["url"] != "https://ci.example.com/runs/41" {
+		t.Fatalf("payload url = %v, want the top-level field to win", p["url"])
+	}
+}
+
 func TestPayloadMergeDoesNotShadowTopLevelFields(t *testing.T) {
 	s := newSource(t, "")
 	body := `{"kind":"sale","title":"real title","payload":{"title":"payload title","note":"kept"}}`
