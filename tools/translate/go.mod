@@ -3,7 +3,7 @@ module github.com/nickhirras/loot/tools/translate
 go 1.26.6
 
 require (
-	github.com/anthropics/anthropic-sdk-go v1.73.0
+	github.com/anthropics/anthropic-sdk-go v1.75.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
