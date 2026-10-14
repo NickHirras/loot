@@ -333,7 +333,7 @@ func (e *Engine) renderOverlay(ov *compiledOverlay, ruleName, field string, data
 	if err := t.Execute(&buf, data); err != nil {
 		return "", false
 	}
-	return strings.TrimSpace(buf.String()), true
+	return trimSeparator(buf.String()), true
 }
 
 // translatable reports whether the overlay may speak for ruleName: it must

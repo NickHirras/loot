@@ -447,7 +447,77 @@ func (e *Engine) render(ruleName, field, text string, data tmplData) string {
 		// validated) should not lose the drop; fall back to the raw text.
 		return text
 	}
-	return strings.TrimSpace(buf.String())
+	return trimSeparator(buf.String())
+}
+
+// trimSeparator strips surrounding whitespace and any leading or trailing "·"
+// separator left behind when an optional template field (such as {{.AmountFmt}}
+// on a $0 trial purchase) renders empty.
+func trimSeparator(s string) string {
+	s = strings.TrimSpace(s)
+	for strings.HasPrefix(s, "·") {
+		s = strings.TrimSpace(strings.TrimPrefix(s, "·"))
+	}
+	for strings.HasSuffix(s, "·") {
+		s = strings.TrimSpace(strings.TrimSuffix(s, "·"))
+	}
+	return s
+}
+
+// Rerender rebuilds a stored drop's title and subtitle from its recorded Rule
+// and FloorRule against ev as it stands now (for example, after a raw
+// RevenueCat app_id has been mapped to a human app name). It touches no store
+// and returns false when the drop records no rule or names one this engine
+// does not have.
+func (e *Engine) Rerender(ctx context.Context, d core.Drop, ev core.Event) (string, string, bool) {
+	if d.Rule == "" {
+		return d.Title, d.Subtitle, false
+	}
+	then, ok := e.ruleText(d.Rule)
+	if !ok {
+		return d.Title, d.Subtitle, false
+	}
+	var floorThen Then
+	if d.FloorRule != "" {
+		floorThen, ok = e.ruleText(d.FloorRule)
+		if !ok {
+			return d.Title, d.Subtitle, false
+		}
+	}
+
+	var payload map[string]any
+	if len(ev.Payload) > 0 {
+		_ = json.Unmarshal(ev.Payload, &payload)
+	}
+	data := e.buildTmplData(ev, payload)
+
+	title := e.render(d.Rule, "title", then.Title, data)
+	subtitle := e.render(d.Rule, "subtitle", then.Subtitle, data)
+	if d.FloorRule != "" {
+		data.BaseTitle = title
+		floorTitle := e.render(d.FloorRule, "title", floorThen.Title, data)
+		floorSub := e.render(d.FloorRule, "subtitle", floorThen.Subtitle, data)
+		if floorTitle != "" {
+			if floorSub == "" {
+				floorSub = title
+			}
+			title = floorTitle
+		}
+		subtitle = floorSub
+	}
+	if title == "" {
+		title = strings.TrimSpace(ev.Source + " " + ev.Kind)
+	}
+
+	lang := normalizeLang(d.Lang)
+	if lang != "" && lang != i18n.BaseLang {
+		base := d
+		base.Title, base.Subtitle, base.Lang = title, subtitle, i18n.BaseLang
+		if lt, ls, lok := e.Localize(ctx, base, ev, payload, lang); lok {
+			return lt, ls, true
+		}
+	}
+	return title, subtitle, true
 }
 
 func (e *Engine) buildTmplData(ev core.Event, payload map[string]any) tmplData {

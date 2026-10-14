@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+
+	"github.com/nickhirras/loot/internal/core"
 )
 
 // The app scope, in one place.
@@ -143,6 +145,80 @@ func (s *Store) RemapProducts(ctx context.Context, resolver Resolver) (int, erro
 			return changed, fmt.Errorf("remap product rows: %w", err)
 		}
 		changed += int(n)
+	}
+	return changed, nil
+}
+
+// RemapRevenueCatApps updates stored RevenueCat events whose `app` column still
+// holds an unmapped app_id (because the webhook landed before the id was added
+// to loot.yaml) and re-renders any RevenueCat drop whose title or subtitle
+// changes as a result.
+func (s *Store) RemapRevenueCatApps(
+	ctx context.Context,
+	resolve func(app string, payload []byte) string,
+	rerender func(ctx context.Context, d core.Drop, ev core.Event) (string, string, bool),
+) (int, error) {
+	changed := 0
+	if resolve != nil {
+		type evRow struct {
+			id      string
+			app     string
+			payload []byte
+		}
+		rows, err := s.q.QueryContext(ctx,
+			`SELECT id, app, payload FROM events WHERE source = 'revenuecat' AND app <> ''`)
+		if err != nil {
+			return 0, fmt.Errorf("select revenuecat events: %w", err)
+		}
+		var list []evRow
+		for rows.Next() {
+			var r evRow
+			if err := rows.Scan(&r.id, &r.app, &r.payload); err != nil {
+				rows.Close()
+				return 0, fmt.Errorf("scan revenuecat event: %w", err)
+			}
+			list = append(list, r)
+		}
+		err = rows.Err()
+		rows.Close()
+		if err != nil {
+			return 0, fmt.Errorf("iterate revenuecat events: %w", err)
+		}
+
+		for _, r := range list {
+			want := strings.TrimSpace(resolve(r.app, r.payload))
+			if want == "" || want == r.app {
+				continue
+			}
+			if _, err := s.q.ExecContext(ctx,
+				`UPDATE events SET app = ? WHERE id = ?`, want, r.id); err != nil {
+				return changed, fmt.Errorf("update revenuecat app %s: %w", r.id, err)
+			}
+			changed++
+		}
+	}
+
+	if rerender != nil {
+		rows, err := s.q.QueryContext(ctx, dropSelect+` WHERE e.source = 'revenuecat'`)
+		if err != nil {
+			return changed, fmt.Errorf("select revenuecat drops: %w", err)
+		}
+		drops, err := scanDrops(rows, 32)
+		rows.Close()
+		if err != nil {
+			return changed, err
+		}
+		for _, v := range drops {
+			title, subtitle, ok := rerender(ctx, v.Drop, v.Event())
+			if !ok || (title == v.Title && subtitle == v.Subtitle) {
+				continue
+			}
+			if _, err := s.q.ExecContext(ctx,
+				`UPDATE drops SET title = ?, subtitle = ? WHERE id = ?`,
+				title, subtitle, v.ID); err != nil {
+				return changed, fmt.Errorf("update revenuecat drop %s: %w", v.ID, err)
+			}
+		}
 	}
 	return changed, nil
 }

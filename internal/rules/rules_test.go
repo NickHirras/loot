@@ -834,3 +834,29 @@ func TestSalesDayTitlesReadWell(t *testing.T) {
 		}
 	}
 }
+
+func TestZeroAmountPurchaseSubtitleHasNoDanglingSeparatorAndRerenders(t *testing.T) {
+	ctx := context.Background()
+	e := defaultEngine(t, seenCountry("SE"))
+
+	ev := rcEvent("purchase", 0, `{"event":{"period_type":"TRIAL"}}`)
+	ev.App = "appe86fcdfc98"
+	ev.Country = "SE"
+
+	drop, err := e.Classify(ctx, ev)
+	if err != nil {
+		t.Fatalf("classify: %v", err)
+	}
+	if drop.Subtitle != "appe86fcdfc98" {
+		t.Fatalf("subtitle = %q, want %q (no leading separator)", drop.Subtitle, "appe86fcdfc98")
+	}
+
+	ev.App = "Nistis"
+	title, subtitle, ok := e.Rerender(ctx, drop, ev)
+	if !ok {
+		t.Fatal("Rerender declined a default revenuecat-purchase drop")
+	}
+	if title != "New subscriber" || subtitle != "Nistis" {
+		t.Fatalf("rerendered = %q / %q, want New subscriber / Nistis", title, subtitle)
+	}
+}

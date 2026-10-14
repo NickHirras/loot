@@ -354,3 +354,65 @@ func TestProductPairs(t *testing.T) {
 		t.Errorf("pairs are not ordered by product: %+v", pairs)
 	}
 }
+
+func TestRemapRevenueCatApps(t *testing.T) {
+	ctx := context.Background()
+	st := newStore(t)
+
+	ev := core.Event{
+		ID:         core.NewID(),
+		Source:     "revenuecat",
+		Kind:       "cancellation",
+		App:        "appe86fcdfc98",
+		Product:    "appe86fcdfc98",
+		Country:    "SE",
+		OccurredAt: time.Now().UTC(),
+		ObservedAt: time.Now().UTC(),
+		Day:        day(0),
+		DedupeKey:  "rc:cancel:se",
+	}
+	if _, err := st.InsertEvent(ctx, ev); err != nil {
+		t.Fatalf("insert event: %v", err)
+	}
+	drop := core.Drop{
+		ID:        core.NewID(),
+		EventID:   ev.ID,
+		Rarity:    core.Cursed,
+		Title:     "Subscriber lost",
+		Subtitle:  "cancellation · appe86fcdfc98",
+		XP:        5,
+		CreatedAt: time.Now().UTC(),
+		Rule:      "revenuecat-churn",
+		Lang:      "en",
+	}
+	if err := st.InsertDrop(ctx, drop); err != nil {
+		t.Fatalf("insert drop: %v", err)
+	}
+
+	changed, err := st.RemapRevenueCatApps(ctx, func(app string, _ []byte) string {
+		if app == "appe86fcdfc98" {
+			return "Nistis"
+		}
+		return app
+	}, func(_ context.Context, d core.Drop, e core.Event) (string, string, bool) {
+		return d.Title, e.Kind + " · " + e.App, true
+	})
+	if err != nil {
+		t.Fatalf("remap revenuecat apps: %v", err)
+	}
+	if changed != 1 {
+		t.Fatalf("changed = %d, want 1", changed)
+	}
+
+	drops, err := st.ListDrops(ctx, store.DropQuery{})
+	if err != nil {
+		t.Fatalf("list drops: %v", err)
+	}
+	if len(drops) != 1 {
+		t.Fatalf("drops = %d, want 1", len(drops))
+	}
+	if drops[0].App != "Nistis" || drops[0].Subtitle != "cancellation · Nistis" {
+		t.Fatalf("got app=%q subtitle=%q, want Nistis and cancellation · Nistis",
+			drops[0].App, drops[0].Subtitle)
+	}
+}

@@ -244,6 +244,75 @@ func dedupeKey(eventID, txnID string, body []byte) string {
 	return "rc:sha256:" + hex.EncodeToString(sum[:16])
 }
 
+// ResolveApp maps a raw RevenueCat app identifier (or, failing that, the
+// webhook's product_id or its reverse-domain bundle/package prefix) through
+// apps. Unmapped identifiers are returned unchanged.
+func ResolveApp(apps map[string]string, app string, body []byte) string {
+	app = strings.TrimSpace(app)
+	if len(apps) == 0 {
+		return app
+	}
+	if name := lookupApp(apps, app); name != "" {
+		return name
+	}
+	var wh webhook
+	if len(body) > 0 && json.Unmarshal(body, &wh) == nil {
+		if prodID := strings.TrimSpace(wh.Event.ProductID); prodID != "" {
+			if name := lookupApp(apps, prodID); name != "" {
+				return name
+			}
+			if name := lookupPrefix(apps, prodID); name != "" {
+				return name
+			}
+		}
+	}
+	if name := lookupPrefix(apps, app); name != "" {
+		return name
+	}
+	return app
+}
+
+func lookupApp(apps map[string]string, key string) string {
+	if key == "" {
+		return ""
+	}
+	if name := strings.TrimSpace(apps[key]); name != "" {
+		return name
+	}
+	for k, v := range apps {
+		if strings.EqualFold(strings.TrimSpace(k), key) {
+			if name := strings.TrimSpace(v); name != "" {
+				return name
+			}
+		}
+	}
+	return ""
+}
+
+// lookupPrefix matches a reverse-domain bundle/package key ("com.nistis.app")
+// against a dotted SKU ("com.nistis.app.pro.monthly"), picking the longest
+// matching prefix.
+func lookupPrefix(apps map[string]string, sku string) string {
+	skuLower := strings.ToLower(strings.TrimSpace(sku))
+	if skuLower == "" {
+		return ""
+	}
+	var bestKey, bestName string
+	for k, v := range apps {
+		kTrim := strings.TrimSpace(k)
+		vTrim := strings.TrimSpace(v)
+		if kTrim == "" || vTrim == "" || !strings.Contains(kTrim, ".") {
+			continue
+		}
+		prefix := strings.ToLower(kTrim) + "."
+		if strings.HasPrefix(skuLower, prefix) && len(kTrim) > len(bestKey) {
+			bestKey = kTrim
+			bestName = vTrim
+		}
+	}
+	return bestName
+}
+
 // HandleWebhook implements core.WebhookHandler.
 func (s *Source) HandleWebhook(w http.ResponseWriter, r *http.Request, emit func(core.Event)) {
 	if r.Method != http.MethodPost {
@@ -268,9 +337,7 @@ func (s *Source) HandleWebhook(w http.ResponseWriter, r *http.Request, emit func
 		return
 	}
 
-	if name, ok := s.Apps[ev.App]; ok && name != "" {
-		ev.App = name
-	}
+	ev.App = ResolveApp(s.Apps, ev.App, body)
 	sandbox := IsSandbox(body)
 	if sandbox && ev.Kind != "test" && !s.IncludeSandbox {
 		// Stored (so the webhook visibly works and /api/sources counts it)

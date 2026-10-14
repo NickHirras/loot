@@ -336,3 +336,16 @@ func TestTestPingHasNoCountryAndAppsAreMapped(t *testing.T) {
 		t.Fatalf("got kind=%s country=%q silent=%v app=%q", got.Kind, got.Country, got.Silent, got.App)
 	}
 }
+
+func TestResolveAppByProductPrefix(t *testing.T) {
+	src := revenuecat.New("", nil)
+	src.Apps = map[string]string{
+		"com.nistis.app": "Nistis",
+	}
+	body := `{"api_version":"1.0","event":{"id":"evt-prefix","type":"INITIAL_PURCHASE","product_id":"com.nistis.app.pro.monthly","price":0,"currency":"USD","country_code":"SE","environment":"PRODUCTION","app_id":"appe86fcdfc98"}}`
+	var got core.Event
+	src.HandleWebhook(httptest.NewRecorder(), httptest.NewRequest(http.MethodPost, "/hooks/revenuecat", strings.NewReader(body)), func(e core.Event) { got = e })
+	if got.App != "Nistis" {
+		t.Fatalf("app = %q, want Nistis via product_id prefix", got.App)
+	}
+}

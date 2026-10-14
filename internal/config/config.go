@@ -630,6 +630,57 @@ func (c Config) RevenueCatEnabled() bool {
 	return *c.Sources.RevenueCat.Enabled
 }
 
+// RevenueCatApps returns the RevenueCat identifier -> display name mapping,
+// combining the top-level `apps:` product scope with `sources.revenuecat.apps`.
+//
+// Two things from `apps:` are included automatically so nobody has to maintain
+// the same mapping in two places:
+//   - every entry under `match.revenuecat` maps to that product's name;
+//   - every reverse-domain bundle/package id (e.g. "com.nistis.app") maps to
+//     that product's name too, so a RevenueCat webhook carrying an unmapped
+//     app_id can still be identified when its product_id starts with the app's
+//     bundle/package prefix ("com.nistis.app.pro.monthly").
+//
+// Explicit entries in `sources.revenuecat.apps` win when both name the same id.
+func (c Config) RevenueCatApps() map[string]string {
+	out := map[string]string{}
+	for _, prod := range c.Apps {
+		name := strings.TrimSpace(prod.Name)
+		if name == "" {
+			continue
+		}
+		for source, ids := range prod.Match {
+			isRC := strings.EqualFold(strings.TrimSpace(source), "revenuecat")
+			for _, id := range ids {
+				id = strings.TrimSpace(id)
+				if id == "" {
+					continue
+				}
+				if isRC || isReverseDomain(id) {
+					out[id] = name
+				}
+			}
+		}
+	}
+	for id, name := range c.Sources.RevenueCat.Apps {
+		id = strings.TrimSpace(id)
+		name = strings.TrimSpace(name)
+		if id != "" && name != "" {
+			out[id] = name
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+// isReverseDomain reports whether s looks like a bundle or package identifier
+// ("com.nistis.app"), which RevenueCat SKUs commonly use as a prefix.
+func isReverseDomain(s string) bool {
+	return strings.Contains(s, ".") && !strings.ContainsAny(s, " \t/:")
+}
+
 // FXEnabled reports whether Loot may fetch live exchange rates. Defaults to on.
 func (c Config) FXEnabled() bool {
 	if c.FX.Enabled == nil {

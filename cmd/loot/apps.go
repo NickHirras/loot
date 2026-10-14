@@ -11,6 +11,8 @@ import (
 
 	"github.com/nickhirras/loot/internal/config"
 	"github.com/nickhirras/loot/internal/demo"
+	"github.com/nickhirras/loot/internal/rules"
+	"github.com/nickhirras/loot/internal/sources/revenuecat"
 	"github.com/nickhirras/loot/internal/store"
 )
 
@@ -76,9 +78,24 @@ func runApps(args []string) error {
 	case "", "list":
 		return listApps(ctx, st, products)
 	case "remap":
+		engine, err := rules.Load(cfg.RulesPath, st)
+		if err != nil {
+			return err
+		}
+		engine.SetDisplayCurrency(cfg.DisplayCurrency)
+		rcApps := cfg.RevenueCatApps()
+		rcN, err := st.RemapRevenueCatApps(ctx, func(app string, payload []byte) string {
+			return revenuecat.ResolveApp(rcApps, app, payload)
+		}, engine.Rerender)
+		if err != nil {
+			return err
+		}
 		n, err := st.RemapProducts(ctx, products)
 		if err != nil {
 			return err
+		}
+		if rcN > n {
+			n = rcN
 		}
 		fmt.Printf("remapped %d event(s) across %d configured product(s)\n", n, len(products))
 		return listApps(ctx, st, products)

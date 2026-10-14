@@ -484,3 +484,31 @@ func TestLanguageIsTrimmedNotValidated(t *testing.T) {
 		t.Errorf("an unknown language tag must not be rejected: %v", err)
 	}
 }
+
+func TestRevenueCatAppsMergesProductScope(t *testing.T) {
+	path := writeConfig(t, `
+sources:
+  revenuecat:
+    apps:
+      app_override: "Nistis (iOS)"
+apps:
+  - name: Nistis
+    match:
+      revenuecat: ["app5525946104", "appe86fcdfc98", "app_override"]
+      googleplay: ["com.nistis.app"]
+`)
+	cfg, err := config.Load(path, true)
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	apps := cfg.RevenueCatApps()
+	if apps["appe86fcdfc98"] != "Nistis" {
+		t.Errorf("appe86fcdfc98 = %q, want Nistis from apps.match.revenuecat", apps["appe86fcdfc98"])
+	}
+	if apps["com.nistis.app"] != "Nistis" {
+		t.Errorf("com.nistis.app = %q, want Nistis from reverse-domain package id", apps["com.nistis.app"])
+	}
+	if apps["app_override"] != "Nistis (iOS)" {
+		t.Errorf("app_override = %q, want explicit sources.revenuecat.apps to win", apps["app_override"])
+	}
+}

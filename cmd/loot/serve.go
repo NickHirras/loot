@@ -120,14 +120,6 @@ func runServe(args []string) error {
 	if cfg.Demo.Enabled && len(products) == 0 {
 		products = demo.Products()
 	}
-	// Remap at every startup, so editing `apps:` is the whole of the work:
-	// there is no migration to run and no stale scope to discover a week
-	// later. It walks the distinct (source, app) pairs, not the rows.
-	if n, err := st.RemapProducts(ctx, products); err != nil {
-		return err
-	} else if n > 0 {
-		log.Info("products remapped", "events", n, "products", len(products))
-	}
 
 	// Events stored before there was a base amount, but already in the display
 	// currency, need no rates to catch up.
@@ -154,6 +146,23 @@ func runServe(args []string) error {
 	}
 	if cfg.RulesPath != "" {
 		log.Info("rules loaded", "path", cfg.RulesPath)
+	}
+
+	// Remap at every startup, so editing `apps:` (or `sources.revenuecat.apps`)
+	// is the whole of the work: there is no migration to run and no stale
+	// app_id or scope to discover a week later.
+	rcApps := cfg.RevenueCatApps()
+	if n, err := st.RemapRevenueCatApps(ctx, func(app string, payload []byte) string {
+		return revenuecat.ResolveApp(rcApps, app, payload)
+	}, engine.Rerender); err != nil {
+		return err
+	} else if n > 0 {
+		log.Info("revenuecat apps remapped", "events", n)
+	}
+	if n, err := st.RemapProducts(ctx, products); err != nil {
+		return err
+	} else if n > 0 {
+		log.Info("products remapped", "events", n, "products", len(products))
 	}
 
 	// Demo mode is pinned to the embedded rate snapshot: no fetch, no cache,
@@ -287,7 +296,7 @@ func runServe(args []string) error {
 	}
 	if !cfg.Demo.Enabled && cfg.RevenueCatEnabled() {
 		rc := revenuecat.New(cfg.Sources.RevenueCat.Secret, log)
-		rc.Apps = cfg.Sources.RevenueCat.Apps
+		rc.Apps = cfg.RevenueCatApps()
 		rc.IncludeSandbox = cfg.Sources.RevenueCat.IncludeSandbox
 		sources = append(sources, rc)
 		if cfg.Sources.RevenueCat.Secret == "" {
