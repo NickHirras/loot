@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"reflect"
 	"sort"
 	"strconv"
 	"strings"
@@ -57,6 +58,11 @@ type fakePartner struct {
 	// notFound forces a 404 for one (path, applicationId) pair, which is how
 	// Partner Center answers both "no data" and "no such app".
 	notFound map[string]bool
+
+	// rateLimit answers the next N requests for a path with 429, carrying
+	// retryAfter as the Retry-After header when it is set. -1 means forever.
+	rateLimit  map[string]int
+	retryAfter string
 
 	tokenForms []url.Values
 	requests   []*url.URL
@@ -122,6 +128,19 @@ func (f *fakePartner) handler() http.Handler {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(f.apiStatus)
 			_, _ = io.WriteString(w, f.apiBody)
+			return
+		}
+
+		if n, ok := f.rateLimit[r.URL.Path]; ok && n != 0 {
+			if n > 0 {
+				f.rateLimit[r.URL.Path] = n - 1
+			}
+			w.Header().Set("Content-Type", "application/json")
+			if f.retryAfter != "" {
+				w.Header().Set("Retry-After", f.retryAfter)
+			}
+			w.WriteHeader(http.StatusTooManyRequests)
+			_, _ = io.WriteString(w, `{"code":"TooManyRequests","message":"Rate limit is exceeded. Try again later."}`)
 			return
 		}
 
@@ -832,6 +851,138 @@ func TestPollAddOn404IsTolerated(t *testing.T) {
 	}
 	if got := st.LastSettledDay[testStoreID]; got != settledDay {
 		t.Errorf("cursor = %q, want %q", got, settledDay)
+	}
+}
+
+// recordSleeps swaps the source's sleep for one that only notes what it was
+// asked to wait, so a 429 costs the test no wall clock.
+func recordSleeps(src *microsoftstore.Source) *[]time.Duration {
+	var slept []time.Duration
+	src.Sleep = func(_ context.Context, d time.Duration) error {
+		slept = append(slept, d)
+		return nil
+	}
+	return &slept
+}
+
+// Partner Center answers 429 for a while after an account is associated and
+// whenever the hourly quota is spent. A short run of them is waited out for
+// exactly the Retry-After it names, and the poll then completes as if nothing
+// happened: events present, cursor advanced, last_error clear.
+func TestPollWaitsOutRateLimit(t *testing.T) {
+	fake := newFake(t)
+	fake.rateLimit = map[string]int{"/v1.0/my/analytics/inappacquisitions": 2}
+	fake.retryAfter = "7"
+	src := newTestSource(t, fake, []string{testStoreID})
+	slept := recordSleeps(src)
+
+	events, state, err := src.Poll(context.Background(), nil)
+	if err != nil {
+		t.Fatalf("two 429s should have been waited out: %v", err)
+	}
+	if len(events) == 0 {
+		t.Fatal("no events after the rate limit cleared")
+	}
+	if want := []time.Duration{7 * time.Second, 7 * time.Second}; !reflect.DeepEqual(*slept, want) {
+		t.Errorf("slept %v, want %v", *slept, want)
+	}
+	if got := len(fake.asked("/v1.0/my/analytics/inappacquisitions")); got != 3 {
+		t.Errorf("add-on endpoint asked %d times, want 3 (two refused, one served)", got)
+	}
+
+	var st struct {
+		LastSettledDay map[string]string `json:"last_settled_day"`
+	}
+	if err := json.Unmarshal(state, &st); err != nil {
+		t.Fatalf("decode state: %v", err)
+	}
+	if got := st.LastSettledDay[testStoreID]; got != settledDay {
+		t.Errorf("cursor = %q, want %q", got, settledDay)
+	}
+}
+
+// Retry-After may be an HTTP-date rather than a count of seconds; the wait is
+// measured from the source's own clock. With no header at all the built-in
+// backoff is used.
+func TestPollRateLimitRetryAfterForms(t *testing.T) {
+	t.Run("http-date", func(t *testing.T) {
+		fake := newFake(t)
+		fake.rateLimit = map[string]int{"/v1.0/my/analytics/appacquisitions": 1}
+		fake.retryAfter = testNow.Add(45 * time.Second).UTC().Format(http.TimeFormat)
+		src := newTestSource(t, fake, []string{testStoreID})
+		slept := recordSleeps(src)
+
+		if _, _, err := src.Poll(context.Background(), nil); err != nil {
+			t.Fatalf("poll: %v", err)
+		}
+		if want := []time.Duration{45 * time.Second}; !reflect.DeepEqual(*slept, want) {
+			t.Errorf("slept %v, want %v", *slept, want)
+		}
+	})
+	t.Run("no header", func(t *testing.T) {
+		fake := newFake(t)
+		fake.rateLimit = map[string]int{"/v1.0/my/analytics/appacquisitions": 2}
+		src := newTestSource(t, fake, []string{testStoreID})
+		slept := recordSleeps(src)
+
+		if _, _, err := src.Poll(context.Background(), nil); err != nil {
+			t.Fatalf("poll: %v", err)
+		}
+		if len(*slept) != 2 || (*slept)[0] >= (*slept)[1] {
+			t.Errorf("slept %v, want two growing backoffs", *slept)
+		}
+	})
+}
+
+// A rate limit that never lifts is reported, after a bounded number of
+// retries, and the cursor stays put so the day is read next time.
+func TestPollGivesUpOnPersistentRateLimit(t *testing.T) {
+	fake := newFake(t)
+	fake.rateLimit = map[string]int{"/v1.0/my/analytics/inappacquisitions": -1}
+	fake.retryAfter = "3"
+	src := newTestSource(t, fake, []string{testStoreID})
+	slept := recordSleeps(src)
+
+	_, state, err := src.Poll(context.Background(), nil)
+	if err == nil {
+		t.Fatal("a 429 that never lifts must surface")
+	}
+	if !strings.Contains(err.Error(), "rate limited by partner center") || !strings.Contains(err.Error(), "inappacquisitions") {
+		t.Errorf("error = %q, want it to name the rate limit and the endpoint", err)
+	}
+	if len(*slept) != 3 {
+		t.Errorf("slept %d times, want 3", len(*slept))
+	}
+
+	var st struct {
+		LastSettledDay map[string]string `json:"last_settled_day"`
+	}
+	if err := json.Unmarshal(state, &st); err != nil {
+		t.Fatalf("decode state: %v", err)
+	}
+	if got := st.LastSettledDay[testStoreID]; got != "" {
+		t.Errorf("cursor advanced to %q past a day that was never read", got)
+	}
+}
+
+// A Retry-After longer than Loot is willing to hold a poll fails at once
+// rather than sleeping through it; the next poll is hours away regardless.
+func TestPollRateLimitTooLongFailsFast(t *testing.T) {
+	fake := newFake(t)
+	fake.rateLimit = map[string]int{"/v1.0/my/analytics/appacquisitions": 1}
+	fake.retryAfter = "3600"
+	src := newTestSource(t, fake, []string{testStoreID})
+	slept := recordSleeps(src)
+
+	_, _, err := src.Poll(context.Background(), nil)
+	if err == nil || !strings.Contains(err.Error(), "rate limited by partner center") {
+		t.Fatalf("err = %v, want a rate limit error", err)
+	}
+	if len(*slept) != 0 {
+		t.Errorf("slept %v, want no wait at all", *slept)
+	}
+	if got := len(fake.asked("/v1.0/my/analytics/appacquisitions")); got != 1 {
+		t.Errorf("asked %d times, want 1", got)
 	}
 }
 
