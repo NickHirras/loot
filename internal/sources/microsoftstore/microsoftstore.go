@@ -399,7 +399,9 @@ func (s *Source) fetchSubscriptions(ctx context.Context, a app, date string, obs
 	q.Set("endDate", date)
 	q.Set("aggregationLevel", "day")
 	q.Set("top", strconv.Itoa(subscriptionsPageSize))
-	q.Set("skip", "0")
+	// No skip here, although the documentation lists it: the live endpoint
+	// answers `400 Query option 'Skip' is not allowed` to any value of it,
+	// even 0 (seen Nov 2026). Paging rides on @nextLink alone.
 
 	rows, err := fetchPages[apiSubscription](ctx, s, subscriptionsPath, q)
 	switch {
