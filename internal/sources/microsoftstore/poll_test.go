@@ -865,6 +865,30 @@ func recordSleeps(src *microsoftstore.Source) *[]time.Duration {
 	return &slept
 }
 
+// The subscriptions endpoint rejects the skip query option outright, with a
+// 400 that lit last_error on every poll: a lie in the documentation that the
+// other endpoints do not tell. The request must not carry it.
+func TestSubscriptionsQueryCarriesNoSkip(t *testing.T) {
+	fake := newFake(t)
+	src := newTestSource(t, fake, []string{testStoreID})
+
+	if _, _, err := src.Poll(context.Background(), nil); err != nil {
+		t.Fatalf("poll: %v", err)
+	}
+	asked := fake.asked("/v1.0/my/analytics/subscriptions")
+	if len(asked) == 0 {
+		t.Fatal("subscriptions were never asked for")
+	}
+	for _, q := range asked {
+		if q.Has("skip") {
+			t.Fatalf("subscriptions query carries skip=%q; Partner Center answers 400 to it", q.Get("skip"))
+		}
+		if !q.Has("top") || !q.Has("aggregationLevel") {
+			t.Errorf("subscriptions query lost a parameter it needs: %v", q)
+		}
+	}
+}
+
 // Partner Center answers 429 for a while after an account is associated and
 // whenever the hourly quota is spent. A short run of them is waited out for
 // exactly the Retry-After it names, and the poll then completes as if nothing

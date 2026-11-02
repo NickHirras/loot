@@ -113,6 +113,10 @@ Common failures and what they mean:
 | `analytics/subscriptions` | how many subscriptions were active that day |
 | `applications` | the app list, when `apps` is empty |
 
+The subscriptions request carries no `skip`: Microsoft's documentation lists
+it, but the live endpoint answers `400 Query option 'Skip' is not allowed` to
+any value of it, even `0`, and that error sat in `last_error` on every poll.
+
 Every request asks for `aggregationLevel=day` and a `groupby` of exactly the
 dimensions Loot keys on — `date`, `applicationName`, `acquisitionType`,
 `market`, and the add-on name. That is not an optimisation: without `groupby`
