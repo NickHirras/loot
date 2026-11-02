@@ -22,6 +22,16 @@ import (
 	"github.com/nickhirras/loot/internal/store"
 )
 
+// questNow pins the quest service's clock. Quest windows are weeks and
+// months of *local* days, while core.DayOf always names the UTC day, so a
+// test that seeds "today" from the real clock sees its revenue fall outside
+// the week whenever the local date and the UTC date disagree (every evening
+// in the Americas, every morning east of Greenwich). A fixed instant carrying
+// its own location keeps the window and the seeded day on the same calendar
+// wherever the test runs. A Wednesday mid-month, so neither window is about
+// to close.
+var questNow = time.Date(2026, 8, 19, 12, 0, 0, 0, time.UTC)
+
 // questHarness is the normal harness plus the quest and mystery services, and
 // the pipeline they mint their reward drops through.
 type questHarness struct {
@@ -50,6 +60,8 @@ func newQuestHarness(t *testing.T) *questHarness {
 	p := pipeline.New(st, engine, b, quietLogger())
 
 	questSvc := quests.NewService(st, p, b, "USD", quietLogger())
+	questSvc.Now = func() time.Time { return questNow }
+	questSvc.Generator.Now = questSvc.Now
 	mysterySvc := mysteries.NewService(st, p, b, quietLogger())
 	detector := mysteries.NewDetector(st, b, "USD", quietLogger())
 
@@ -104,7 +116,7 @@ func (h *questHarness) seedLedger(t *testing.T, day string, units int, amount fl
 
 func TestQuestsAPI(t *testing.T) {
 	h := newQuestHarness(t)
-	today := core.DayOf(time.Now().UTC())
+	today := core.DayOf(questNow)
 	h.seedLedger(t, today, 12, 120, "as:today")
 
 	// An empty board answers with empty lists rather than nulls.
@@ -187,7 +199,7 @@ func TestQuestsAPI(t *testing.T) {
 // quest that is already met pays a drop the feed can see.
 func TestQuestCompletionReachesTheFeed(t *testing.T) {
 	h := newQuestHarness(t)
-	today := core.DayOf(time.Now().UTC())
+	today := core.DayOf(questNow)
 	h.seedLedger(t, today, 30, 300, "as:today")
 
 	if _, body := h.post(t, "/api/quests",
