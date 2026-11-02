@@ -865,10 +865,10 @@ func recordSleeps(src *microsoftstore.Source) *[]time.Duration {
 	return &slept
 }
 
-// The subscriptions endpoint rejects the skip query option outright, with a
-// 400 that lit last_error on every poll: a lie in the documentation that the
-// other endpoints do not tell. The request must not carry it.
-func TestSubscriptionsQueryCarriesNoSkip(t *testing.T) {
+// The subscriptions endpoint rejects the top and skip query options outright,
+// with a 400 that lit last_error on every poll: a lie in the documentation
+// that the other endpoints do not tell. The request must carry neither.
+func TestSubscriptionsQueryCarriesNoTopOrSkip(t *testing.T) {
 	fake := newFake(t)
 	src := newTestSource(t, fake, []string{testStoreID})
 
@@ -880,10 +880,12 @@ func TestSubscriptionsQueryCarriesNoSkip(t *testing.T) {
 		t.Fatal("subscriptions were never asked for")
 	}
 	for _, q := range asked {
-		if q.Has("skip") {
-			t.Fatalf("subscriptions query carries skip=%q; Partner Center answers 400 to it", q.Get("skip"))
+		for _, bad := range []string{"top", "skip"} {
+			if q.Has(bad) {
+				t.Fatalf("subscriptions query carries %s=%q; Partner Center answers 400 to it", bad, q.Get(bad))
+			}
 		}
-		if !q.Has("top") || !q.Has("aggregationLevel") {
+		if !q.Has("aggregationLevel") || !q.Has("applicationId") {
 			t.Errorf("subscriptions query lost a parameter it needs: %v", q)
 		}
 	}

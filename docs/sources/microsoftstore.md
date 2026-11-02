@@ -113,9 +113,12 @@ Common failures and what they mean:
 | `analytics/subscriptions` | how many subscriptions were active that day |
 | `applications` | the app list, when `apps` is empty |
 
-The subscriptions request carries no `skip`: Microsoft's documentation lists
-it, but the live endpoint answers `400 Query option 'Skip' is not allowed` to
-any value of it, even `0`, and that error sat in `last_error` on every poll.
+The subscriptions request carries neither `top` nor `skip`: Microsoft's
+documentation lists both, but the live endpoint answers `400 Query option
+'Top' is not allowed` (and the same for `Skip`) to any value of either, even
+`skip=0`, and that error sat in `last_error` on every poll. It accepts
+`aggregationLevel`, `orderby` and `groupby`, and pages with `@nextLink` at a
+page size of its own choosing.
 
 Every request asks for `aggregationLevel=day` and a `groupby` of exactly the
 dimensions Loot keys on — `date`, `applicationName`, `acquisitionType`,

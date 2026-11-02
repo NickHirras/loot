@@ -73,12 +73,12 @@ const (
 	applicationsPath    = "applications"
 )
 
-// Page sizes. The acquisitions endpoints accept (and default to) 10000 rows;
-// the subscriptions endpoint caps at 100. Both page with @nextLink.
+// Page sizes. The acquisitions endpoints accept (and default to) 10000 rows.
+// The subscriptions endpoint refuses to be told a page size at all (see
+// fetchSubscriptions). Every endpoint pages with @nextLink.
 const (
-	acquisitionsPageSize  = 10000
-	subscriptionsPageSize = 100
-	applicationsPageSize  = 100
+	acquisitionsPageSize = 10000
+	applicationsPageSize = 100
 )
 
 // state is the persisted cursor.
@@ -398,10 +398,11 @@ func (s *Source) fetchSubscriptions(ctx context.Context, a app, date string, obs
 	q.Set("startDate", date)
 	q.Set("endDate", date)
 	q.Set("aggregationLevel", "day")
-	q.Set("top", strconv.Itoa(subscriptionsPageSize))
-	// No skip here, although the documentation lists it: the live endpoint
-	// answers `400 Query option 'Skip' is not allowed` to any value of it,
-	// even 0 (seen Nov 2026). Paging rides on @nextLink alone.
+	// No top and no skip here, although the documentation lists both: the
+	// live endpoint answers `400 Query option 'Top' is not allowed` (and the
+	// same for Skip) to any value of either, even skip=0, while it accepts
+	// aggregationLevel, orderby and groupby (probed Nov 2026). Paging rides
+	// on @nextLink alone, at whatever page size the server chooses.
 
 	rows, err := fetchPages[apiSubscription](ctx, s, subscriptionsPath, q)
 	switch {
