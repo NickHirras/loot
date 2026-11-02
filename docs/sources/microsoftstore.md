@@ -102,6 +102,7 @@ Common failures and what they mean:
 | `AADSTS90002` | `tenant_id` does not name a Microsoft Entra directory |
 | `403 … Partner Center` | the application is not in **Account settings → User management → Azure AD applications**, or does not have the **Manager** role |
 | `no apps found` | discovery is unavailable on this account; set `apps` to your Store IDs |
+| `rate limited by partner center` | a 429 that did not clear after three retries — see below |
 
 ## What it reads
 
@@ -121,6 +122,19 @@ are never requested.
 
 Responses page with `@nextLink`, which Loot follows; only the path and query of
 that link are used, so a rewritten link can never send your token elsewhere.
+
+### Rate limits
+
+Partner Center answers `429 Too Many Requests` in two situations: for a while
+after an account is first associated, before the new application has
+propagated, and when the hourly quota is spent. A poll makes only a handful of
+requests, so the first is far more common. Loot waits out a 429 up to three
+times per request, sleeping for the `Retry-After` the server names (seconds or
+an HTTP date) or 5s, 20s and 60s when it names none, then carries on as if
+nothing happened. A `Retry-After` longer than two minutes, or a fourth 429 in a
+row, fails the request instead: the app's cursor stays put, `last_error` says
+`rate limited by partner center` with the endpoint, and the next 6-hour poll
+tries again. `loot check` goes through the same path under its 30 second cap.
 
 ## What it emits
 
@@ -233,4 +247,4 @@ which Loot does not read.
 
 - A **personal (individual) developer account has no Entra tenant**. Partner Center → Account settings → Tenants → *Developer* tab → **Create Microsoft Entra ID** makes a free one-person tenant; then **Associate Microsoft Entra ID** on that same *Developer* tab (the tenant created from the Commercial side is *not* automatically associated with the developer program).
 - The **Microsoft Entra applications** tab only appears in User management after you **Sign in with Microsoft Entra ID** (the tenant's admin) *and* the tenant is associated on the Developer tab. Creating the app from there shows it twice (the registration and its service principal) — same Client ID; open the first one for **Add new key**.
-- Right after creation the analytics API answers `401 {"error":"User Unauthorized due to AMS call failure."}` (and sometimes 429/404) until the association propagates. `loot check` explains this; wait a few minutes and retry.
+- Right after creation the analytics API answers `401 {"error":"User Unauthorized due to AMS call failure."}` (and sometimes 429/404) until the association propagates. `loot check` explains this; wait a few minutes and retry. The 429 was seen on `inappacquisitions` after `appacquisitions` had already succeeded on the same poll (Nov 2026), which is what the retry above is for.

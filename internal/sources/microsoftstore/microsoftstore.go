@@ -127,6 +127,9 @@ type Source struct {
 	Log      *slog.Logger
 	// Now is swappable for tests.
 	Now func() time.Time
+	// Sleep waits out a rate limit; nil means a context-aware timer. Tests
+	// swap it so a 429 costs them no wall clock.
+	Sleep func(ctx context.Context, d time.Duration) error
 
 	tokens *tokenCache
 }
@@ -634,6 +637,21 @@ func (s *Source) now() time.Time {
 		return time.Now()
 	}
 	return s.Now()
+}
+
+// sleep waits d, or until ctx is done, whichever comes first.
+func (s *Source) sleep(ctx context.Context, d time.Duration) error {
+	if s.Sleep != nil {
+		return s.Sleep(ctx, d)
+	}
+	t := time.NewTimer(d)
+	defer t.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-t.C:
+		return nil
+	}
 }
 
 func (s *Source) logger() *slog.Logger {

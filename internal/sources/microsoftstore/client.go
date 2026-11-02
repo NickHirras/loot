@@ -45,7 +45,24 @@ const (
 	// tokenSkew is how long before real expiry a cached token is retired, so
 	// a token never dies mid-request.
 	tokenSkew = 2 * time.Minute
+
+	// maxRateLimitRetries is how many times one request is retried after a
+	// 429 before the poll gives up on it. Partner Center answers 429 (and 401,
+	// and 404) for a while after an account is first associated, and its
+	// limits are counted per hour, so a few patient retries clear the common
+	// case and a persistent one still surfaces in last_error.
+	maxRateLimitRetries = 3
+
+	// maxRetryAfter caps how long one 429 is waited out. A Retry-After beyond
+	// it means the hour's quota is gone; the next poll is hours away anyway,
+	// so the request fails now rather than holding the poll (and `loot check`)
+	// for most of that time.
+	maxRetryAfter = 2 * time.Minute
 )
+
+// rateLimitBackoff is the wait before each retry when the 429 carries no
+// usable Retry-After, indexed by how many retries have already been made.
+var rateLimitBackoff = []time.Duration{5 * time.Second, 20 * time.Second, 60 * time.Second}
 
 // errCredentials means Microsoft Entra refused to mint a token: a wrong
 // tenant, client id or secret, or an expired secret. Retrying will not help.
@@ -320,15 +337,49 @@ func (s *Source) resolveNext(link string) string {
 
 // getJSON performs one authenticated GET and decodes the body into out,
 // classifying the failures a user can actually do something about.
+//
+// A 429 is the one answer worth waiting on: it is retried up to
+// [maxRateLimitRetries] times, sleeping for the Retry-After the server asked
+// for (or [rateLimitBackoff] when it named none), and only then reported.
 func (s *Source) getJSON(ctx context.Context, endpoint string, out any) error {
+	for retries := 0; ; retries++ {
+		resp, body, err := s.get(ctx, endpoint)
+		if err != nil {
+			return err
+		}
+		if resp.StatusCode != http.StatusTooManyRequests {
+			return s.decode(endpoint, resp.StatusCode, body, out)
+		}
+
+		wait := retryAfter(resp.Header, s.now(), backoffFor(retries))
+		switch {
+		case retries >= maxRateLimitRetries:
+			return fmt.Errorf("microsoftstore: rate limited by partner center (%s): still refused after %d retries",
+				redact(endpoint), retries)
+		case wait > maxRetryAfter:
+			return fmt.Errorf("microsoftstore: rate limited by partner center (%s): asked to wait %s, which is longer than the %s Loot will hold a poll for",
+				redact(endpoint), wait.Round(time.Second), maxRetryAfter)
+		}
+		s.logger().Info("microsoftstore: rate limited, retrying",
+			"endpoint", redact(endpoint), "wait", wait.String(), "retry", retries+1, "of", maxRateLimitRetries)
+		if err := s.sleep(ctx, wait); err != nil {
+			return fmt.Errorf("microsoftstore: rate limited by partner center (%s): gave up waiting: %w",
+				redact(endpoint), err)
+		}
+	}
+}
+
+// get performs one authenticated GET and returns the response with its body
+// already read, so the caller can decide what the status means.
+func (s *Source) get(ctx context.Context, endpoint string) (*http.Response, []byte, error) {
 	token, err := s.bearer(ctx)
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
-		return fmt.Errorf("microsoftstore: build request: %w", err)
+		return nil, nil, fmt.Errorf("microsoftstore: build request: %w", err)
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Accept", "application/json")
@@ -336,26 +387,60 @@ func (s *Source) getJSON(ctx context.Context, endpoint string, out any) error {
 
 	resp, err := s.client().Do(req)
 	if err != nil {
-		return fmt.Errorf("microsoftstore: get %s: %w", redact(endpoint), err)
+		return nil, nil, fmt.Errorf("microsoftstore: get %s: %w", redact(endpoint), err)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
 	if err != nil {
-		return fmt.Errorf("microsoftstore: read %s: %w", redact(endpoint), err)
+		return nil, nil, fmt.Errorf("microsoftstore: read %s: %w", redact(endpoint), err)
 	}
+	return resp, body, nil
+}
 
+// backoffFor is the wait before the given retry when the server named none.
+func backoffFor(retries int) time.Duration {
+	if retries < len(rateLimitBackoff) {
+		return rateLimitBackoff[retries]
+	}
+	return rateLimitBackoff[len(rateLimitBackoff)-1]
+}
+
+// retryAfter reads a Retry-After header, which RFC 9110 allows as either a
+// number of seconds or an HTTP-date, and falls back when it is absent, in the
+// past, or unparsable.
+func retryAfter(h http.Header, now time.Time, fallback time.Duration) time.Duration {
+	raw := strings.TrimSpace(h.Get("Retry-After"))
+	if raw == "" {
+		return fallback
+	}
+	if secs, err := strconv.ParseInt(raw, 10, 64); err == nil {
+		if secs <= 0 {
+			return fallback
+		}
+		return time.Duration(secs) * time.Second
+	}
+	if at, err := http.ParseTime(raw); err == nil {
+		if d := at.Sub(now); d > 0 {
+			return d
+		}
+	}
+	return fallback
+}
+
+// decode classifies one non-429 response and, on success, unmarshals it.
+func (s *Source) decode(endpoint string, status int, body []byte, out any) error {
 	switch {
-	case resp.StatusCode == http.StatusOK:
+	case status == http.StatusOK:
 		if err := json.Unmarshal(body, out); err != nil {
 			return fmt.Errorf("microsoftstore: decode %s: %w", redact(endpoint), err)
 		}
 		return nil
-	case resp.StatusCode == http.StatusNotFound:
+	case status == http.StatusNotFound:
 		// "No data" and "no such app" arrive the same way; the caller decides
 		// which of the two it is from context.
-		return fmt.Errorf("%w (%s)", errNoData, parseAPIError(resp.StatusCode, body).Error())
-	case resp.StatusCode == http.StatusUnauthorized:
+		return fmt.Errorf("%w (%s)", errNoData, parseAPIError(status, body).Error())
+	case status == http.StatusUnauthorized:
 		// Seen in the wild right after creating the Entra application:
 		// {"error":"User Unauthorized due to AMS call failure."} — the token
 		// is fine; Partner Center just doesn't know the application yet.
@@ -363,18 +448,16 @@ func (s *Source) getJSON(ctx context.Context, endpoint string, out any) error {
 			return fmt.Errorf("%w: %s — Partner Center does not recognise this Microsoft Entra application yet. "+
 				"Make sure it is listed under Account settings → User management → Microsoft Entra applications with the Manager role "+
 				"(the tenant must be associated under Account settings → Tenants → Developer first); a freshly added application can take a while to propagate",
-				errNotAssociated, parseAPIError(resp.StatusCode, body).Error())
+				errNotAssociated, parseAPIError(status, body).Error())
 		}
 		return fmt.Errorf("%w: %s — the access token was refused; check tenant_id, client_id and client_secret",
-			errCredentials, parseAPIError(resp.StatusCode, body).Error())
-	case resp.StatusCode == http.StatusForbidden:
+			errCredentials, parseAPIError(status, body).Error())
+	case status == http.StatusForbidden:
 		return fmt.Errorf("%w: %s — add this Microsoft Entra application in Partner Center under "+
 			"Account settings → User management → Microsoft Entra applications (Azure AD applications) and give it the Manager role",
-			errNotAssociated, parseAPIError(resp.StatusCode, body).Error())
-	case resp.StatusCode == http.StatusTooManyRequests:
-		return fmt.Errorf("microsoftstore: rate limited by partner center (%s)", redact(endpoint))
+			errNotAssociated, parseAPIError(status, body).Error())
 	default:
-		return fmt.Errorf("microsoftstore: %s: %s", redact(endpoint), parseAPIError(resp.StatusCode, body).Error())
+		return fmt.Errorf("microsoftstore: %s: %s", redact(endpoint), parseAPIError(status, body).Error())
 	}
 }
 
