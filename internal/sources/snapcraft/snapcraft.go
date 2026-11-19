@@ -16,35 +16,32 @@
 //	                       {"name":"continued","values":[…]},
 //	                       {"name":"lost","values":[…]}]}]}
 //
-// Loot asks for two metrics: `daily_device_change`, whose new/continued/lost
-// series are the day's real figures, and `installed_base_by_country`, whose
-// series are named by ISO 3166-1 alpha-2 code. The store also publishes
-// installed_base_by_channel / _operating_system / _version and weekly variants
-// of all of them; none carry a fact worth a drop.
+// Loot asks for two metrics: `weekly_installed_base_by_country`, whose series
+// are named by ISO 3166-1 alpha-2 code and say how many distinct devices were
+// seen in each country in the trailing week, and `daily_device_change`, whose
+// new/continued/lost series compare each day with the one before it.
 //
 // # What is emitted per (snap, day)
 //
-//	install         silent   Quantity = new devices
-//	active_devices  silent   Quantity = new + continued (the installed base)
-//	lost            silent   Quantity = lost devices
-//	install         silent   Quantity = derived per-country gain, one per country
-//	installs_day    chest    Quantity = new devices — the day's one drop
+//	audience        silent   Quantity = weekly devices in one country, one per country
+//	audience        silent   Quantity = weekly devices in total (no country)
+//	device_new      silent   Quantity = devices seen today and not yesterday
+//	active_devices  silent   Quantity = new + continued (the day's installed base)
+//	lost            silent   Quantity = devices seen yesterday and not today
 //
-// Plus, once per (snap, country) ever:
-//
-//	install         silent   Quantity = the standing installed base in that
-//	                                    country the first time it is seen
+// `audience` is the number that means something: it is the store's own answer
+// to "how many devices have this snap". Nothing here is an install and nothing
+// here produces a drop by itself — the pipeline mints a settlement the first
+// time a country appears and a milestone when the total reaches one.
 //
 // # Caveats
 //
 //   - **Metrics lag.** A day's figures appear a day or two late, and the store
-//     returns nulls in the meantime. A day whose daily_device_change is all
-//     null is skipped without moving the cursor, so it is picked up later.
-//   - **Country figures are derived.** installed_base_by_country is a base, not
-//     an arrival count; see countryDeltas in metrics.go for the derivation and
-//     what it cannot see, and countryBaselines for the one-off event that gives
-//     each country a starting point rather than founding it only if it happens
-//     to grow while Loot is watching.
+//     returns nulls in the meantime. A day that is all null is skipped without
+//     moving its cursor, so it is picked up later.
+//   - **`new` is not installs.** It is churn between two consecutive days; see
+//     EventsFromMetrics in metrics.go for why it is no longer counted as one.
+//   - **Devices, not people.** Every figure counts machines.
 //
 // # Credentials
 //
@@ -113,16 +110,10 @@ type state struct {
 	// Cursor maps snap name -> last day emitted (YYYY-MM-DD). A snap with no
 	// entry has never been polled and gets the backfill window.
 	Cursor map[string]string `json:"cursor"`
-	// Baselined maps snap name -> country -> the day that (snap, country) pair
-	// was founded on: the day its standing installed base was attributed, and
-	// therefore the day its deltas start counting *after*. See
-	// countryBaselines in metrics.go.
-	//
-	// The day matters as well as the membership. Dedupe already makes a second
-	// baseline event harmless, but a re-read of the founding day — which
-	// happens whenever an unpublished day holds the cursor behind it — would
-	// otherwise let the delta logic charge that day's arrival a second time.
-	Baselined map[string]map[string]string `json:"baselined,omitempty"`
+	// AudienceCursor maps snap name -> last day an audience snapshot was
+	// emitted for. It is separate from Cursor because the two metrics are
+	// published separately and were adopted at different times.
+	AudienceCursor map[string]string `json:"audience_cursor,omitempty"`
 	// RefreshedDischarge is the unbound discharge macaroon Loot last obtained
 	// from Ubuntu One SSO, and RefreshedFor fingerprints the login file it was
 	// obtained for. They live here rather than in the login file because that
@@ -246,13 +237,23 @@ func (s *Source) Poll(ctx context.Context, raw []byte) ([]core.Event, []byte, er
 			// recomputed from "now" on every future poll and never advance.
 			st.Cursor[snap] = floor
 		}
-		if floor >= yesterday {
+		// The audience cursor is its own: a snap Loot has polled for months has
+		// no entry here the first time it runs a version that reads audience
+		// snapshots, and gets the backfill window for them alone.
+		audFloor, audSeeded := st.AudienceCursor[snap]
+		if !audSeeded || audFloor == "" {
+			audFloor = s.firstRunFloor(now)
+			st.AudienceCursor[snap] = audFloor
+		}
+		if floor >= yesterday && audFloor >= yesterday {
 			continue
 		}
 
-		// The country filter starts one day early because a per-country
-		// install is the difference between two installed-base readings.
-		resp, err := s.fetchMetrics(ctx, &auth, id, floor, addDays(floor, 1), yesterday)
+		// A range that is already up to date is still asked for, as its last
+		// day: one request shape is simpler than three, and the floor filters
+		// out whatever comes back.
+		resp, err := s.fetchMetrics(ctx, &auth, id,
+			minDay(addDays(floor, 1), yesterday), minDay(addDays(audFloor, 1), yesterday), yesterday)
 		if err != nil {
 			s.log.Warn("snapcraft poll failed", "snap", snap, "error", err)
 			if firstErr == nil {
@@ -261,22 +262,18 @@ func (s *Source) Poll(ctx context.Context, raw []byte) ([]core.Event, []byte, er
 			continue
 		}
 
-		evs, newest, founded := EventsFromMetrics(snap, id, resp, floor, today, now, st.Baselined[snap])
+		evs, newest := EventsFromMetrics(snap, id, resp, floor, today, now)
 		events = append(events, evs...)
 		if newest > st.Cursor[snap] {
 			st.Cursor[snap] = newest
 		}
-		if len(founded) > 0 {
-			if st.Baselined[snap] == nil {
-				st.Baselined[snap] = make(map[string]string, len(founded))
-			}
-			for cc, day := range founded {
-				st.Baselined[snap][cc] = day
-			}
-			s.log.Info("snapcraft: founded new countries",
-				"snap", snap, "countries", len(founded))
+		aud, audNewest := AudienceEvents(snap, id, resp, audFloor, today, now)
+		events = append(events, aud...)
+		if audNewest > st.AudienceCursor[snap] {
+			st.AudienceCursor[snap] = audNewest
 		}
-		s.log.Debug("snapcraft polled", "snap", snap, "events", len(evs), "cursor", st.Cursor[snap])
+		s.log.Debug("snapcraft polled", "snap", snap, "events", len(evs)+len(aud),
+			"cursor", st.Cursor[snap], "audience_cursor", st.AudienceCursor[snap])
 	}
 
 	// Persist whatever discharge is current, so the next process starts with
@@ -370,9 +367,9 @@ func (s *Source) firstRunFloor(now time.Time) string {
 
 func newState() *state {
 	return &state{
-		SnapIDs:   map[string]string{},
-		Cursor:    map[string]string{},
-		Baselined: map[string]map[string]string{},
+		SnapIDs:        map[string]string{},
+		Cursor:         map[string]string{},
+		AudienceCursor: map[string]string{},
 	}
 }
 
@@ -390,11 +387,10 @@ func decodeState(raw []byte) *state {
 	if st.Cursor == nil {
 		st.Cursor = map[string]string{}
 	}
-	// Absent on state written before per-country baselines existed, which is
-	// exactly the case that wants founding: every country the snap is already
-	// installed in gets its baseline on the next poll.
-	if st.Baselined == nil {
-		st.Baselined = map[string]map[string]string{}
+	// Absent on state written before audience snapshots existed, which is
+	// exactly the case that wants a backfill: see Poll.
+	if st.AudienceCursor == nil {
+		st.AudienceCursor = map[string]string{}
 	}
 	return st
 }
@@ -423,6 +419,14 @@ func (s *Source) now() time.Time {
 // parseDay reads a YYYY-MM-DD bucket as midnight UTC.
 func parseDay(day string) (time.Time, error) {
 	return time.ParseInLocation(core.DayLayout, day, time.UTC)
+}
+
+// minDay returns the earlier of two YYYY-MM-DD day strings.
+func minDay(a, b string) string {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 // addDays shifts a YYYY-MM-DD day string. An unparseable day is returned

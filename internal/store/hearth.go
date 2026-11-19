@@ -31,6 +31,16 @@ import (
 //     purchases are real people, and for many apps they are the only per
 //     country signal there is.
 //
+// # Sources that report their own installed base
+//
+// All of the above is a count of arrivals, which is the best that can be done
+// for a store that only ever says who came. A store that also says who is
+// *still there* (kind `audience`: Snapcraft's weekly devices, Google Play's
+// active devices) is read differently: its newest snapshot is the population,
+// per country, and every arrival it reported is ignored — see audienceSourced
+// in audience.go. Those settlements can shrink, and that is the point: the
+// number is how many are there, not how many ever passed through.
+//
 // Deliberately excluded: `sales_day` and `installs_day` summaries (they are a
 // rollup of the rows beside them), `refund`, `cancellation`, `expiration` and
 // friends (bad news does not add citizens), `active_devices` and
@@ -43,6 +53,7 @@ import (
 // only, `sales_day` excluded, signed so refunds net out.
 const hearthPopulation = `
 CASE
+    WHEN ` + audienceSourced + ` THEN 0
     WHEN e.is_ledger = 1 AND e.kind IN ('sale', 'iap', 'subscription', 'download') AND e.quantity > 0 THEN e.quantity
     WHEN e.kind = 'install' AND e.quantity > 0 THEN e.quantity
     WHEN e.source = 'revenuecat' AND e.kind = 'purchase' THEN 1
@@ -54,6 +65,7 @@ END`
 // sum — see hearthUnknownInstalls.
 const hearthPopulationNoInstalls = `
 CASE
+    WHEN ` + audienceSourced + ` THEN 0
     WHEN e.is_ledger = 1 AND e.kind IN ('sale', 'iap', 'subscription', 'download') AND e.quantity > 0 THEN e.quantity
     WHEN e.source = 'revenuecat' AND e.kind = 'purchase' THEN 1
     ELSE 0
@@ -83,7 +95,7 @@ SELECT source, COALESCE(SUM(MAX(day_total - placed, 0)), 0) FROM (
            ` + installValue + ` AS day_total,
            COALESCE(SUM(CASE WHEN e.country <> '' AND e.quantity > 0 THEN e.quantity ELSE 0 END), 0) AS placed
     FROM events e
-    WHERE e.kind = 'install'` + scope + `
+    WHERE e.kind = 'install' AND NOT ` + audienceSourced + scope + `
     GROUP BY e.source, e.app, e.day)
 GROUP BY source`
 }
@@ -194,8 +206,12 @@ type Hearth struct {
 	// its sum.
 	Fleet     []HearthVessel  `json:"fleet"`
 	Countries []HearthCountry `json:"countries"`
-	Tiers     []core.Tier     `json:"tiers"`
-	Recent    []HearthDrop    `json:"recent"`
+	// Audience is who has each product now, store by store, with what each
+	// figure measures. It is the plain reading of the same data the globe
+	// draws.
+	Audience []ProductAudience `json:"audience"`
+	Tiers    []core.Tier       `json:"tiers"`
+	Recent   []HearthDrop      `json:"recent"`
 }
 
 // Hearth aggregates every country Loot has seen into settlements, places the
@@ -208,6 +224,7 @@ func (s *Store) Hearth(ctx context.Context, homeCountry, displayCurrency string)
 		DisplayCurrency: displayCurrency,
 		Fleet:           []HearthVessel{},
 		Countries:       []HearthCountry{},
+		Audience:        []ProductAudience{},
 		Tiers:           core.Tiers,
 		Recent:          []HearthDrop{},
 	}
@@ -222,6 +239,20 @@ func (s *Store) Hearth(ctx context.Context, homeCountry, displayCurrency string)
 
 	fleet, err := s.hearthFleet(ctx)
 	if err != nil {
+		return out, err
+	}
+
+	// Sources that report an installed base contributed nothing above: their
+	// population is their newest snapshot, placed where the store placed it,
+	// with whatever it could not place put to sea.
+	readings, err := s.audienceLatest(ctx)
+	if err != nil {
+		return out, err
+	}
+	placed, apps := foldAudience(readings)
+	countries = settleAudience(countries, placed)
+	fleet = embarkAudience(fleet, apps)
+	if out.Audience, err = s.audienceFrom(ctx, apps); err != nil {
 		return out, err
 	}
 
@@ -312,6 +343,78 @@ func (s *Store) Hearth(ctx context.Context, homeCountry, displayCurrency string)
 		return out, err
 	}
 	return out, nil
+}
+
+// settleAudience adds the newest per-country audience to the settlements, and
+// then drops any settlement nobody lives in and nobody has paid from.
+//
+// The second half is new, and deliberate. A country only an audience source
+// ever reported has exactly as many people as that source's newest snapshot
+// says, and when that is none the settlement is empty: listing it at zero
+// would be a map of where the app used to be. Its founding drop stays in the
+// feed — that happened — and it is founded on the map again the day somebody
+// comes back.
+func settleAudience(countries []HearthCountry, placed map[string]int) []HearthCountry {
+	seen := map[string]bool{}
+	for i := range countries {
+		seen[countries[i].Country] = true
+		countries[i].Population += placed[countries[i].Country]
+	}
+	// Every audience row is itself an event carrying its country, so the
+	// country query has normally listed it already; this is for the scoped or
+	// freshly migrated corner where it has not.
+	missing := make([]string, 0)
+	for cc, n := range placed {
+		if !seen[cc] && n > 0 {
+			missing = append(missing, cc)
+		}
+	}
+	sort.Strings(missing)
+	for _, cc := range missing {
+		countries = append(countries, HearthCountry{Country: cc, Population: placed[cc]})
+	}
+
+	out := countries[:0]
+	for _, c := range countries {
+		if c.Population <= 0 && c.RevenueBase == 0 {
+			continue
+		}
+		out = append(out, c)
+	}
+	return out
+}
+
+// embarkAudience puts each source's unplaced audience aboard its vessel: the
+// part of the store's own total that it attributed to no country.
+func embarkAudience(fleet []HearthVessel, apps []audienceApp) []HearthVessel {
+	index := map[string]int{}
+	for i, v := range fleet {
+		index[v.Source] = i
+	}
+	for _, a := range apps {
+		n := a.Unplaced()
+		if n <= 0 {
+			continue
+		}
+		i, ok := index[a.Source]
+		if !ok {
+			i = len(fleet)
+			index[a.Source] = i
+			fleet = append(fleet, HearthVessel{Source: a.Source, FirstSeen: a.AsOf, LastSeen: a.AsOf})
+		}
+		fleet[i].Population += n
+	}
+	sort.SliceStable(fleet, func(i, j int) bool {
+		a, b := fleet[i], fleet[j]
+		if a.Population != b.Population {
+			return a.Population > b.Population
+		}
+		if a.RevenueBase != b.RevenueBase {
+			return a.RevenueBase > b.RevenueBase
+		}
+		return a.Source < b.Source
+	})
+	return fleet
 }
 
 // pickCapital resolves the capital: the configured country when it is set,

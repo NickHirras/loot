@@ -55,8 +55,11 @@ const (
 	// pages is the 2000 most recent stars, far more than a poll interval can
 	// realistically produce.
 	maxStarPages = 20
-	// maxReleases is how many releases each poll inspects.
-	maxReleases = 20
+	// maxReleases is how many releases each poll inspects. It is a whole page:
+	// the same response carries every release file's download counter, and a
+	// project that ships often has most of its downloads on releases older
+	// than the newest twenty.
+	maxReleases = 100
 	// maxListPages caps how many pages of issues or forks one poll walks. A
 	// thousand items in ten minutes is not a repository, it is an incident, and
 	// a poller that would page through it forever is worse than one that stops
@@ -163,6 +166,14 @@ type repoState struct {
 	LastReleaseID  int64  `json:"last_release_id"`
 	// LastForkAt is the newest fork created_at seen, RFC3339.
 	LastForkAt string `json:"last_fork_at"`
+	// AssetDownloads maps a release asset's id to the download_count Loot last
+	// read for it. GitHub only reports a running total per file, so a download
+	// is the difference between two readings.
+	AssetDownloads map[string]int `json:"asset_downloads,omitempty"`
+	// AssetsSeeded records that the counters have been read once, which is what
+	// tells a file's standing total (a baseline) from downloads that happened
+	// while Loot was watching.
+	AssetsSeeded bool `json:"assets_seeded,omitempty"`
 }
 
 func decodeState(raw []byte) *state {
@@ -682,6 +693,15 @@ type release struct {
 	Draft       bool       `json:"draft"`
 	Prerelease  bool       `json:"prerelease"`
 	PublishedAt *time.Time `json:"published_at"`
+	Assets      []asset    `json:"assets"`
+}
+
+// asset is one file attached to a release.
+type asset struct {
+	ID            int64     `json:"id"`
+	Name          string    `json:"name"`
+	DownloadCount int       `json:"download_count"`
+	CreatedAt     time.Time `json:"created_at"`
 }
 
 // pollReleases emits a "release" event per newly published release. Drafts are
@@ -705,6 +725,8 @@ func (s *Source) pollReleases(ctx context.Context, r repoRef, rs *repoState, now
 		newest time.Time
 		newRel release
 	)
+	// The download counters ride along on the response already in hand.
+	downloads := assetDownloadEvents(repo, list, rs, now)
 	for _, rel := range list {
 		if rel.Draft || rel.PublishedAt == nil || rel.TagName == "" {
 			continue
@@ -735,7 +757,8 @@ func (s *Source) pollReleases(ctx context.Context, r repoRef, rs *repoState, now
 			Payload:    payload,
 		})
 	}
-	sort.Slice(events, func(i, j int) bool { return events[i].OccurredAt.Before(events[j].OccurredAt) })
+	events = append(events, downloads...)
+	sort.SliceStable(events, func(i, j int) bool { return events[i].OccurredAt.Before(events[j].OccurredAt) })
 
 	switch {
 	case newest.After(floor):
@@ -746,6 +769,118 @@ func (s *Source) pollReleases(ctx context.Context, r repoRef, rs *repoState, now
 		rs.LastReleaseAt = formatTime(floor)
 	}
 	return events, nil
+}
+
+// assetFormats maps a release file's suffix to the package format it is. The
+// order matters only for the compound suffixes, which are listed before the
+// plain ones they end in.
+var assetFormats = []struct{ suffix, format string }{
+	{".flatpak", "flatpak"},
+	{".flatpakref", "flatpak"},
+	{".deb", "deb"},
+	{".rpm", "rpm"},
+	{".appimage", "appimage"},
+	{".snap", "snap"},
+	{".apk", "apk"},
+	{".aab", "apk"},
+	{".dmg", "macos"},
+	{".pkg", "macos"},
+	{".exe", "windows"},
+	{".msi", "windows"},
+	{".msix", "windows"},
+	{".msixbundle", "windows"},
+	{".tar.gz", "archive"},
+	{".tgz", "archive"},
+	{".tar.xz", "archive"},
+	{".tar.zst", "archive"},
+	{".tar.bz2", "archive"},
+	{".zip", "archive"},
+}
+
+// assetFormat classifies a release file by name, or returns "" for a file that
+// is not something a person installs: checksums, signatures, zsync deltas,
+// screenshots and demo videos are all downloaded, and none of them is a
+// download of the app.
+func assetFormat(name string) string {
+	lower := strings.ToLower(name)
+	for _, f := range assetFormats {
+		if strings.HasSuffix(lower, f.suffix) {
+			return f.format
+		}
+	}
+	return ""
+}
+
+// assetDownloadEvents turns the releases' download counters into silent
+// `asset_download` events: one per file whose counter moved since the last
+// poll, carrying how far it moved.
+//
+// GitHub reports a running total per file and nothing else — no dates, no
+// countries, no distinction between a person and a mirror. So:
+//
+//   - the first reading of a repository is a **baseline**: each file's whole
+//     standing total, dated the day the file was uploaded (the only date there
+//     is) and flagged `baseline` in the payload;
+//   - after that an event is the growth between two polls, dated when Loot saw
+//     it, which is accurate to the poll interval.
+//
+// The dedupe key carries the total reached, so re-reading the same counter is a
+// no-op and a counter that goes backwards (an asset re-uploaded under the same
+// id cannot; a deleted one simply disappears) emits nothing.
+//
+// These are downloads, not people. Loot shows them as downloads and never adds
+// them to an audience.
+func assetDownloadEvents(repo string, list []release, rs *repoState, now time.Time) []core.Event {
+	if rs.AssetDownloads == nil {
+		rs.AssetDownloads = map[string]int{}
+	}
+	baseline := !rs.AssetsSeeded
+
+	var events []core.Event
+	for _, rel := range list {
+		if rel.Draft {
+			continue
+		}
+		for _, a := range rel.Assets {
+			format := assetFormat(a.Name)
+			if format == "" || a.ID == 0 {
+				continue
+			}
+			id := strconv.FormatInt(a.ID, 10)
+			prev, seen := rs.AssetDownloads[id]
+			rs.AssetDownloads[id] = a.DownloadCount
+			delta := a.DownloadCount - prev
+			if delta <= 0 {
+				continue
+			}
+			occurred := now
+			if baseline && !seen && !a.CreatedAt.IsZero() {
+				occurred = a.CreatedAt.UTC()
+			}
+			payload, _ := json.Marshal(map[string]any{
+				"repo":     repo,
+				"asset":    a.Name,
+				"format":   format,
+				"tag":      rel.TagName,
+				"total":    a.DownloadCount,
+				"baseline": baseline && !seen,
+			})
+			events = append(events, core.Event{
+				ID:         core.NewIDAt(occurred),
+				Source:     Name,
+				Kind:       core.KindAssetDownload,
+				App:        repo,
+				OccurredAt: occurred,
+				ObservedAt: now,
+				Quantity:   delta,
+				DedupeKey:  fmt.Sprintf("github:asset:%s:%s:%d", repo, id, a.DownloadCount),
+				Silent:     true,
+				Payload:    payload,
+			})
+		}
+	}
+	rs.AssetsSeeded = true
+	return events
 }
 
 // fork is one entry of the forks list.

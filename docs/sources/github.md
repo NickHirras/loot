@@ -74,6 +74,7 @@ Override the window once at startup with `loot serve --since 2026-01-01`.
 | `pr_opened` | a pull request is opened | `github:pr_opened:<repo>:<n>` | same |
 | `pr_merged` | a pull request is **merged** | `github:pr_merged:<repo>:<n>` | same |
 | `release` | a release is published | `github:release:<repo>:<tag>` | `tag`, `name`, `url`, `prerelease` |
+| `asset_download` | a release file's download counter moved — **silent**, no drop | `github:asset:<repo>:<asset id>:<total>` | `asset`, `format`, `tag`, `total`, `baseline` |
 | `stars_total` | every poll — **silent**, no drop | `github:stars_total:<repo>:<day>` | `repo`, `stars` |
 
 `stars_total` is a daily snapshot of `stargazers_count` rather than news.
@@ -92,6 +93,18 @@ Notes on the edges:
   returns both. Loot tells them apart by the `pull_request` field.
 - A pull request that is closed **without** being merged produces nothing. It
   is not a win, and the feed is for wins and warnings.
+- **Release downloads are downloads, not people.** GitHub keeps one running
+  counter per release file and nothing else: no dates, no countries, no way to
+  tell a person from a mirror or a CI job. Loot reads the counters off the
+  releases list it already fetches (the newest 100 releases), and stores the
+  growth between two polls as a silent `asset_download` whose quantity is how
+  far the counter moved. The first reading of a repository is a **baseline**:
+  each file's whole standing total, dated the day the file was uploaded and
+  flagged `"baseline": true`. Files are grouped by format (`flatpak`, `deb`,
+  `rpm`, `appimage`, `snap`, `apk`, `macos`, `windows`, `archive`); checksums,
+  signatures, `.zsync` files and anything else that is not an installable is
+  ignored. The totals appear on the Hearth's **Downloads** card and are never
+  added to an audience.
 - Draft releases are skipped; prereleases are kept and flagged
   `"prerelease": true` in the payload, so you can write a rule that treats a
   beta more quietly than a `.0`.

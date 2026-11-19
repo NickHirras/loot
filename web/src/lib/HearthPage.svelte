@@ -8,7 +8,7 @@
   import { vesselName } from './sea'
   import { loot } from './state.svelte'
   import { currency, flagEmoji, integer, timeAgo } from './types'
-  import { eraLabel, tierLabel } from './labels'
+  import { audienceBasisLabel, downloadFormatLabel, eraLabel, sourceName, tierLabel } from './labels'
   import { m } from '../paraglide/messages'
 
   // The page owns the polling: mounting starts it, leaving stops it. The
@@ -23,6 +23,10 @@
   /** The vessels: people no source could place. Empty means no section. */
   const fleet = $derived(data?.fleet ?? [])
   const capitalName = $derived(data?.capital ? countryName(data.capital) : '')
+  /** Products some store has counted an audience for. */
+  const audience = $derived((data?.audience ?? []).filter((p) => p.sources.length > 0))
+  /** Products whose release files have been downloaded. */
+  const downloads = $derived((data?.audience ?? []).filter((p) => p.downloads.length > 0))
 
   /** How much of the era bar is filled, live. */
   const progress = $derived(Math.round(hearth.eraProgress * 100))
@@ -148,6 +152,39 @@
             </p>
           </div>
 
+          {#if audience.length}
+            <!-- The plain reading of what the globe draws: one number per app
+                 per store, each labelled with what it actually counts. -->
+            <div class="card">
+              <h3>{m.hearth_audience()}</h3>
+              <ul class="audience">
+                {#each audience as app (app.product)}
+                  <li>
+                    <div class="app-line">
+                      <span class="app-name">{app.product}</span>
+                      {#if app.current > 0}
+                        <span class="app-total">{integer(app.current)}</span>
+                      {/if}
+                    </div>
+                    <ul class="stores">
+                      {#each app.sources as row (row.source)}
+                        <li
+                          class:all-time={row.basis === 'arrivals'}
+                          title={row.as_of ? m.hearth_audience_as_of({ date: row.as_of }) : undefined}
+                        >
+                          <span class="store-name">{sourceName(row.source)}</span>
+                          <span class="basis">{audienceBasisLabel(row.basis)}</span>
+                          <span class="count">{integer(row.count)}</span>
+                        </li>
+                      {/each}
+                    </ul>
+                  </li>
+                {/each}
+              </ul>
+              <p class="fine">{m.hearth_audience_fine()}</p>
+            </div>
+          {/if}
+
           <div class="card">
             <h3>{m.hearth_civilization()}</h3>
             <dl class="facts">
@@ -175,6 +212,28 @@
                 {/each}
               </ul>
               <p class="fine">{m.hearth_fleet_fine()}</p>
+            </div>
+          {/if}
+
+          {#if downloads.length}
+            <div class="card">
+              <h3>{m.hearth_downloads()}</h3>
+              <ul class="audience">
+                {#each downloads as app (app.product)}
+                  <li>
+                    <div class="app-line"><span class="app-name">{app.product}</span></div>
+                    <ul class="stores">
+                      {#each app.downloads as file (file.format)}
+                        <li>
+                          <span class="store-name">{downloadFormatLabel(file.format)}</span>
+                          <span class="count">{integer(file.count)}</span>
+                        </li>
+                      {/each}
+                    </ul>
+                  </li>
+                {/each}
+              </ul>
+              <p class="fine">{m.hearth_downloads_fine()}</p>
             </div>
           {/if}
 
@@ -498,6 +557,76 @@
   dd {
     margin: 0;
     font-variant-numeric: tabular-nums;
+  }
+
+  .audience,
+  .stores {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .audience {
+    gap: 0.55rem;
+  }
+
+  .app-line {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.6rem;
+    font-size: 0.86rem;
+    font-weight: 600;
+  }
+
+  .app-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .app-total {
+    font-size: 1rem;
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .stores {
+    gap: 0.15rem;
+    margin-top: 0.2rem;
+  }
+
+  .stores li {
+    display: flex;
+    align-items: baseline;
+    gap: 0.4rem;
+    font-size: 0.76rem;
+    color: var(--text-dim);
+  }
+
+  .store-name {
+    white-space: nowrap;
+  }
+
+  .basis {
+    font-size: 0.66rem;
+    color: var(--text-faint);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .stores .count {
+    margin-left: auto;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* A running total sits beside the levels but is visibly not one of them. */
+  .stores li.all-time,
+  .stores li.all-time .count {
+    color: var(--text-faint);
   }
 
   .fleet {

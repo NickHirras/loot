@@ -122,6 +122,12 @@ func (s *Source) pollInstalls(ctx context.Context, st *state, months []string, n
 		start[k] = v
 	}
 	advanced := map[string]string{}
+	// The audience snapshots have a cursor of their own; see state.AudienceCursor.
+	audStart := make(map[string]string, len(st.AudienceCursor))
+	for k, v := range st.AudienceCursor {
+		audStart[k] = v
+	}
+	audAdvanced := map[string]string{}
 
 	// Objects are processed in name order so a poll is reproducible: overview
 	// before country for a given month, oldest month first.
@@ -145,7 +151,7 @@ func (s *Source) pollInstalls(ctx context.Context, st *state, months []string, n
 			continue
 		}
 		seen[obj.Name] = true
-		if prev, ok := st.InstallsFiles[obj.Name]; ok && prev != "" && prev == obj.MD5Hash {
+		if prev, ok := st.InstallsFiles[obj.Name]; ok && prev != "" && prev == obj.MD5Hash && st.AudienceSeeded {
 			s.Log.Debug("googleplay: installs report unchanged", "object", obj.Name)
 			continue
 		}
@@ -170,7 +176,16 @@ func (s *Source) pollInstalls(ctx context.Context, st *state, months []string, n
 				continue
 			}
 			cursor := installsCursorKey(rowPkg, dimension)
-			if r.Date >= today || r.Date <= start[cursor] {
+			if r.Date >= today {
+				continue
+			}
+			if r.Date > audStart[cursor] {
+				if r.Date > audAdvanced[cursor] {
+					audAdvanced[cursor] = r.Date
+				}
+				events = append(events, s.audienceEvents(r, rowPkg, dimension, now)...)
+			}
+			if r.Date <= start[cursor] {
 				continue
 			}
 			if r.Date > advanced[cursor] {
@@ -183,6 +198,12 @@ func (s *Source) pollInstalls(ctx context.Context, st *state, months []string, n
 			}
 		}
 		st.InstallsFiles[obj.Name] = obj.MD5Hash
+	}
+	st.AudienceSeeded = true
+	for cursor, day := range audAdvanced {
+		if day > st.AudienceCursor[cursor] {
+			st.AudienceCursor[cursor] = day
+		}
 	}
 
 	for name := range st.InstallsFiles {
@@ -286,6 +307,48 @@ func (s *Source) countryInstallEvents(r InstallRow, pkg string, observed time.Ti
 		DedupeKey:  fmt.Sprintf("play:installs:%s:%s:%s", pkg, r.Date, r.Country),
 		Silent:     true,
 		Payload:    installsPayload(r, pkg, installs),
+	}}
+}
+
+// audienceEvents turns one row's "Active Device Installs" into an `audience`
+// snapshot: the devices that have the app installed and have been online
+// recently. It is the nearest thing these reports have to the Play Console's
+// "Installed audience", and unlike the install counts beside it, it is a level:
+// tomorrow's row replaces today's rather than adding to it.
+//
+// The overview row is the app's total and the country rows are its parts. They
+// come from different files that are published at different times, which is
+// why the reader pairs each with the newest of its own kind.
+func (s *Source) audienceEvents(r InstallRow, pkg, dimension string, observed time.Time) []core.Event {
+	if r.ActiveDeviceInstalls <= 0 {
+		return nil
+	}
+	if dimension == "country" && r.Country == "" {
+		return nil
+	}
+	occurred, err := time.ParseInLocation(core.DayLayout, r.Date, time.UTC)
+	if err != nil {
+		return nil
+	}
+	country := ""
+	key := fmt.Sprintf("play:audience:%s:%s", pkg, r.Date)
+	if dimension == "country" {
+		country = r.Country
+		key += ":" + r.Country
+	}
+	return []core.Event{{
+		ID:         core.NewIDAt(occurred),
+		Source:     Name,
+		Kind:       core.KindAudience,
+		App:        pkg,
+		OccurredAt: occurred,
+		ObservedAt: observed,
+		Day:        r.Date,
+		Country:    country,
+		Quantity:   r.ActiveDeviceInstalls,
+		DedupeKey:  key,
+		Silent:     true,
+		Payload:    installsPayload(r, pkg, r.Installs()),
 	}}
 }
 
