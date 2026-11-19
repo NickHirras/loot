@@ -2,8 +2,8 @@
 
 **Polling, every 6 hours.** Loot reads the Snap Store's own developer metrics —
 the same numbers behind `snapcraft metrics` and the dashboard's graphs — and
-turns each completed day into one chest drop per snap, plus the silent counters
-that feed the vault and the Hearth.
+stores each completed day's **weekly installed base**, in total and per
+country, as the snap's audience: how many devices have it now.
 
 There is no webhook and no public API here: everything comes from
 `https://dashboard.snapcraft.io/dev/api/snaps/metrics`, authenticated with a
@@ -163,172 +163,114 @@ One request per snap per poll, asking for two metrics:
 
 | metric | what it is |
 |---|---|
-| `daily_device_change` | three series — `new`, `continued`, `lost` — one value per day |
-| `installed_base_by_country` | one series per ISO 3166-1 alpha-2 country, each value the devices running the snap in that country **that day** |
+| `weekly_installed_base_by_country` | one series per country, each value the distinct devices seen in that country **in the seven days ending that day** |
+| `daily_device_change` | three series — `new`, `continued`, `lost` — comparing each day with the day before |
 
-The store also publishes `installed_base_by_channel`,
-`installed_base_by_operating_system`, `installed_base_by_version`,
-`weekly_device_change` and the `weekly_installed_base_by_*` family. None of them
-carry a fact the feed can turn into a drop, and every extra filter is another
-series downloaded four times a day, so Loot does not ask for them.
+The store also publishes the installed base by channel, operating system,
+version and architecture, daily and weekly. None of them carry a fact Loot
+shows, and every extra filter is another series downloaded four times a day.
 
 ## What Loot emits
 
 Per snap, per **completed** day (today is never emitted — the store has not
-published it):
+published it). Every one of these is silent:
 
-| kind | quantity | silent? | dedupe key |
-|---|---|---|---|
-| `install` | `new` devices | silent | `snapcraft:installs:<snap>:<day>` |
-| `active_devices` | `new + continued` | silent | `snapcraft:active:<snap>:<day>` |
-| `lost` | `lost` devices | silent | `snapcraft:lost:<snap>:<day>` |
-| `install` (one per country) | derived country gain | silent | `snapcraft:installs:<snap>:<day>:<country>` |
-| **`installs_day`** | `new` devices | **chest drop** | `snapcraft:installs_day:<snap>:<day>` |
+| kind | quantity | dedupe key |
+|---|---|---|
+| `audience` (one per country) | weekly devices in that country | `snapcraft:audience:<snap>:<day>:<country>` |
+| `audience` (no country) | weekly devices in total | `snapcraft:audience:<snap>:<day>` |
+| `device_new` | devices seen that day and not the day before | `snapcraft:installs:<snap>:<day>` |
+| `active_devices` | `new + continued`: devices seen that day | `snapcraft:active:<snap>:<day>` |
+| `lost` | devices seen the day before and not that day | `snapcraft:lost:<snap>:<day>` |
 
-Plus, exactly once per (snap, country) for as long as Loot's state survives:
+The `audience` rows are the ones that matter. The Hearth's population for a
+snap is its **newest** snapshot — nothing is summed — so a settlement is as big
+as the store says it is this week, and shrinks when devices go away.
 
-| kind | quantity | silent? | dedupe key |
-|---|---|---|---|
-| `install` (baseline) | the standing installed base in that country | silent | `snapcraft:baseline:<snap>:<country>` |
+The source produces no drops of its own. The pipeline mints two kinds on its
+behalf, both into that day's chest:
 
-`installs_day` is the only event that produces a drop, and it goes into that
-day's chest rather than the live feed — the same treatment Google Play's install
-days get, so a 30-day backfill fills chests instead of spraying a month of
-installs across the feed. The `installs-day-record` rule makes your best install
-day **epic** for free.
-
-`lost` events are recorded but currently invisible: they carry no drop and the
-UI does not read them yet. They are stored now so the history exists when it
-does.
+- a **settlement** the first time a country is seen at all;
+- an **audience milestone** the first time a snap's weekly total reaches a rung
+  of the ladder (5, 10, 25, 50, 75, 100, 150, 200, 250, 300, 400, 500, 750,
+  1,000 …). Only upwards: a snap that dips below a rung and recovers is not
+  congratulated twice.
 
 The first poll of a snap backfills `backfill_days` (30 by default). Set it to
-`0` to emit nothing historical and only report days from here on; for a one-off
-bootstrap from a fixed date, `./bin/loot serve --since 2026-01-01`.
+`0` to emit nothing historical; for a one-off bootstrap from a fixed date,
+`./bin/loot serve --since 2026-01-01`.
 
 ## Caveats
 
-### Metrics lag by a day or two
+### `new` is not installs
 
-The store publishes a day's figures some hours — occasionally a couple of days —
-after that day closes, and returns `null` values for the buckets it has not
-filled in yet. Loot skips an all-null day **without moving its cursor**, so the
-day is picked up on a later poll rather than being lost. A `NO_DATA` metric
-status (a snap with no installs yet) is treated the same way. Neither is an
-error and neither lights up `last_error`.
+This is the important one, and Loot got it wrong for a while.
 
-The cursor advances only to the end of the **contiguous run** of published days,
-not to the newest day with data anywhere in the response. Given a published
-Monday, an unpublished Tuesday and a published Wednesday, the cursor stops at
-Monday — Wednesday's events are still emitted, and Tuesday is asked for again
-until it lands. (Days the store has no bucket for at all are a different thing:
-it truncates the range to what it has rather than padding it with nulls, so a
-missing bucket is not treated as a hole.)
+`daily_device_change` compares one day with the day before it and nothing else.
+`new` means "seen today, not yesterday"; `lost` means "seen yesterday, not
+today". A laptop that stays shut over the weekend is lost on Saturday and new
+again on Monday. Nothing in the Snap Store's metrics says how many devices
+installed a snap for the first time.
 
-### Per-country installs are a baseline plus derived daily gains
+Loot used to store `new` as an `install` and add it up. A snap with a steady
+base of about 170 devices, 15–25 of which come and go each day, read as well
+over a thousand "installs" within three months, and the Hearth showed that as
+its population. The series is still recorded, as `device_new`, because it is
+what the store said — but nothing sums it, it feeds no quest or record, and it
+produces no drop.
 
-This is the important one. `installed_base_by_country` is a **base**, not an
-arrival count: it says how many devices in each country were running the snap
-that day. Loot turns it into two different things.
+A database from before the change is migrated in place: its old Snapcraft
+`install` rows become `device_new` (and `country_gain` for the per-country
+differences Loot used to derive), so they stop counting everywhere at once. The
+`installs_day` drops those days produced are left as they were; they are
+history, and XP is never taken back.
 
-**The baseline — one event, the first time a country is ever seen.** The first
-poll that sees a positive base for a (snap, country) pair emits a single silent
-`install` carrying the *whole standing base*, dated the oldest day the deltas
-will be measured from:
+### Why the weekly base, not the daily one
 
-```
-baseline[country] = base[country][day0]      dedupe: snapcraft:baseline:<snap>:<country>
-```
-
-Without it the globe would be wrong in a way that is easy to miss. Differences
-can only see countries that **grow while Loot is watching**, so a snap with a
-settled base in Australia that neither gains nor loses a device this week emits
-nothing for Australia, ever — and since a settlement is founded by the first
-event carrying a country, the Hearth would show two flags for a snap running in
-twenty countries. The baseline is the missing first term.
-
-**The daily gain — one event per country per day, after that.**
-
-```
-installs[country][day] = max(0, base[country][day] − base[country][day−1])
-```
-
-which is why the country filter is always fetched one day further back than the
-device filter.
-
-`day0` is the oldest bucket of the **contiguous** run rather than simply the
-oldest bucket in the window, and a country's deltas start at `day0 + 1`. Both
-choices exist to make the arithmetic close:
-
-```
-baseline(day0) + Σ delta(day0+1 … dayN) == base(dayN)
-```
-
-For a country that first appears mid-life, `base[day0] − 0` *is* the baseline,
-so counting the `day0` difference as well would double it. Loot suppresses it.
-
-Consequences worth knowing:
-
-- **Losses mask installs.** A country that gained 5 devices and lost 7 on the
-  same day reads as **0**, not 5. The derived figure is a *net* gain, so it
-  never overstates and frequently understates.
-- **The country numbers do not sum to the day's installs.** The authoritative
-  install count is the un-countried `daily_device_change` `new` series, which is
-  emitted separately. Do not expect the per-country events to add up to it.
-
-Every derived event's payload carries `"derived": true` along with the two base
-readings it came from; a baseline's carries `"baseline": true` with `"base"` and
-`"as_of"`. Either way a surprising number can be checked against what the store
-said.
-
-A day whose preceding bucket is missing (the first day of a window, or a gap in
-the store's data) produces no *delta* events at all: differencing across a gap
-would turn a week's growth into a one-day spike. Baselines are unaffected —
-they do not difference anything.
-
-### What the Hearth's population actually means
-
-For Snapcraft, a settlement's population is **the installed base in that country
-at the moment Loot was wired up, plus every net daily gain since**. It is not a
-live headcount, and it never shrinks: losses are recorded as `lost` events but
-are never subtracted from a settlement, because settlements on the Hearth do not
-shrink by design.
-
-Two kinds of drift follow, both accepted:
-
-- **Decline.** A country whose base has fallen since its baseline keeps the
-  higher figure. Founded at 50 and now at 47, the Hearth still says 50.
-- **Gaps.** When the store leaves a hole in its buckets, the growth across that
-  hole is never differenced and so is never attributed. Countries that already
-  have a settlement are **not** re-baselined after a gap — re-founding them
-  would say nothing new about the globe, and a second baseline would double-count
-  everything before it. Only a country never seen before gets a baseline, and it
-  gets one from the first bucket of the contiguous run after the gap.
-
-Loot remembers which `(snap, country)` pairs it has founded, and on which day,
-in its source state (`baselined`). Delete that state and the next poll re-founds
-every country from its base at that moment — the dedupe keys mean no duplicate
-events are stored, but the figures are re-read from today's base rather than the
-original one.
-
-### Turning it on for a snap Loot already polls
-
-Baselines were added after the fact, so a snap with existing state simply has no
-`baselined` entry yet. On the very next poll, **every country the snap is
-currently installed in gets founded at once** — expect a burst of settlement
-drops in one chest, one per country, sized by that country's current base. It
-happens once. Nothing is emitted for countries the store reports a zero or
-missing base for.
+The daily installed base only counts machines that happened to be switched on
+that day, and for a desktop app it swings by a third between a Tuesday and a
+Sunday. The weekly base is the closest thing the store has to "how many devices
+have this".
 
 ### Devices, not people
 
 Snap metrics count **devices**. Someone with a laptop and a desktop is two
-installs here, where Google Play's "user installs" would call them one. There is
-no user-level series to switch to.
+here, and so is every VM and CI machine that installs the snap. There is no
+user-level series to switch to.
 
-### Country codes
+### Devices the store cannot place
 
-Devices the store could not place are reported under a non-ISO series name
-(`??`). Those are skipped rather than invented into a country; they still appear
-in the day's total `install` event, which carries no country and therefore lands
-aboard the Hearth's **fleet** — for Snapcraft, an offshore rig in the North Sea
-called *Snapcraft Platform Nine*.
+The per-country series are named by ISO 3166-1 alpha-2 code, except for the
+devices the store did not attribute to a country, which it files under names
+that are not codes (`??`, `_INTERNAL`). Those can be a large share: the store
+moved more than half of one snap's devices into `_INTERNAL` overnight in
+November 2026, with the total unchanged.
+
+Loot never invents a country for them. They are counted in the snap's total —
+which is why the total is the authoritative figure — and the difference between
+the total and the placed rows sails with the Hearth's **fleet**, aboard
+*Snapcraft Platform Nine*. The total row's payload records both halves as
+`placed` and `unplaced`.
+
+### Metrics lag by a day or two
+
+The store publishes a day's figures some hours — occasionally a couple of days —
+after that day closes, and returns `null` for the buckets it has not filled in
+yet. A day that is all null is skipped **without moving its cursor**, so it is
+picked up on a later poll. A `null` for a single country on a day that is
+otherwise published just means nobody was there. A `NO_DATA` metric status (a
+snap with no installs yet) is treated the same way. None of it is an error.
+
+Each metric has its own cursor, and each advances only to the end of its
+**contiguous run** of published days. Given a published Monday, an unpublished
+Tuesday and a published Wednesday, the cursor stops at Monday — Wednesday's
+events are still emitted, and Tuesday is asked for again until it lands.
+
+### Turning it on for a snap Loot already polls
+
+Audience snapshots were added after the fact, so a snap with existing state has
+a device cursor and no audience cursor. On the next poll it backfills
+`backfill_days` of snapshots for that snap alone, without re-emitting anything
+it already has. Expect its settlements to **drop** to their real size, the
+fleet to change, and one milestone drop for the highest rung the snap has
+already reached.

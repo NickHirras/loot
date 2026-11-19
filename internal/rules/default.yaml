@@ -141,8 +141,8 @@ rules:
       xp: 10
 
   # ------------------------------------------------------- Install day totals
-  # Sources that report installs a whole day at a time (Google Play, Flathub,
-  # Snapcraft) emit one `installs_day` per app per day, alongside a silent
+  # Sources that report installs a whole day at a time (Google Play, Flathub)
+  # emit one `installs_day` per app per day, alongside a silent
   # `install` row that carries the count. The generic rules below are matched
   # on kind alone, so any source that adopts the same event gets them for free;
   # the Flathub pair sits first only to call the store by its own name.
@@ -185,6 +185,40 @@ rules:
       title: "{{.QuantityFmt}} installs on {{.SourceName}}"
       subtitle: "{{.App}}"
       xp: 10
+
+  # ------------------------------------------------------ Audience milestones
+  # Sources that report their own installed base (Snapcraft's weekly devices,
+  # Google Play's active devices) store it as silent `audience` snapshots. The
+  # pipeline mints one of these the first time an app's audience on a source
+  # reaches a rung of the ladder; Quantity is the rung.
+  - name: audience-milestone-thousands
+    match:
+      kind: audience_milestone
+      min_quantity: 1000
+    then:
+      rarity: legendary
+      title: "{{.QuantityFmt}} devices on {{.SourceName}}"
+      subtitle: "{{.App}} · audience milestone"
+      xp: 1000
+
+  - name: audience-milestone-hundreds
+    match:
+      kind: audience_milestone
+      min_quantity: 100
+    then:
+      rarity: epic
+      title: "{{.QuantityFmt}} devices on {{.SourceName}}"
+      subtitle: "{{.App}} · audience milestone"
+      xp: 400
+
+  - name: audience-milestone
+    match:
+      kind: audience_milestone
+    then:
+      rarity: rare
+      title: "{{.QuantityFmt}} devices on {{.SourceName}}"
+      subtitle: "{{.App}} · audience milestone"
+      xp: 150
 
   # -------------------------------------------------------------- Settlements
   # The pipeline synthesizes one of these the first time an event carries a

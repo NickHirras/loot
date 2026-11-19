@@ -14,7 +14,7 @@
     {
       "status": "OK",
       "snap_id": "SNAPID00000000000000000000000001",
-      "metric_name": "installed_base_by_country",
+      "metric_name": "weekly_installed_base_by_country",
       "buckets": ["2026-08-14", "2026-08-15", "2026-08-16", "2026-08-17"],
       "series": [
         {"name": "US", "values": [100, 110, 118, null]},

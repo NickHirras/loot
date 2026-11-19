@@ -15,14 +15,19 @@ import (
 	"github.com/nickhirras/loot/internal/core"
 )
 
-// Metric names used by Loot. The store also publishes
-// installed_base_by_channel / _operating_system / _version and the weekly_*
-// variants; none of them add a fact the feed can turn into a drop, and every
-// extra filter is another series to download every six hours.
+// Metric names used by Loot. The store also publishes the installed base by
+// channel, operating system, version and architecture, daily and weekly; none
+// of them add a fact Loot shows, and every extra filter is another series to
+// download every six hours.
 const (
-	metricDailyDeviceChange = "daily_device_change"
-	metricBaseByCountry     = "installed_base_by_country"
+	metricDailyDeviceChange   = "daily_device_change"
+	metricWeeklyBaseByCountry = "weekly_installed_base_by_country"
 )
+
+// kindDeviceNew is the kind of the daily "new" series: devices seen today that
+// were not seen yesterday. It is deliberately not "install" — see
+// EventsFromMetrics.
+const kindDeviceNew = "device_new"
 
 // Series names of daily_device_change.
 const (
@@ -87,15 +92,6 @@ func (r MetricsResponse) Metric(name string) (Metric, bool) {
 	return Metric{}, false
 }
 
-// bucketIndex maps each bucket day to its position in the values vectors.
-func (m Metric) bucketIndex() map[string]int {
-	idx := make(map[string]int, len(m.Buckets))
-	for i, d := range m.Buckets {
-		idx[d] = i
-	}
-	return idx
-}
-
 // at returns the value of the named series at bucket position i. ok is false
 // when the series is absent or the sample is null.
 func (m Metric) at(series string, i int) (float64, bool) {
@@ -124,15 +120,16 @@ func ParseMetrics(body []byte) (MetricsResponse, error) {
 	return out, nil
 }
 
-// fetchMetrics asks for both metrics in one request. The country filter starts
-// one day earlier than the device-change filter because per-country installs
-// are derived from the difference between two consecutive installed-base days.
-func (s *Source) fetchMetrics(ctx context.Context, auth *credentials, snapID, countryStart, start, end string) (MetricsResponse, error) {
+// fetchMetrics asks for both metrics in one request. The two ranges are
+// separate because the two cursors are: a Loot that has been reading device
+// changes for months still has every audience snapshot to backfill the first
+// time it runs a version that knows about them.
+func (s *Source) fetchMetrics(ctx context.Context, auth *credentials, snapID, start, audienceStart, end string) (MetricsResponse, error) {
 	req := struct {
 		Filters []Filter `json:"filters"`
 	}{Filters: []Filter{
 		{SnapID: snapID, MetricName: metricDailyDeviceChange, Start: start, End: end},
-		{SnapID: snapID, MetricName: metricBaseByCountry, Start: countryStart, End: end},
+		{SnapID: snapID, MetricName: metricWeeklyBaseByCountry, Start: audienceStart, End: end},
 	}}
 	body, err := json.Marshal(req)
 	if err != nil {
@@ -350,7 +347,7 @@ func joinErrors(list []APIError) string {
 	return strings.Join(parts, "; ")
 }
 
-// dayPayload is what every snapcraft event carries in Event.Payload.
+// dayPayload is what every per-day device event carries in Event.Payload.
 type dayPayload struct {
 	Snap   string `json:"snap"`
 	SnapID string `json:"snap_id,omitempty"`
@@ -361,17 +358,6 @@ type dayPayload struct {
 	Lost      int `json:"lost"`
 	// InstalledBase is new + continued: the devices running the snap that day.
 	InstalledBase int `json:"installed_base"`
-	// Country and Installs are set only on the per-country events, where
-	// Installs is a derived difference rather than a reported figure.
-	Country  string `json:"country,omitempty"`
-	Installs int    `json:"installs,omitempty"`
-	// Derived marks a figure Loot computed rather than read. Per-country
-	// installs are the only one.
-	Derived bool `json:"derived,omitempty"`
-	// BaseToday / BaseYesterday show the two installed-base readings the
-	// derived figure came from, so a surprising number can be checked.
-	BaseToday     int `json:"base_today,omitempty"`
-	BaseYesterday int `json:"base_yesterday,omitempty"`
 }
 
 func (p dayPayload) raw() json.RawMessage {
@@ -379,29 +365,38 @@ func (p dayPayload) raw() json.RawMessage {
 	return b
 }
 
-// baselinePayload is what a per-country *baseline* event carries. It is
-// deliberately not a dayPayload: the daily_device_change figures have nothing
-// to do with a baseline, and zeroed new/continued/lost fields would only invite
-// being read as real. Base is a figure the store reported, not a difference
-// Loot computed, so there is no "derived" flag here either.
-type baselinePayload struct {
+// audiencePayload is what an `audience` event carries. Placed and Unplaced are
+// set on the total row only: how much of the weekly base the store put in a
+// country, and how much it could not.
+type audiencePayload struct {
 	Snap     string `json:"snap"`
 	SnapID   string `json:"snap_id,omitempty"`
-	Country  string `json:"country"`
 	Date     string `json:"date"`
-	Baseline bool   `json:"baseline"`
-	Base     int    `json:"base"`
-	AsOf     string `json:"as_of"`
+	Basis    string `json:"basis"`
+	Country  string `json:"country,omitempty"`
+	Placed   int    `json:"placed,omitempty"`
+	Unplaced int    `json:"unplaced,omitempty"`
 }
 
-func (p baselinePayload) raw() json.RawMessage {
+func (p audiencePayload) raw() json.RawMessage {
 	b, _ := json.Marshal(p)
 	return b
 }
 
-// EventsFromMetrics turns one snap's metrics response into events for every
-// completed day strictly after floor and strictly before today, and reports how
-// far the caller may advance its cursor.
+// EventsFromMetrics turns one snap's daily_device_change into the silent
+// per-day counters, for every completed day strictly after floor and strictly
+// before today, and reports how far the caller may advance its cursor.
+//
+// # None of these are installs
+//
+// The three series compare one day with the day before it and nothing else:
+// `new` is "seen today, not yesterday", `lost` is "seen yesterday, not today".
+// A laptop that stays shut over the weekend is lost on Saturday and new again
+// on Monday. Loot used to record `new` as an `install` and add it up, which
+// turned a steady base of a couple of hundred devices into thousands of
+// "arrivals" — so they are stored under their own kinds, which nothing sums
+// into a population, a quest or a record, and they produce no drop. What an
+// app's audience actually is comes from AudienceEvents.
 //
 // Metric availability lags the calendar by a day or two and the store fills the
 // gap with nulls; a day whose daily_device_change is entirely null is left
@@ -414,45 +409,16 @@ func (p baselinePayload) raw() json.RawMessage {
 // read again once its figures landed. Events for the days beyond the gap are
 // still emitted (their dedupe keys make the re-read free); it is only the
 // cursor that waits.
-//
-// baselined maps a country code to the day this snap was already founded there
-// on, as remembered by the caller's state; countries missing from it are
-// founded now (see countryBaselines) and returned as the third result so the
-// caller can remember them too. Baseline events ignore floor entirely: the
-// standing installed base is a fact about days before the window, and it is
-// only worth saying once.
-func EventsFromMetrics(snap, snapID string, resp MetricsResponse, floor, today string, observed time.Time, baselined map[string]string) ([]core.Event, string, map[string]string) {
+func EventsFromMetrics(snap, snapID string, resp MetricsResponse, floor, today string, observed time.Time) ([]core.Event, string) {
 	change, ok := resp.Metric(metricDailyDeviceChange)
 	if !ok {
-		return nil, "", nil
+		return nil, ""
 	}
-	country, hasCountry := resp.Metric(metricBaseByCountry)
-	countryIdx := map[string]int{}
 
 	var (
 		events []core.Event
 		newest string
-		fresh  map[string]string
-		// founded is baselined plus whatever was founded in this pass: the
-		// day each country's deltas are measured *from*, so the delta logic
-		// can avoid counting the baseline day twice.
-		founded = baselined
 	)
-	if hasCountry {
-		countryIdx = country.bucketIndex()
-		var baselines []core.Event
-		baselines, fresh = countryBaselines(snap, snapID, country, baselined, today, observed)
-		events = append(events, baselines...)
-		if len(fresh) > 0 {
-			founded = make(map[string]string, len(baselined)+len(fresh))
-			for cc, d := range baselined {
-				founded[cc] = d
-			}
-			for cc, d := range fresh {
-				founded[cc] = d
-			}
-		}
-	}
 
 	days := append([]string(nil), change.Buckets...)
 	sort.Strings(days)
@@ -497,7 +463,7 @@ func EventsFromMetrics(snap, snapID string, resp MetricsResponse, floor, today s
 			InstalledBase: int(newDev) + int(continued),
 		}
 
-		mk := func(kind string, qty int, key string, silent, chest bool, payload dayPayload, cc string) core.Event {
+		mk := func(kind string, qty int, key string) core.Event {
 			return core.Event{
 				ID:         core.NewIDAt(occurred),
 				Source:     Name,
@@ -506,259 +472,155 @@ func EventsFromMetrics(snap, snapID string, resp MetricsResponse, floor, today s
 				OccurredAt: occurred,
 				ObservedAt: observed,
 				Day:        day,
-				Country:    cc,
 				Quantity:   qty,
 				DedupeKey:  key,
-				IsLedger:   false,
-				Silent:     silent,
-				Chest:      chest,
-				Payload:    payload.raw(),
+				Silent:     true,
+				Payload:    base.raw(),
 			}
 		}
 
+		// The dedupe keys predate the kinds: "installs" is what `device_new`
+		// was called when it was mistaken for one. Keeping the key means a
+		// database from before the rename does not grow a second copy of every
+		// day it already has.
 		if base.New > 0 {
-			events = append(events, mk("install", base.New,
-				fmt.Sprintf("snapcraft:installs:%s:%s", snap, day), true, false, base, ""))
+			events = append(events, mk(kindDeviceNew, base.New,
+				fmt.Sprintf("snapcraft:installs:%s:%s", snap, day)))
 		}
 		if base.InstalledBase > 0 {
 			events = append(events, mk("active_devices", base.InstalledBase,
-				fmt.Sprintf("snapcraft:active:%s:%s", snap, day), true, false, base, ""))
+				fmt.Sprintf("snapcraft:active:%s:%s", snap, day)))
 		}
 		if base.Lost > 0 {
 			events = append(events, mk("lost", base.Lost,
-				fmt.Sprintf("snapcraft:lost:%s:%s", snap, day), true, false, base, ""))
-		}
-
-		if hasCountry {
-			for _, d := range countryDeltas(country, countryIdx, day, founded) {
-				p := base
-				p.Country = d.country
-				p.Installs = d.delta
-				p.Derived = true
-				p.BaseToday = d.today
-				p.BaseYesterday = d.yesterday
-				events = append(events, mk("install", d.delta,
-					fmt.Sprintf("snapcraft:installs:%s:%s:%s", snap, day, d.country),
-					true, false, p, d.country))
-			}
-		}
-
-		// The day's one headline, chest-bound so a 30 day backfill fills
-		// chests instead of spraying a month of installs across the feed.
-		if base.New > 0 {
-			events = append(events, mk("installs_day", base.New,
-				fmt.Sprintf("snapcraft:installs_day:%s:%s", snap, day), false, true, base, ""))
+				fmt.Sprintf("snapcraft:lost:%s:%s", snap, day)))
 		}
 	}
-	return events, newest, fresh
+	return events, newest
 }
 
-// countryBaselines founds this snap in every country it has never been seen in,
-// with one event carrying the standing installed base.
+// AudienceEvents turns one snap's weekly_installed_base_by_country into
+// `audience` snapshots for every completed day strictly after floor and
+// strictly before today, and reports how far the audience cursor may advance.
 //
-// Per-country installs are day-over-day differences of a *base*, so on its own
-// the delta logic can only ever see countries that grow while Loot is watching.
-// A snap with a settled base in Australia that neither gains nor loses a device
-// this week emits nothing for Australia, ever — and the Hearth, which founds a
-// settlement on the first event carrying a country, never learns the snap is
-// installed there at all. That was the bug: a globe with two settlements for a
-// snap running in twenty countries.
+// Each day yields one event per country the store placed devices in, and one
+// total with no country. The total is the sum of *every* series, including the
+// ones the store names with something other than an ISO code ("??") for
+// devices it could not place: those devices are real, they are simply nowhere,
+// and the Hearth shows the difference between the total and the placed rows as
+// the snap's vessel at sea.
 //
-// The baseline is the missing first term. The first time a (snap, country) pair
-// is seen with a positive base, one event carries the whole base, dated the
-// oldest day the deltas will be measured from, so that
+// The weekly base is used rather than the daily one because it is the closest
+// thing the store has to "how many devices have this": a daily base only counts
+// the machines that happened to be switched on that day, and swings by a third
+// between a Tuesday and a Sunday for a desktop app.
 //
-//	baseline(day0) + Σ delta(day0+1 … dayN) == base(dayN)
-//
-// exactly. day0 is the start of the *contiguous* run of buckets rather than
-// simply the oldest bucket in the window because differencing cannot cross a
-// gap: a baseline placed before a gap would leave the growth across it
-// unattributed. Deltas on day0 itself are suppressed (see countryDeltas) — for
-// a country appearing mid-life, base[day0] − 0 *is* the baseline, and counting
-// both would double it.
-//
-// Countries already founded are never re-baselined, not even after a data gap.
-// They have a settlement already, re-founding says nothing new, and the drift a
-// gap introduces is accepted and documented rather than papered over with a
-// second baseline that would double-count everything before it.
-//
-// The returned map is country -> baseline day for the countries founded here,
-// for the caller to merge into its state. The dedupe key alone would make a
-// re-emission harmless, but re-deriving it every six hours would hand the
-// pipeline the same forty rows forever.
-func countryBaselines(snap, snapID string, country Metric, baselined map[string]string, today string, observed time.Time) ([]core.Event, map[string]string) {
-	start := contiguousRunStart(country.Buckets)
-	if start < 0 {
-		return nil, nil
+// Nothing here is a difference between two days, so there is nothing to
+// baseline and nothing to drift: a snapshot is right or wrong on its own, and
+// tomorrow's replaces it.
+func AudienceEvents(snap, snapID string, resp MetricsResponse, floor, today string, observed time.Time) ([]core.Event, string) {
+	weekly, ok := resp.Metric(metricWeeklyBaseByCountry)
+	if !ok {
+		return nil, ""
 	}
 
-	type founding struct {
-		cc   string
-		day  string
-		base int
-	}
-	found := make([]founding, 0, len(country.Series))
-	for _, s := range country.Series {
-		cc := strings.ToUpper(strings.TrimSpace(s.Name))
-		if !validCountry(cc) {
-			continue
-		}
-		if _, done := baselined[cc]; done {
-			continue
-		}
-		day, base, ok := firstPositiveBase(country, s.Name, start, today)
-		if !ok {
-			continue
-		}
-		found = append(found, founding{cc: cc, day: day, base: base})
-	}
-	// Sorted so a first poll's forty settlements arrive in a stable order
-	// rather than in Go's map-ish series order.
-	sort.Slice(found, func(a, b int) bool { return found[a].cc < found[b].cc })
+	days := append([]string(nil), weekly.Buckets...)
+	sort.Strings(days)
 
 	var (
 		events []core.Event
-		fresh  map[string]string
+		newest string
+		broken bool
 	)
-	for _, f := range found {
-		if _, dup := fresh[f.cc]; dup {
-			// The store would have to report a country twice for this; take
-			// the first reading rather than emitting two events with the same
-			// dedupe key.
+	for _, day := range days {
+		if day >= today || (floor != "" && day <= floor) {
 			continue
 		}
-		occurred, err := parseDay(f.day)
+		i := indexOf(weekly.Buckets, day)
+
+		// A country with nobody in it is reported as null rather than as zero,
+		// so a day is unpublished only when *every* series is null.
+		var (
+			published bool
+			total     int
+			placed    = map[string]int{}
+		)
+		for _, s := range weekly.Series {
+			// The series' own value, not a lookup by name: two series that
+			// shared a name would otherwise both read the first one's.
+			if i < 0 || i >= len(s.Values) || s.Values[i] == nil {
+				continue
+			}
+			published = true
+			n := int(*s.Values[i])
+			if n <= 0 {
+				continue
+			}
+			total += n
+			if cc := strings.ToUpper(strings.TrimSpace(s.Name)); validCountry(cc) {
+				placed[cc] += n
+			}
+		}
+		if !published {
+			broken = true
+			continue
+		}
+		if !broken && day > newest {
+			newest = day
+		}
+		if total <= 0 {
+			continue
+		}
+		occurred, err := parseDay(day)
 		if err != nil {
 			continue
 		}
-		payload := baselinePayload{
-			Snap:     snap,
-			SnapID:   snapID,
-			Country:  f.cc,
-			Date:     f.day,
-			Baseline: true,
-			Base:     f.base,
-			AsOf:     f.day,
-		}
-		events = append(events, core.Event{
-			ID:         core.NewIDAt(occurred),
-			Source:     Name,
-			Kind:       "install",
-			App:        snap,
-			OccurredAt: occurred,
-			ObservedAt: observed,
-			Day:        f.day,
-			Country:    f.cc,
-			Quantity:   f.base,
-			DedupeKey:  fmt.Sprintf("snapcraft:baseline:%s:%s", snap, f.cc),
-			IsLedger:   false,
-			// Silent, and not chest-hinted: the pipeline treats a silent event
-			// as a backfill, so the settlement it founds lands in that day's
-			// chest instead of spraying flags across the live feed.
-			Silent:  true,
-			Chest:   false,
-			Payload: payload.raw(),
-		})
-		if fresh == nil {
-			fresh = make(map[string]string, len(found))
-		}
-		fresh[f.cc] = f.day
-	}
-	return events, fresh
-}
 
-// contiguousRunStart returns the index of the oldest bucket in the unbroken
-// calendar run that ends at the newest bucket, or -1 when there are none.
-// Buckets arrive in ascending order.
-func contiguousRunStart(buckets []string) int {
-	if len(buckets) == 0 {
-		return -1
-	}
-	i := len(buckets) - 1
-	for i > 0 && buckets[i-1] == addDays(buckets[i], -1) {
-		i--
-	}
-	return i
-}
+		countries := make([]string, 0, len(placed))
+		placedTotal := 0
+		for cc, n := range placed {
+			countries = append(countries, cc)
+			placedTotal += n
+		}
+		// Sorted so a poll is reproducible rather than in Go's map order.
+		sort.Strings(countries)
 
-// firstPositiveBase finds the oldest bucket at or after index from whose value
-// for series is present and above zero, which is the day that country's
-// baseline belongs on. Days at or after today are skipped: the store has not
-// finished counting them.
-func firstPositiveBase(m Metric, series string, from int, today string) (string, int, bool) {
-	for i := from; i < len(m.Buckets); i++ {
-		if today != "" && m.Buckets[i] >= today {
-			break
+		mk := func(cc string, qty int, key string, p audiencePayload) core.Event {
+			return core.Event{
+				ID:         core.NewIDAt(occurred),
+				Source:     Name,
+				Kind:       core.KindAudience,
+				App:        snap,
+				OccurredAt: occurred,
+				ObservedAt: observed,
+				Day:        day,
+				Country:    cc,
+				Quantity:   qty,
+				DedupeKey:  key,
+				// Silent: a snapshot is not news. The pipeline still founds a
+				// settlement for a country it has never seen, and mints a
+				// milestone when the total reaches one.
+				Silent:  true,
+				Payload: p.raw(),
+			}
 		}
-		v, ok := m.at(series, i)
-		if !ok || int(v) <= 0 {
-			continue
-		}
-		return m.Buckets[i], int(v), true
-	}
-	return "", 0, false
-}
+		base := audiencePayload{Snap: snap, SnapID: snapID, Date: day, Basis: string(core.BasisWeeklyDevices)}
 
-// countryDelta is one country's derived install count for a day.
-type countryDelta struct {
-	country   string
-	delta     int
-	today     int
-	yesterday int
-}
-
-// countryDeltas derives per-country installs for day from the installed-base
-// metric.
-//
-// installed_base_by_country is a *base*: how many devices in each country were
-// running the snap that day, not how many arrived. The daily arrival is
-// therefore base[day] − base[day−1], clamped at zero.
-//
-// That clamp is the honest limit of this data. A country that gained 5 devices
-// and lost 7 reads as 0, not 5, so the derived figure is a *net* gain and never
-// exceeds the truth. It is used for the globe's settlements, where "a country
-// that grew today" is the question being asked; the authoritative daily install
-// count is the un-countried daily_device_change "new" series, which is emitted
-// separately and is not the sum of these.
-//
-// founded maps a country to the day its baseline was struck on (countryBaselines).
-// A country's deltas start the day *after* that: the baseline already carries
-// base[day0], so for a country appearing mid-life the day0 difference
-// base[day0] − 0 is the very same arrival and would count it twice.
-func countryDeltas(country Metric, idx map[string]int, day string, founded map[string]string) []countryDelta {
-	i, ok := idx[day]
-	if !ok || i == 0 {
-		return nil
+		for _, cc := range countries {
+			p := base
+			p.Country = cc
+			events = append(events, mk(cc, placed[cc],
+				fmt.Sprintf("snapcraft:audience:%s:%s:%s", snap, day, cc), p))
+		}
+		// The total goes last so that, within a day, the countries it is the
+		// sum of are already stored when the pipeline looks at it.
+		p := base
+		p.Placed = placedTotal
+		p.Unplaced = total - placedTotal
+		events = append(events, mk("", total,
+			fmt.Sprintf("snapcraft:audience:%s:%s", snap, day), p))
 	}
-	// Require the preceding bucket to be the preceding calendar day; a gap in
-	// the buckets would turn a multi-day gain into a one-day spike.
-	if country.Buckets[i-1] != addDays(day, -1) {
-		return nil
-	}
-
-	out := make([]countryDelta, 0, 8)
-	for _, s := range country.Series {
-		cc := strings.ToUpper(strings.TrimSpace(s.Name))
-		if !validCountry(cc) {
-			continue
-		}
-		// baseline == base[day0]; deltas run from day0+1.
-		if day0, seen := founded[cc]; seen && day <= day0 {
-			continue
-		}
-		cur, okCur := country.at(s.Name, i)
-		prev, okPrev := country.at(s.Name, i-1)
-		if !okCur || !okPrev {
-			continue
-		}
-		delta := int(cur) - int(prev)
-		if delta <= 0 {
-			continue
-		}
-		out = append(out, countryDelta{country: cc, delta: delta, today: int(cur), yesterday: int(prev)})
-	}
-	sort.Slice(out, func(a, b int) bool { return out[a].country < out[b].country })
-	return out
+	return events, newest
 }
 
 // validCountry accepts ISO 3166-1 alpha-2 only. The store also reports "??"

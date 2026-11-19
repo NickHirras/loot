@@ -219,6 +219,9 @@ func (p *Pipeline) ingest(ctx context.Context, ev core.Event, depth int) (*core.
 			// A failed settlement must not lose the event that caused it.
 			p.Logger.Error("settlement failed", "error", err, "country", ev.Country)
 		}
+		if err := p.milestone(ctx, ev); err != nil {
+			p.Logger.Error("audience milestone failed", "error", err, "app", ev.App)
+		}
 	}
 	if p.AfterIngest != nil && ev.Source != settlementSource {
 		p.AfterIngest(ev)
@@ -391,6 +394,61 @@ func (p *Pipeline) settle(ctx context.Context, ev core.Event) error {
 		Payload:   payload,
 	}
 	_, err = p.ingest(ctx, settlement, 1)
+	return err
+}
+
+// milestone mints an audience_milestone the first time an app's audience on
+// one source reaches a rung of core.AudienceMilestones.
+//
+// It is the audience's equivalent of a settlement: the snapshot that revealed
+// it is silent — a level is not news — but crossing 100 devices is. Only the
+// total row is considered (the per-country rows are parts of it), and only the
+// highest rung reached, so wiring up an app that already has 170 devices says
+// "passed 150" once rather than replaying every rung below it.
+//
+// The only state is the events themselves: a rung is minted when it is higher
+// than every rung already minted for that (source, app), so an audience that
+// dips below one and climbs back does not celebrate twice, and one that falls
+// is never congratulated on the rung beneath.
+func (p *Pipeline) milestone(ctx context.Context, ev core.Event) error {
+	if ev.Kind != core.KindAudience || ev.Country != "" {
+		return nil
+	}
+	rung := core.AudienceMilestone(ev.Quantity)
+	if rung == 0 {
+		return nil
+	}
+	// Only ever upwards. Without this an audience that reached 10 and slipped
+	// to 9 the next day would be congratulated on reaching 5.
+	reached, err := p.Store.HighestAudienceMilestone(ctx, ev.Source, ev.App)
+	if err != nil {
+		return err
+	}
+	if rung <= reached {
+		return nil
+	}
+	payload, err := json.Marshal(map[string]any{
+		"audience": ev.Quantity,
+		"basis":    core.AudienceBasisFor(ev.Source),
+		"via":      ev.Source,
+	})
+	if err != nil {
+		return fmt.Errorf("milestone payload: %w", err)
+	}
+	_, err = p.ingest(ctx, core.Event{
+		Source:     ev.Source,
+		Kind:       core.KindAudienceMilestone,
+		App:        ev.App,
+		OccurredAt: ev.OccurredAt,
+		Day:        ev.Day,
+		Quantity:   rung,
+		// Chest-bound, like the settlement a silent row founds: a snapshot
+		// describes a day that is already over, so its news belongs in that
+		// day's chest rather than interrupting the live feed.
+		Chest:     true,
+		DedupeKey: fmt.Sprintf("%s:audience_milestone:%s:%d", ev.Source, ev.App, rung),
+		Payload:   payload,
+	}, 1)
 	return err
 }
 

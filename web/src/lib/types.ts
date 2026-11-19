@@ -492,6 +492,39 @@ export interface HearthDrop {
   created_at: string
 }
 
+/**
+ * What an audience figure measures. Two of these are a level — how many are
+ * there now — and one is a running total that can only grow; the UI never adds
+ * the two kinds together.
+ */
+export type AudienceBasis = 'weekly_devices' | 'active_devices' | 'arrivals'
+
+/** One store's reading of one product's audience. */
+export interface AudienceSource {
+  source: string
+  count: number
+  basis: AudienceBasis
+  /** The business day the snapshot describes; absent for `arrivals`. */
+  as_of?: string
+}
+
+/** How often one kind of release file has been downloaded. */
+export interface AssetDownloads {
+  format: string
+  count: number
+}
+
+/** Who has one product now, store by store, mirroring store.ProductAudience. */
+export interface ProductAudience {
+  product: string
+  /** The sum of the sources that report a current installed base. */
+  current: number
+  /** The sum of the sources that only report arrivals. Never added to `current`. */
+  arrivals: number
+  sources: AudienceSource[]
+  downloads: AssetDownloads[]
+}
+
 /** The whole of GET /api/hearth. */
 export interface Hearth {
   /** ISO2 of the capital: home_country, or the biggest settlement. */
@@ -506,6 +539,8 @@ export interface Hearth {
   /** The countryless population, one vessel per source; `unknown` is its sum. */
   fleet: HearthVessel[]
   countries: HearthCountry[]
+  /** Who has each product now. Absent from servers older than the audience. */
+  audience?: ProductAudience[]
   tiers: HearthTier[]
   recent: HearthDrop[]
 }

@@ -822,3 +822,97 @@ func summarize(ev core.Event) string {
 	return fmt.Sprintf("kind=%s app=%s day=%s country=%s amount=%v %s qty=%d silent=%v chest=%v",
 		ev.Kind, ev.App, ev.Day, ev.Country, ev.Amount, ev.Currency, ev.Quantity, ev.Silent, ev.Chest)
 }
+
+// "Active Device Installs" is the one column in these reports that is a level
+// rather than a count of arrivals: how many devices have the app now. It is
+// emitted as a silent `audience` snapshot, total and per country.
+func TestPollInstallsEmitsAudienceSnapshots(t *testing.T) {
+	f := newFakeGCS(t)
+	seed(t, f)
+	src := newSource(f, "com.example.app")
+
+	events, state, err := src.Poll(context.Background(), nil)
+	if err != nil {
+		t.Fatalf("poll: %v", err)
+	}
+	got := byDedupe(events)
+
+	total, ok := got["play:audience:com.example.app:2026-08-15"]
+	if !ok {
+		t.Fatalf("no audience total; keys: %v", keys(got))
+	}
+	if total.Kind != core.KindAudience || total.Quantity != 4100 || !total.Silent ||
+		total.Country != "" || total.IsLedger {
+		t.Errorf("audience total = %+v", summarize(total))
+	}
+	for key, ev := range got {
+		if ev.Kind != core.KindAudience {
+			continue
+		}
+		if ev.Country == "ZZ" {
+			t.Errorf("the ZZ pseudo-country got an audience: %s", key)
+		}
+		if ev.Day >= "2026-08-18" {
+			t.Errorf("today's still-accumulating row was emitted: %s", key)
+		}
+	}
+
+	// Nothing changed in the bucket: the second poll says nothing.
+	again, _, err := src.Poll(context.Background(), state)
+	if err != nil {
+		t.Fatalf("second poll: %v", err)
+	}
+	for _, ev := range again {
+		if ev.Kind == core.KindAudience {
+			t.Fatalf("re-emitted %s", ev.DedupeKey)
+		}
+	}
+}
+
+// A Loot that has read these files for months has install cursors at the
+// newest day and an md5 for every file — and no audience snapshots at all. The
+// first poll after the upgrade must read the unchanged files once more and
+// emit the snapshots, without re-emitting a single install.
+func TestPollInstallsBackfillsAudienceAfterAnUpgrade(t *testing.T) {
+	f := newFakeGCS(t)
+	seed(t, f)
+	src := newSource(f, "com.example.app")
+
+	_, state, err := src.Poll(context.Background(), nil)
+	if err != nil {
+		t.Fatalf("poll: %v", err)
+	}
+	// Rewind to what an older Loot would have written.
+	var old map[string]any
+	if err := json.Unmarshal(state, &old); err != nil {
+		t.Fatal(err)
+	}
+	delete(old, "audience_cursor")
+	delete(old, "audience_seeded")
+	legacy, _ := json.Marshal(old)
+
+	events, upgraded, err := src.Poll(context.Background(), legacy)
+	if err != nil {
+		t.Fatalf("upgrade poll: %v", err)
+	}
+	audience := 0
+	for _, ev := range events {
+		switch ev.Kind {
+		case core.KindAudience:
+			audience++
+		case "install", "installs_day", "active_devices":
+			t.Errorf("the upgrade re-emitted %s", ev.DedupeKey)
+		}
+	}
+	if audience == 0 {
+		t.Fatal("no audience snapshots were backfilled from the unchanged files")
+	}
+
+	after, _, err := src.Poll(context.Background(), upgraded)
+	if err != nil {
+		t.Fatalf("third poll: %v", err)
+	}
+	if len(after) != 0 {
+		t.Errorf("the backfill repeated: %d events", len(after))
+	}
+}

@@ -147,6 +147,15 @@ type state struct {
 	// InstallsFiles is the md5 skip list for the statistics CSVs, the same
 	// trick as SalesFiles.
 	InstallsFiles map[string]string `json:"installs_files"`
+	// AudienceCursor is InstallsCursor's twin for the `audience` snapshots read
+	// from the same reports, keyed the same way. It is separate because the
+	// snapshots were adopted later than the install counts: a Loot that has
+	// read these files for months has every snapshot in them still to emit.
+	AudienceCursor map[string]string `json:"audience_cursor,omitempty"`
+	// AudienceSeeded records that the statistics files have been read once for
+	// their audience snapshots. Until it is set the md5 skip is ignored, or a
+	// month that has stopped changing would never give its snapshots up.
+	AudienceSeeded bool `json:"audience_seeded,omitempty"`
 }
 
 func decodeState(raw []byte) state {
@@ -170,6 +179,9 @@ func decodeState(raw []byte) state {
 	}
 	if st.InstallsFiles == nil {
 		st.InstallsFiles = map[string]string{}
+	}
+	if st.AudienceCursor == nil {
+		st.AudienceCursor = map[string]string{}
 	}
 	migrateInstallsCursor(&st)
 	return st

@@ -361,3 +361,50 @@ export function questErrorLabel(code: string, fallback: string, value = ""): str
       return fallback
   }
 }
+
+/**
+ * A source's name as people say it. These are brand names, so they are the
+ * same in every language and live here rather than in the message catalog.
+ */
+const SOURCE_NAMES: Record<string, string> = {
+  appstore: 'App Store',
+  googleplay: 'Google Play',
+  microsoftstore: 'Microsoft Store',
+  snapcraft: 'Snapcraft',
+  flathub: 'Flathub',
+  revenuecat: 'RevenueCat',
+  github: 'GitHub',
+}
+
+export function sourceName(source: string): string {
+  return SOURCE_NAMES[source] ?? source
+}
+
+/** What an audience figure counts, in a few words. */
+export function audienceBasisLabel(basis: string): string {
+  switch (basis) {
+    case 'weekly_devices':
+      return m.hearth_audience_weekly_devices()
+    case 'active_devices':
+      return m.hearth_audience_active_devices()
+    default:
+      return m.hearth_audience_arrivals()
+  }
+}
+
+/** Package formats are proper names too; only the two catch-alls translate. */
+const DOWNLOAD_FORMATS: Record<string, string> = {
+  flatpak: 'Flatpak',
+  deb: '.deb',
+  rpm: '.rpm',
+  appimage: 'AppImage',
+  snap: 'Snap',
+  apk: 'APK',
+  macos: 'macOS',
+  windows: 'Windows',
+}
+
+export function downloadFormatLabel(format: string): string {
+  if (format === 'archive') return m.hearth_download_archive()
+  return DOWNLOAD_FORMATS[format] ?? m.hearth_download_other()
+}

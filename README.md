@@ -279,7 +279,7 @@ sources:
     backfill_days: 7
 ```
 
-Loot polls `https://flathub.org/api/v2/stats/{app_id}` once an hour and, for each app and each **completed** day (today is still accumulating, so it is never emitted; its count would be frozen at a partial value), stores a silent `install` row (`flathub:<app>:<date>`) and mints one chest-bound `installs_day` drop (`flathub:installs_day:<app>:<date>`). That is the same shape as Google Play and Snapcraft, so a day's installs land in that day's chest instead of the live feed. Re-polling is free.
+Loot polls `https://flathub.org/api/v2/stats/{app_id}` once an hour and, for each app and each **completed** day (today is still accumulating, so it is never emitted; its count would be frozen at a partial value), stores a silent `install` row (`flathub:<app>:<date>`) and mints one chest-bound `installs_day` drop (`flathub:installs_day:<app>:<date>`). That is the same shape as Google Play, so a day's installs land in that day's chest instead of the live feed. Re-polling is free.
 
 `backfill_days` limits what the *first* poll emits. The API returns roughly 180 days of history, and replaying all of it would bury you in drops; the default of 7 gives the feed some history and gives the "best day ever" rule a baseline to beat. Set it to `0` to emit nothing on the first run and only report days from here on. For a one-off bootstrap from a specific date:
 
@@ -405,7 +405,7 @@ Each has its own guide with setup steps, config (YAML + env), what it emits, and
 | Source | Guide | What it produces |
 |---|---|---|
 | Microsoft Store (Partner Center analytics, 6h) | [docs/sources/microsoftstore.md](docs/sources/microsoftstore.md) | ledger rows per app/market/day (gross prices, settled after 3 days), `sales_day` chests, subscription snapshots |
-| Snapcraft (Snap Store metrics, 6h) | [docs/sources/snapcraft.md](docs/sources/snapcraft.md) | new/active/lost devices per snap/day, derived per-country installs (settlements), `installs_day` chests |
+| Snapcraft (Snap Store metrics, 6h) | [docs/sources/snapcraft.md](docs/sources/snapcraft.md) | weekly devices per snap, in total and per country (`audience` snapshots: settlements that can shrink), audience milestones |
 | GitHub (poll 10 min + `POST /hooks/github`) | [docs/sources/github.md](docs/sources/github.md) | stars, star milestones, forks, issues opened/closed ("a quest appears"), PRs, releases |
 | Generic webhook (`POST /hooks/webhook`) | [docs/sources/webhook.md](docs/sources/webhook.md) | anything: name your kind, rarity, title; batch posts; optional ledger amounts |
 | Play Vitals (Developer Reporting API, 6h) | [docs/sources/crashes.md](docs/sources/crashes.md) | daily crashes/ANRs per version (reuses the Play service account); feeds boss fights |
@@ -565,15 +565,33 @@ When a drop lands, it *arrives*: an arc leaves its country and flies to your cap
 
 ### Population
 
-A settlement's size is its **population**: not money, not events, but a count of people who arrived.
+A settlement's size is its **population**, and where the number comes from depends on what the store is willing to say.
+
+**A store that reports who is still there** is read as exactly that. Snapcraft publishes how many distinct devices it saw in the last week, per country, and Google Play publishes its active device installs. Loot stores each day's reading as a silent `audience` snapshot and the population is **the newest one**: nothing is added up, and a settlement shrinks when its people leave. Everything else that source reports about arrivals (installs, downloads, sales units) is ignored for the population, because those are the same people.
+
+**A store that only reports who came** is counted by arrivals, which can only grow:
 
 | counted as one person | where it comes from |
 |---|---|
-| each unit on a ledger row of kind `sale`, `iap`, `subscription` or `download` | App Store and Google Play financial reports |
-| each `install` | Google Play's per-country install statistics, Flathub |
+| each unit on a ledger row of kind `sale`, `iap`, `subscription` or `download` | App Store and Microsoft Store financial reports |
+| each `install` | Flathub, or Google Play before its first audience snapshot |
 | each RevenueCat `purchase` | the RevenueCat webhook |
 
-Only positive quantities count, so **a settlement never shrinks**: a refund nets out of revenue but does not evict a citizen. Deliberately excluded are the `sales_day` and `installs_day` rollups (they are a summary of the rows beside them), cancellations and expirations (bad news does not add people), `active_devices` and `subscription_snapshot` (they are absolute snapshots, not arrivals), and Loot's own synthetic `settlement` event. Revenue per country follows the vault's rule exactly: ledger rows only, signed, `sales_day` excluded.
+Only positive quantities count there, so a refund nets out of revenue but does not evict anybody. Deliberately excluded are the `sales_day` and `installs_day` rollups (they are a summary of the rows beside them), cancellations and expirations (bad news does not add people), and Loot's own synthetic `settlement` event. Revenue per country follows the vault's rule exactly: ledger rows only, signed, `sales_day` excluded.
+
+### Audience
+
+The **Audience** card beside the globe is the same data without the metaphor: one line per app per store, each labelled with what it actually counts.
+
+| label | what it is |
+|---|---|
+| *devices this week* | Snapcraft's weekly installed base: distinct devices seen in the trailing seven days |
+| *active devices* | Google Play's active device installs |
+| *all-time* | a store with no current figure, so every arrival it has reported; listed, but never added to the app's total |
+
+The number beside the app's name is the sum of the first two kinds only. These are devices, not people, and each store defines "active" its own way, so treat the total as a size rather than a census. When an app's audience on a store first reaches a rung of the ladder in [`internal/core/audience.go`](internal/core/audience.go) (5, 10, 25, 50, 75, 100, 150, 200…), Loot mints one `audience_milestone` drop into that day's chest.
+
+The **Downloads** card counts release files fetched from GitHub (`.deb`, `.rpm`, Flatpak bundles, AppImages, archives), from the counters GitHub keeps per file. Downloads are not people: a mirror is a download, and so is every update fetched by hand. They are never added to an audience. `GET /api/hearth` returns both as `audience`, one entry per product.
 
 ### Tiers
 
@@ -611,7 +629,7 @@ home_country: "NZ"   # ISO 3166-1 alpha-2, or "" for the biggest settlement
 
 `LOOT_HOME_COUNTRY` overrides it. A country you have never sold in is still a valid capital: it is where you are, not where your customers are.
 
-Events with no country at all are counted apart, as **the fleet**. Flathub reports how many people installed but never says from where, and every store's per-country file lags its overview file by a poll or two. Those people should not be invented into a country or silently dropped, so each source that has them gets a ship, anchored in open ocean, sized on the same tier ladder as a settlement: *The Flathub Freighter*, *Snapcraft Platform Nine* (a rig, off Ubuntu's homeland), *The Cupertino Clipper*, *The Play Trawler*.
+Events with no country at all are counted apart, as **the fleet**. Flathub reports how many people installed but never says from where, every store's per-country file lags its overview file by a poll or two, and Snapcraft files the devices it cannot locate under a series that is not a country at all. Those people should not be invented into a country or silently dropped, so each source that has them gets a ship, anchored in open ocean, sized on the same tier ladder as a settlement: *The Flathub Freighter*, *Snapcraft Platform Nine* (a rig, off Ubuntu's homeland), *The Cupertino Clipper*, *The Play Trawler*.
 
 Be clear about what the ships are: **a visualization, not a location**. These people have no position at all. The anchorage says only which source could not place them. A vessel is never a country: it does not count toward your settlements, your continents, the Cartographer and Settler trophies, or any quest that counts countries, and it is drawn cold and hull-shaped precisely so it cannot be mistaken for a city. `GET /api/hearth` returns them as `fleet`, one entry per source, with the scalar `unknown` bucket kept beside it as their sum. The tables live in [`web/src/lib/sea.ts`](web/src/lib/sea.ts).
 

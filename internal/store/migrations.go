@@ -273,4 +273,29 @@ ALTER TABLE drops ADD COLUMN floor_rule TEXT NOT NULL DEFAULT '';
 ALTER TABLE drops ADD COLUMN lang       TEXT NOT NULL DEFAULT '';
 `,
 	},
+	{
+		// Snapcraft's daily "new" devices were stored as installs, and they are
+		// not: the store's `new` is "seen today and not yesterday", so a laptop
+		// that was off on Sunday is new again on Monday. Summed, a steady base
+		// of a couple of hundred devices read as thousands of arrivals in the
+		// Hearth, the quests and the records.
+		//
+		// The rows are kept — they are what the store said — but under kinds
+		// that nothing adds up. `device_new` is the daily series; `country_gain`
+		// is what the per-country baseline and day-over-day differences were,
+		// which Loot no longer derives at all now that it reads the store's own
+		// per-country audience (kind `audience`).
+		//
+		// The `installs_day` drops those days produced are left exactly as they
+		// were minted. They are history, and XP is never taken back.
+		Name: "0008_snapcraft_devices",
+		SQL: `
+UPDATE events SET kind = 'device_new'   WHERE source = 'snapcraft' AND kind = 'install' AND country =  '';
+UPDATE events SET kind = 'country_gain' WHERE source = 'snapcraft' AND kind = 'install' AND country <> '';
+
+-- "What is the newest audience snapshot for this app on this source" is asked
+-- on every Hearth read.
+CREATE INDEX events_audience_idx ON events(source, app, day) WHERE kind = 'audience';
+`,
+	},
 }
