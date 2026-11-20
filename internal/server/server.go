@@ -87,6 +87,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/apps", s.handleApps)
 	mux.HandleFunc("GET /api/vault/summary", s.handleVaultSummary)
 	mux.HandleFunc("GET /api/hearth", s.handleHearth)
+	mux.HandleFunc("GET /api/hearth/trend", s.handleHearthTrend)
 	mux.HandleFunc("GET /api/chest", s.handleChest)
 	mux.HandleFunc("POST /api/chest/open", s.handleChestOpen)
 	mux.HandleFunc("GET /api/quests", s.handleQuests)

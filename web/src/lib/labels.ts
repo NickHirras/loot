@@ -16,7 +16,7 @@
  */
 import { m } from '../paraglide/messages'
 import type { Tab } from './route.svelte'
-import type { Metric, MysteryKind, Rarity, Tier } from './types'
+import type { Metric, MysteryKind, Rarity, Tier, TrendMetric, TrendRange } from './types'
 
 /** `common` → "common". */
 export function rarityLabel(rarity: Rarity | string): string {
@@ -407,4 +407,28 @@ const DOWNLOAD_FORMATS: Record<string, string> = {
 export function downloadFormatLabel(format: string): string {
   if (format === 'archive') return m.hearth_download_archive()
   return DOWNLOAD_FORMATS[format] ?? m.hearth_download_other()
+}
+
+/** Label for one Hearth trend range pill. */
+export function trendRangeLabel(range: TrendRange): string {
+  switch (range) {
+    case '7d':
+      return m.hearth_trend_range_7d()
+    case '30d':
+      return m.hearth_trend_range_30d()
+    case '90d':
+      return m.hearth_trend_range_90d()
+    case 'ytd':
+      return m.hearth_trend_range_ytd()
+    case '1y':
+      return m.hearth_trend_range_1y()
+    case 'all':
+      return m.hearth_trend_range_all()
+  }
+}
+
+/** Display label for one stacked series inside a Hearth trend chart. */
+export function trendSeriesLabel(metric: TrendMetric, key: string): string {
+  if (metric === 'downloads') return downloadFormatLabel(key)
+  return sourceName(key)
 }

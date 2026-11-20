@@ -349,6 +349,24 @@ export function integer(value: number): string {
   return integerFormat().format(value ?? 0)
 }
 
+const compactFormats = new Map<string, Intl.NumberFormat>()
+
+function compactFormat(): Intl.NumberFormat {
+  const locale = currentLocale()
+  let fmt = compactFormats.get(locale)
+  if (!fmt) {
+    fmt = new Intl.NumberFormat(locale, { notation: 'compact', maximumFractionDigits: 1 })
+    compactFormats.set(locale, fmt)
+  }
+  return fmt
+}
+
+/** Compact whole number for chart y-axis ticks (e.g. "58.7K", "201"). */
+export function integerCompact(value: number): string {
+  if (Math.abs(value ?? 0) < 1000) return integer(value ?? 0)
+  return compactFormat().format(value ?? 0)
+}
+
 const percentFormats = new Map<string, Intl.NumberFormat>()
 
 function percentFormat(): Intl.NumberFormat {
@@ -543,6 +561,71 @@ export interface Hearth {
   audience?: ProductAudience[]
   tiers: HearthTier[]
   recent: HearthDrop[]
+}
+
+/** The ranges GET /api/hearth/trend accepts, matching week/month/quarter/YTD/year/all. */
+export const TREND_RANGES = ['7d', '30d', '90d', 'ytd', '1y', 'all'] as const
+
+export type TrendRange = (typeof TREND_RANGES)[number]
+
+export type TrendKind = 'level' | 'cumulative'
+
+export type TrendMetric =
+  | 'audience'
+  | 'population'
+  | 'settlements'
+  | 'revenue'
+  | 'fleet'
+  | 'downloads'
+  | 'country'
+  | 'xp'
+
+/** Identifies one Hearth metric to drill into. */
+export interface HearthTrendTarget {
+  metric: TrendMetric
+  product?: string
+  source?: string
+  format?: string
+  country?: string
+}
+
+/** Stable string key for comparing two HearthTrendTarget selections. */
+export function trendTargetKey(t: HearthTrendTarget | null): string {
+  if (!t) return ''
+  return [t.metric, t.product ?? '', t.source ?? '', t.format ?? '', t.country ?? ''].join('|')
+}
+
+/** One business day of a Hearth trend series. */
+export interface TrendPoint {
+  day: string
+  /** Level or running cumulative total, or null before/after a level store reported. */
+  value: number | null
+  /** Daily additions (cumulative) or day-over-day delta (level). */
+  daily: number
+  /** Optional breakdown of `value` across stores or package formats. */
+  by_series?: Record<string, number>
+}
+
+/** The whole of GET /api/hearth/trend. */
+export interface HearthTrend {
+  metric: TrendMetric
+  range: TrendRange
+  from: string
+  to: string
+  days: number
+  kind: TrendKind
+  unit: 'count' | 'money' | 'xp'
+  basis?: AudienceBasis
+  display_currency?: string
+  current: number
+  start: number
+  change: number
+  peak: number
+  peak_day?: string
+  first_day?: string
+  last_day?: string
+  series_names?: string[]
+  points: TrendPoint[]
 }
 
 // --------------------------------------------------------------- quest types

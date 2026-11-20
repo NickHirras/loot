@@ -90,6 +90,18 @@ await shot('vault')
 // bring the European cluster round; ambient starts over the Atlantic already.
 await go('#/hearth', 72000)
 await shot('hearth')
+
+// -- hearth drill-in trends: stacked product audience and single-series population
+await page.locator('button.app-line', { hasText: 'Tidewatch' }).first().click()
+await sleep(800)
+await page.locator('.trend-card button.range-btn', { hasText: 'All' }).first().click()
+await sleep(1000)
+await shot('hearth-trend-audience')
+
+await page.locator('button.fact-btn', { hasText: 'Population' }).first().click()
+await sleep(1000)
+await shot('hearth-trend-population')
+
 await go('#/ambient', 11000)
 await shot('ambient')
 

@@ -2,9 +2,11 @@ package server
 
 import (
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
+	"github.com/nickhirras/loot/internal/core"
 	"github.com/nickhirras/loot/internal/store"
 )
 
@@ -85,4 +87,69 @@ func (s *Server) handleHearth(w http.ResponseWriter, r *http.Request) {
 	s.hearth.put(scope, hearth)
 
 	writeJSON(w, http.StatusOK, s.localizeHearth(r, lang, hearth))
+}
+
+// handleHearthTrend serves GET /api/hearth/trend: a daily time series for one
+// Hearth metric over a trailing or calendar window (7d, 30d, 90d, ytd, 1y, all).
+func (s *Server) handleHearthTrend(w http.ResponseWriter, r *http.Request) {
+	qs := r.URL.Query()
+	metric := strings.ToLower(strings.TrimSpace(qs.Get("metric")))
+	if metric == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]any{
+			"error": "metric is required (use audience, population, settlements, revenue, fleet, downloads, country or xp)",
+		})
+		return
+	}
+	rangeKey := strings.ToLower(strings.TrimSpace(qs.Get("range")))
+	if rangeKey == "" {
+		rangeKey = "30d"
+	}
+	if !store.ValidTrendRange(rangeKey) {
+		writeJSON(w, http.StatusBadRequest, map[string]any{
+			"error": "unknown range " + rangeKey + " (use 7d, 30d, 90d, ytd, 1y or all)",
+		})
+		return
+	}
+
+	q := store.HearthTrendQuery{
+		Metric:  metric,
+		Range:   rangeKey,
+		Product: strings.TrimSpace(qs.Get("product")),
+		Source:  strings.ToLower(strings.TrimSpace(qs.Get("source"))),
+		Format:  strings.ToLower(strings.TrimSpace(qs.Get("format"))),
+		Country: strings.ToUpper(strings.TrimSpace(qs.Get("country"))),
+	}
+
+	switch metric {
+	case "audience", "downloads":
+		if q.Product == "" {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "product is required for " + metric})
+			return
+		}
+	case "fleet":
+		if q.Source == "" {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "source is required for fleet"})
+			return
+		}
+	case "country":
+		if len(q.Country) != 2 {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "country must be a 2-letter ISO code"})
+			return
+		}
+	case "population", "settlements", "revenue", "xp":
+		// No extra selector required.
+	default:
+		writeJSON(w, http.StatusBadRequest, map[string]any{
+			"error": "unknown metric " + metric + " (use audience, population, settlements, revenue, fleet, downloads, country or xp)",
+		})
+		return
+	}
+
+	today := core.DayOf(time.Now().UTC())
+	trend, err := s.scoped(r).HearthTrend(r.Context(), q, s.displayCurrency(), today)
+	if err != nil {
+		s.fail(w, "hearth trend", err)
+		return
+	}
+	writeJSON(w, http.StatusOK, trend)
 }

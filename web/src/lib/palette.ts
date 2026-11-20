@@ -26,6 +26,8 @@ const ASSIGNED: Record<string, number> = {
   googleplay: 1,
   revenuecat: 2,
   flathub: 3,
+  microsoftstore: 4,
+  snapcraft: 5,
   dev: 4,
   loot: 5,
 }

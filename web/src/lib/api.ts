@@ -12,6 +12,8 @@ import type {
   HearthCountry,
   HearthDrop,
   HearthTier,
+  HearthTrend,
+  HearthTrendTarget,
   HearthVessel,
   Mystery,
   NewQuest,
@@ -22,6 +24,8 @@ import type {
   RecapResponse,
   SourceInfo,
   Stats,
+  TrendPoint,
+  TrendRange,
   UnmappedApp,
   VaultRange,
   VaultSummary,
@@ -256,6 +260,26 @@ export async function fetchHearth(): Promise<Hearth> {
     fleet: data.fleet ?? [],
     tiers: data.tiers ?? [],
     recent: data.recent ?? [],
+  }
+}
+
+/** Daily time series for one Hearth metric over a selected window. */
+export async function fetchHearthTrend(target: HearthTrendTarget, range: TrendRange): Promise<HearthTrend> {
+  const params = withScope(new URLSearchParams({ metric: target.metric, range }))
+  if (target.product) params.set('product', target.product)
+  if (target.source) params.set('source', target.source)
+  if (target.format) params.set('format', target.format)
+  if (target.country) params.set('country', target.country)
+  const data = await getJSON<
+    Omit<HearthTrend, 'points' | 'series_names'> & {
+      points: TrendPoint[] | null
+      series_names?: string[] | null
+    }
+  >(`/api/hearth/trend?${params}`)
+  return {
+    ...data,
+    points: data.points ?? [],
+    series_names: data.series_names ?? [],
   }
 }
 

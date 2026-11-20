@@ -68,7 +68,7 @@ A few knobs:
 
 ## What it looks like
 
-Six screens, all of them demo data at 1400×900. Because the demo world comes from a fixed seed, they are reproducible: [`docs/screenshots/capture.mjs`](docs/screenshots/capture.mjs) re-shoots every one of them against `loot serve --demo`.
+Eight screens, all of them demo data at 1400×900. Because the demo world comes from a fixed seed, they are reproducible: [`docs/screenshots/capture.mjs`](docs/screenshots/capture.mjs) re-shoots every one of them against `loot serve --demo`.
 
 <table>
 <tr>
@@ -89,6 +89,16 @@ Six screens, all of them demo data at 1400×900. Because the demo world comes fr
 <td width="50%">
 <img src="docs/screenshots/quests.png" alt="The quests tab: weekly and monthly goals with progress bars, and mysteries with sparklines">
 <b>Quests</b>: goals generated from your own history, and the anomalies Loot could not explain, waiting for you to write down why.
+</td>
+</tr>
+<tr>
+<td width="50%">
+<img src="docs/screenshots/hearth-trend-audience.png" alt="Hearth metric drill-in: Tidewatch all-time audience stacked by store over time with daily additions underneath">
+<b>Hearth trends (audience)</b>: click any product or store in the Hearth sidebar to drill into its curve over 7d, 30d, 90d, YTD, 1Y or all time, stacked by store with daily bars underneath.
+</td>
+<td width="50%">
+<img src="docs/screenshots/hearth-trend-population.png" alt="Hearth metric drill-in: civilization population over time with daily additions underneath and the globe below">
+<b>Hearth trends (civilization)</b>: settlements, population, revenue, the fleet, GitHub release downloads, individual countries and total XP all open inline beside the sidebar.
 </td>
 </tr>
 <tr>
@@ -593,6 +603,17 @@ The number beside the app's name is the sum of the first two kinds only. These a
 
 The **Downloads** card counts release files fetched from GitHub (`.deb`, `.rpm`, Flatpak bundles, AppImages, archives), from the counters GitHub keeps per file. Downloads are not people: a mirror is a download, and so is every update fetched by hand. They are never added to an audience. `GET /api/hearth` returns both as `audience`, one entry per product.
 
+### Metric trends
+
+Click any card or row in the Hearth sidebar (an app or individual store in **Audience**, **Settlements**, **Population** or **Revenue** in **Civilization**, a vessel in **The fleet**, a product or package format in **Downloads**, any country in **Settlements**, or the **Era / XP** card) to open its trend chart beside the sidebar over `7d`, `30d`, `90d`, `YTD`, `1Y` or `All` time.
+
+Every chart follows the same counting rules as the Hearth itself, so the right edge agrees with the card that opened it:
+
+- **Installed-base stores** (Snapcraft weekly devices, Google Play active devices) plot as levels that can move up or down, with diverging green/red daily change bars underneath. Days before a store's first snapshot or past its latest published day stay blank rather than faking zeros.
+- **Arrival-based stores, downloads, revenue and XP** plot as running cumulative totals with daily additions underneath. Multi-store products and multi-format GitHub downloads stack by series, and clicking a legend entry drills straight into that single store or format.
+
+`GET /api/hearth/trend?metric=<metric>&range=7d|30d|90d|ytd|1y|all` serves the series (`metric` is one of `audience`, `population`, `settlements`, `revenue`, `fleet`, `downloads`, `country`, `xp`, plus `product`, `source`, `format` or `country` as needed, and honours `?app=` scope).
+
 ### Tiers
 
 A settlement's tier is **relative to your biggest country**, not an absolute headcount, so the map looks the same whether you have 300 customers or three million, and growth shows up as a changing skyline instead of everything maxing out at once.
@@ -801,6 +822,7 @@ Adding a source means implementing `core.Source` (and optionally `core.WebhookHa
 | `GET /api/sources` | source list with last poll time and last error |
 | `GET /api/vault/summary?range=30d` | revenue, units, series and breakdowns in the display currency |
 | `GET /api/hearth` | the globe: settlements with population and tier, capital, era, recent arrivals |
+| `GET /api/hearth/trend?metric=population&range=30d` | daily time series for one Hearth metric (`audience`, `population`, `settlements`, `revenue`, `fleet`, `downloads`, `country`, `xp`) over `7d`, `30d`, `90d`, `ytd`, `1y` or `all` |
 | `GET /api/chest` | the chests waiting to be opened, oldest first |
 | `POST /api/chest/open` | `{"date":"2026-08-17"}` (or `{}` for the oldest, `{"all":true}` for every chest waiting); reveals and returns the cascade |
 | `GET /ws` | websocket stream, see below |

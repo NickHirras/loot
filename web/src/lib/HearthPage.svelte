@@ -1,13 +1,17 @@
 <script lang="ts">
   import { untrack } from 'svelte'
   import Globe from './Globe.svelte'
+  import HearthTrendPanel from './HearthTrendPanel.svelte'
+  import { fetchHearthTrend } from './api'
   import { countryName } from './geo'
   import { hearth } from './hearth.svelte'
   import { rarityColor } from './palette'
   import { router } from './route.svelte'
+  import { scope } from './scope.svelte'
   import { vesselName } from './sea'
   import { loot } from './state.svelte'
-  import { currency, flagEmoji, integer, timeAgo } from './types'
+  import type { HearthTrend, HearthTrendTarget, TrendRange } from './types'
+  import { currency, flagEmoji, integer, timeAgo, trendTargetKey } from './types'
   import { audienceBasisLabel, downloadFormatLabel, eraLabel, sourceName, tierLabel } from './labels'
   import { m } from '../paraglide/messages'
 
@@ -30,6 +34,77 @@
 
   /** How much of the era bar is filled, live. */
   const progress = $derived(Math.round(hearth.eraProgress * 100))
+
+  // --- trend drill-in -------------------------------------------------------
+
+  let selected = $state<HearthTrendTarget | null>(null)
+  let trendRange = $state<TrendRange>('30d')
+  let trendData = $state<HearthTrend | null>(null)
+  let trendLoading = $state(false)
+  let trendError = $state('')
+  let trendSeq = 0
+
+  const selectedKey = $derived(trendTargetKey(selected))
+
+  function isSelected(target: HearthTrendTarget): boolean {
+    return selectedKey !== '' && selectedKey === trendTargetKey(target)
+  }
+
+  async function loadTrend(target: HearthTrendTarget, range: TrendRange) {
+    const seq = ++trendSeq
+    trendLoading = true
+    trendError = ''
+    try {
+      const res = await fetchHearthTrend(target, range)
+      if (seq !== trendSeq) return
+      trendData = res
+    } catch (err) {
+      if (seq !== trendSeq) return
+      trendError = err instanceof Error ? err.message : String(err)
+    } finally {
+      if (seq === trendSeq) trendLoading = false
+    }
+  }
+
+  function toggleMetric(target: HearthTrendTarget) {
+    if (isSelected(target)) {
+      closeTrend()
+      return
+    }
+    selectMetric(target)
+  }
+
+  function selectMetric(target: HearthTrendTarget) {
+    selected = target
+    void loadTrend(target, trendRange)
+  }
+
+  function changeRange(next: TrendRange) {
+    trendRange = next
+    if (selected) void loadTrend(selected, next)
+  }
+
+  function closeTrend() {
+    trendSeq++
+    selected = null
+    trendData = null
+    trendError = ''
+    trendLoading = false
+  }
+
+  // Keep an open drill-in in step when the global app scope changes.
+  $effect(() =>
+    untrack(() =>
+      scope.onChange(() => {
+        if (!selected) return
+        if (selected.product && scope.current && selected.product !== scope.current) {
+          closeTrend()
+          return
+        }
+        void loadTrend(selected, trendRange)
+      }),
+    ),
+  )
 
   /** In ambient mode the cursor gets out of the way after a few seconds. */
   let idle = $state(false)
@@ -58,7 +133,10 @@
 
 <svelte:window
   onkeydown={(e) => {
-    if (e.key === 'Escape') router.exitAmbient()
+    if (e.key === 'Escape') {
+      if (ambient) router.exitAmbient()
+      else if (selected) closeTrend()
+    }
   }}
 />
 
@@ -125,22 +203,58 @@
       <p class="note">{m.hearth_loading()}</p>
     {:else}
       <div class="layout">
-        <div class="globe-card">
-          <Globe countries={settlements} fleet={data.fleet ?? []} capital={data.capital} {code} />
-          <!-- Two spellings of the same sentence: a phone has no wheel and no
-               hover, and telling someone to scroll on a canvas that will not
-               is worse than saying nothing. -->
-          <p class="hint">
-            <span class="pointer-hint">{m.hearth_hint_pointer()}</span>
-            <span class="touch-hint">{m.hearth_hint_touch()}</span>
-          </p>
+        <div class="main-col">
+          {#if selected}
+            <button
+              type="button"
+              class="sheet-backdrop"
+              aria-label={m.hearth_trend_close()}
+              onclick={closeTrend}
+            ></button>
+            <div class="trend-host">
+              <HearthTrendPanel
+                target={selected}
+                range={trendRange}
+                trend={trendData}
+                hearth={data}
+                loading={trendLoading}
+                error={trendError}
+                onRangeChange={changeRange}
+                onSelectTarget={selectMetric}
+                onClose={closeTrend}
+              />
+            </div>
+          {/if}
+
+          <div class="globe-card" class:compact={!!selected}>
+            <Globe countries={settlements} fleet={data.fleet ?? []} capital={data.capital} {code} />
+            <!-- Two spellings of the same sentence: a phone has no wheel and no
+                 hover, and telling someone to scroll on a canvas that will not
+                 is worse than saying nothing. -->
+            <p class="hint">
+              <span class="pointer-hint">{m.hearth_hint_pointer()}</span>
+              <span class="touch-hint">{m.hearth_hint_touch()}</span>
+            </p>
+          </div>
         </div>
 
         <aside class="panel">
-          <div class="card era">
+          <button
+            type="button"
+            class="card era era-btn"
+            class:selected={isSelected({ metric: 'xp' })}
+            aria-pressed={isSelected({ metric: 'xp' })}
+            title={m.hearth_trend_inspect({ name: m.hearth_trend_xp_title() })}
+            onclick={() => toggleMetric({ metric: 'xp' })}
+          >
             <div class="era-line">
               <span class="era-name">{eraLabel(data.era.name)}</span>
-              <span class="era-xp">{m.hearth_xp({ xp: integer(hearth.totalXP) })}</span>
+              <span class="era-xp">
+                {m.hearth_xp({ xp: integer(hearth.totalXP) })}
+                <svg class="spark-cue" viewBox="0 0 14 10" width="14" height="10" aria-hidden="true">
+                  <path d="M1 8.5 L4.5 5 L7.5 6.5 L13 1.5" />
+                </svg>
+              </span>
             </div>
             <div class="bar"><div class="fill" style="width: {progress}%"></div></div>
             <p class="era-sub">
@@ -150,7 +264,7 @@
                 {m.hearth_era_top()}
               {/if}
             </p>
-          </div>
+          </button>
 
           {#if audience.length}
             <!-- The plain reading of what the globe draws: one number per app
@@ -159,22 +273,48 @@
               <h3>{m.hearth_audience()}</h3>
               <ul class="audience">
                 {#each audience as app (app.product)}
+                  {@const appTarget = { metric: 'audience' as const, product: app.product }}
                   <li>
-                    <div class="app-line">
+                    <button
+                      type="button"
+                      class="drill-btn app-line"
+                      class:selected={isSelected(appTarget)}
+                      aria-pressed={isSelected(appTarget)}
+                      title={m.hearth_trend_inspect({ name: app.product })}
+                      onclick={() => toggleMetric(appTarget)}
+                    >
                       <span class="app-name">{app.product}</span>
-                      {#if app.current > 0}
-                        <span class="app-total">{integer(app.current)}</span>
-                      {/if}
-                    </div>
+                      <span class="app-right">
+                        {#if app.current > 0}
+                          <span class="app-total">{integer(app.current)}</span>
+                        {/if}
+                        <svg class="spark-cue" viewBox="0 0 14 10" width="14" height="10" aria-hidden="true">
+                          <path d="M1 8.5 L4.5 5 L7.5 6.5 L13 1.5" />
+                        </svg>
+                      </span>
+                    </button>
                     <ul class="stores">
                       {#each app.sources as row (row.source)}
-                        <li
-                          class:all-time={row.basis === 'arrivals'}
-                          title={row.as_of ? m.hearth_audience_as_of({ date: row.as_of }) : undefined}
-                        >
-                          <span class="store-name">{sourceName(row.source)}</span>
-                          <span class="basis">{audienceBasisLabel(row.basis)}</span>
-                          <span class="count">{integer(row.count)}</span>
+                        {@const storeTarget = {
+                          metric: 'audience' as const,
+                          product: app.product,
+                          source: row.source,
+                        }}
+                        <li class:all-time={row.basis === 'arrivals'}>
+                          <button
+                            type="button"
+                            class="drill-btn store-btn"
+                            class:selected={isSelected(storeTarget)}
+                            aria-pressed={isSelected(storeTarget)}
+                            title={row.as_of
+                              ? `${m.hearth_audience_as_of({ date: row.as_of })} · ${m.hearth_trend_inspect({ name: `${app.product} ${sourceName(row.source)}` })}`
+                              : m.hearth_trend_inspect({ name: `${app.product} ${sourceName(row.source)}` })}
+                            onclick={() => toggleMetric(storeTarget)}
+                          >
+                            <span class="store-name">{sourceName(row.source)}</span>
+                            <span class="basis">{audienceBasisLabel(row.basis)}</span>
+                            <span class="count">{integer(row.count)}</span>
+                          </button>
                         </li>
                       {/each}
                     </ul>
@@ -187,11 +327,41 @@
 
           <div class="card">
             <h3>{m.hearth_civilization()}</h3>
-            <dl class="facts">
-              <div><dt>{m.hearth_settlements()}</dt><dd>{integer(settlements.length)}</dd></div>
-              <div><dt>{m.hearth_population()}</dt><dd>{integer(data.population)}</dd></div>
-              <div><dt>{m.hearth_revenue()}</dt><dd>{currency(data.revenue_base, code)}</dd></div>
-            </dl>
+            <div class="facts">
+              <button
+                type="button"
+                class="drill-btn fact-btn"
+                class:selected={isSelected({ metric: 'settlements' })}
+                aria-pressed={isSelected({ metric: 'settlements' })}
+                title={m.hearth_trend_inspect({ name: m.hearth_settlements() })}
+                onclick={() => toggleMetric({ metric: 'settlements' })}
+              >
+                <span class="fact-k">{m.hearth_settlements()}</span>
+                <span class="fact-v">{integer(settlements.length)}</span>
+              </button>
+              <button
+                type="button"
+                class="drill-btn fact-btn"
+                class:selected={isSelected({ metric: 'population' })}
+                aria-pressed={isSelected({ metric: 'population' })}
+                title={m.hearth_trend_inspect({ name: m.hearth_population() })}
+                onclick={() => toggleMetric({ metric: 'population' })}
+              >
+                <span class="fact-k">{m.hearth_population()}</span>
+                <span class="fact-v">{integer(data.population)}</span>
+              </button>
+              <button
+                type="button"
+                class="drill-btn fact-btn"
+                class:selected={isSelected({ metric: 'revenue' })}
+                aria-pressed={isSelected({ metric: 'revenue' })}
+                title={m.hearth_trend_inspect({ name: m.hearth_revenue() })}
+                onclick={() => toggleMetric({ metric: 'revenue' })}
+              >
+                <span class="fact-k">{m.hearth_revenue()}</span>
+                <span class="fact-v">{currency(data.revenue_base, code)}</span>
+              </button>
+            </div>
           </div>
 
           {#if fleet.length}
@@ -199,15 +369,25 @@
               <h3>{m.hearth_fleet()}</h3>
               <ul class="fleet">
                 {#each fleet as ship (ship.source)}
+                  {@const shipTarget = { metric: 'fleet' as const, source: ship.source }}
                   <li>
-                    <span class="anchor">⚓</span>
-                    <span class="ship-name">{vesselName(ship.source)}</span>
-                    <span class="numbers">
-                      <span class="pop">{integer(ship.population)}</span>
-                      {#if ship.revenue_base}
-                        <span class="money">{currency(ship.revenue_base, code)}</span>
-                      {/if}
-                    </span>
+                    <button
+                      type="button"
+                      class="drill-btn fleet-btn"
+                      class:selected={isSelected(shipTarget)}
+                      aria-pressed={isSelected(shipTarget)}
+                      title={m.hearth_trend_inspect({ name: vesselName(ship.source) })}
+                      onclick={() => toggleMetric(shipTarget)}
+                    >
+                      <span class="anchor">⚓</span>
+                      <span class="ship-name">{vesselName(ship.source)}</span>
+                      <span class="numbers">
+                        <span class="pop">{integer(ship.population)}</span>
+                        {#if ship.revenue_base}
+                          <span class="money">{currency(ship.revenue_base, code)}</span>
+                        {/if}
+                      </span>
+                    </button>
                   </li>
                 {/each}
               </ul>
@@ -220,13 +400,42 @@
               <h3>{m.hearth_downloads()}</h3>
               <ul class="audience">
                 {#each downloads as app (app.product)}
+                  {@const dlAppTarget = { metric: 'downloads' as const, product: app.product }}
                   <li>
-                    <div class="app-line"><span class="app-name">{app.product}</span></div>
+                    <button
+                      type="button"
+                      class="drill-btn app-line"
+                      class:selected={isSelected(dlAppTarget)}
+                      aria-pressed={isSelected(dlAppTarget)}
+                      title={m.hearth_trend_inspect({ name: `${app.product} ${m.hearth_downloads()}` })}
+                      onclick={() => toggleMetric(dlAppTarget)}
+                    >
+                      <span class="app-name">{app.product}</span>
+                      <svg class="spark-cue" viewBox="0 0 14 10" width="14" height="10" aria-hidden="true">
+                        <path d="M1 8.5 L4.5 5 L7.5 6.5 L13 1.5" />
+                      </svg>
+                    </button>
                     <ul class="stores">
                       {#each app.downloads as file (file.format)}
+                        {@const dlFmtTarget = {
+                          metric: 'downloads' as const,
+                          product: app.product,
+                          format: file.format,
+                        }}
                         <li>
-                          <span class="store-name">{downloadFormatLabel(file.format)}</span>
-                          <span class="count">{integer(file.count)}</span>
+                          <button
+                            type="button"
+                            class="drill-btn store-btn"
+                            class:selected={isSelected(dlFmtTarget)}
+                            aria-pressed={isSelected(dlFmtTarget)}
+                            title={m.hearth_trend_inspect({
+                              name: `${app.product} ${downloadFormatLabel(file.format)}`,
+                            })}
+                            onclick={() => toggleMetric(dlFmtTarget)}
+                          >
+                            <span class="store-name">{downloadFormatLabel(file.format)}</span>
+                            <span class="count">{integer(file.count)}</span>
+                          </button>
                         </li>
                       {/each}
                     </ul>
@@ -241,16 +450,26 @@
             <h3>{m.hearth_settlements()}</h3>
             <ul class="settlements">
               {#each settlements as place (place.country)}
+                {@const countryTarget = { metric: 'country' as const, country: place.country }}
                 <li class:capital-row={place.country === data.capital}>
-                  <span class="flag">{flagEmoji(place.country)}</span>
-                  <span class="place">
-                    <span class="place-name">{countryName(place.country)}</span>
-                    <span class="tier tier-{place.tier?.index ?? 0}">{tierLabel(place.tier?.name ?? 'outpost')}</span>
-                  </span>
-                  <span class="numbers">
-                    <span class="pop">{integer(place.population)}</span>
-                    <span class="money">{currency(place.revenue_base, code)}</span>
-                  </span>
+                  <button
+                    type="button"
+                    class="drill-btn settlement-btn"
+                    class:selected={isSelected(countryTarget)}
+                    aria-pressed={isSelected(countryTarget)}
+                    title={m.hearth_trend_inspect({ name: countryName(place.country) })}
+                    onclick={() => toggleMetric(countryTarget)}
+                  >
+                    <span class="flag">{flagEmoji(place.country)}</span>
+                    <span class="place">
+                      <span class="place-name">{countryName(place.country)}</span>
+                      <span class="tier tier-{place.tier?.index ?? 0}">{tierLabel(place.tier?.name ?? 'outpost')}</span>
+                    </span>
+                    <span class="numbers">
+                      <span class="pop">{integer(place.population)}</span>
+                      <span class="money">{currency(place.revenue_base, code)}</span>
+                    </span>
+                  </button>
                 </li>
               {:else}
                 <li class="empty">{m.hearth_settlements_empty()}</li>
@@ -464,6 +683,23 @@
     align-items: start;
   }
 
+  .main-col {
+    position: sticky;
+    top: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+    min-width: 0;
+  }
+
+  .sheet-backdrop {
+    display: none;
+  }
+
+  .trend-host {
+    min-width: 0;
+  }
+
   .globe-card {
     position: relative;
     height: min(72vh, 640px);
@@ -471,6 +707,11 @@
     border-radius: var(--radius);
     background: radial-gradient(120% 100% at 50% 30%, #0c1220 0%, #070a12 70%);
     overflow: hidden;
+    transition: height 0.2s ease;
+  }
+
+  .globe-card.compact {
+    height: clamp(240px, 34vh, 360px);
   }
 
   .touch-hint {
@@ -512,6 +753,26 @@
     color: var(--text-dim);
   }
 
+  .era-btn {
+    width: 100%;
+    text-align: left;
+    display: block;
+  }
+
+  .era-btn:hover {
+    border-color: color-mix(in oklab, var(--accent) 32%, var(--border));
+    background: linear-gradient(180deg, var(--panel), color-mix(in oklab, var(--accent) 5%, var(--panel-2)));
+  }
+
+  .era-btn.selected {
+    border-color: color-mix(in oklab, var(--accent) 55%, transparent);
+    background: linear-gradient(
+      180deg,
+      color-mix(in oklab, var(--accent) 8%, var(--panel)),
+      color-mix(in oklab, var(--accent) 4%, var(--panel-2))
+    );
+  }
+
   .era-line {
     display: flex;
     align-items: baseline;
@@ -526,6 +787,9 @@
   }
 
   .era .era-xp {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
     font-size: 0.82rem;
     color: var(--text-dim);
     font-variant-numeric: tabular-nums;
@@ -537,25 +801,75 @@
     color: var(--text-faint);
   }
 
+  /* Drill-in metric rows: inherit the card's calm typography, reveal a hover
+     tint and highlight cleanly when their trend chart is open. */
+  .drill-btn {
+    width: calc(100% + 0.7rem);
+    margin: 0 -0.35rem;
+    padding: 0.18rem 0.35rem;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    background: transparent;
+    text-align: left;
+    line-height: 1.35;
+  }
+
+  .drill-btn:hover {
+    background: color-mix(in oklab, var(--accent) 7%, transparent);
+    border-color: color-mix(in oklab, var(--accent) 18%, transparent);
+  }
+
+  .drill-btn.selected {
+    background: color-mix(in oklab, var(--accent) 13%, transparent);
+    border-color: color-mix(in oklab, var(--accent) 42%, transparent);
+    color: var(--text);
+  }
+
+  .spark-cue {
+    flex: none;
+    fill: none;
+    stroke: var(--text-faint);
+    stroke-width: 1.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    opacity: 0.38;
+    transition:
+      opacity 0.15s ease,
+      stroke 0.15s ease;
+  }
+
+  .drill-btn:hover .spark-cue,
+  .era-btn:hover .spark-cue,
+  .drill-btn.selected .spark-cue,
+  .era-btn.selected .spark-cue {
+    stroke: var(--accent);
+    opacity: 1;
+  }
+
   .facts {
     margin: 0;
     display: grid;
-    gap: 0.2rem;
+    gap: 0.1rem;
     font-size: 0.8rem;
   }
 
-  .facts div {
+  .fact-btn {
     display: flex;
+    align-items: baseline;
     justify-content: space-between;
     gap: 0.6rem;
   }
 
-  dt {
+  .fact-k {
     color: var(--text-faint);
   }
 
-  dd {
-    margin: 0;
+  .fact-btn.selected .fact-k,
+  .fact-btn:hover .fact-k {
+    color: var(--text-dim);
+  }
+
+  .fact-v {
     font-variant-numeric: tabular-nums;
   }
 
@@ -569,12 +883,12 @@
   }
 
   .audience {
-    gap: 0.55rem;
+    gap: 0.5rem;
   }
 
   .app-line {
     display: flex;
-    align-items: baseline;
+    align-items: center;
     justify-content: space-between;
     gap: 0.6rem;
     font-size: 0.86rem;
@@ -587,6 +901,13 @@
     white-space: nowrap;
   }
 
+  .app-right {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    flex: none;
+  }
+
   .app-total {
     font-size: 1rem;
     color: var(--accent);
@@ -594,16 +915,19 @@
   }
 
   .stores {
-    gap: 0.15rem;
-    margin-top: 0.2rem;
+    gap: 0.05rem;
+    margin-top: 0.15rem;
   }
 
   .stores li {
+    color: var(--text-dim);
+  }
+
+  .store-btn {
     display: flex;
     align-items: baseline;
     gap: 0.4rem;
     font-size: 0.76rem;
-    color: var(--text-dim);
   }
 
   .store-name {
@@ -635,10 +959,10 @@
     padding: 0;
     display: flex;
     flex-direction: column;
-    gap: 0.3rem;
+    gap: 0.15rem;
   }
 
-  .fleet li {
+  .fleet-btn {
     display: flex;
     align-items: center;
     gap: 0.45rem;
@@ -671,16 +995,24 @@
     padding: 0;
     display: flex;
     flex-direction: column;
-    gap: 0.3rem;
+    gap: 0.15rem;
     max-height: 320px;
     overflow-y: auto;
   }
 
-  .settlements li {
+  .settlements {
+    /* Let negative-margin drill buttons breathe inside the scroll container. */
+    padding: 0 0.35rem;
+    margin: 0 -0.35rem;
+  }
+
+  .settlement-btn {
     display: flex;
     align-items: center;
     gap: 0.45rem;
     font-size: 0.78rem;
+    width: 100%;
+    margin: 0;
   }
 
   .settlements li.capital-row .place-name {
@@ -801,6 +1133,32 @@
       grid-template-columns: 1fr;
     }
 
+    .main-col {
+      position: static;
+    }
+
+    .sheet-backdrop {
+      display: block;
+      position: fixed;
+      inset: 0;
+      z-index: 29;
+      padding: 0;
+      border: 0;
+      border-radius: 0;
+      background: rgb(4 6 11 / 0.72);
+      backdrop-filter: blur(4px);
+    }
+
+    .trend-host {
+      position: fixed;
+      left: 0.75rem;
+      right: 0.75rem;
+      top: max(1rem, env(safe-area-inset-top, 0px));
+      max-height: calc(100dvh - 2rem);
+      overflow-y: auto;
+      z-index: 30;
+    }
+
     .pointer-hint {
       display: none;
     }
@@ -809,7 +1167,8 @@
       display: inline;
     }
 
-    .globe-card {
+    .globe-card,
+    .globe-card.compact {
       height: min(56vh, 420px);
     }
 
