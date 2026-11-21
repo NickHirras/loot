@@ -113,6 +113,8 @@ export interface Stats {
   dev: boolean
   /** True when this Loot is running on synthetic demo data. */
   demo: boolean
+  /** Server build version string (e.g. "v0.4.0" or "edge-25b4f62"). */
+  version?: string
   listeners: number
 }
 
