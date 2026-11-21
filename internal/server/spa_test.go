@@ -3,6 +3,7 @@ package server_test
 import (
 	"io"
 	"net/http"
+	"os"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -83,5 +84,19 @@ func TestIndexEscapesTheConfiguredLanguage(t *testing.T) {
 	}
 	if !strings.Contains(root, `data-loot-lang="de&#34; onload=&#34;alert(1)"`) {
 		t.Fatalf("shell = %q, want the value escaped", root)
+	}
+}
+
+// Browsers fetch <link rel="manifest"> without credentials by default even on
+// the same origin, which causes reverse proxies using Basic Auth or cookie SSO
+// to answer 401 and fail PWA installability.
+func TestManifestLinkUsesCredentials(t *testing.T) {
+	raw, err := os.ReadFile("../../web/index.html")
+	if err != nil {
+		t.Fatalf("read web/index.html: %v", err)
+	}
+	const want = `<link rel="manifest" href="/manifest.webmanifest" crossorigin="use-credentials" />`
+	if !strings.Contains(string(raw), want) {
+		t.Fatalf("web/index.html missing %q", want)
 	}
 }

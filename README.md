@@ -194,7 +194,11 @@ need no action: each navigation fetches fresh HTML when you're online, so one re
 is enough.
 
 Installing over plain HTTP works on `localhost` only. On a real hostname, put Loot behind TLS
-(see [Security note](#security-note)) or the browser won't offer to install it.
+(see [Security note](#security-note)) or the browser won't offer to install it. The manifest link
+sends credentials (`crossorigin="use-credentials"`) so installing works behind HTTP Basic Auth or an
+authenticating reverse proxy; if Android's background WebAPK updates hit a `401`, exempting the
+static manifest and icon paths (`/manifest.webmanifest`, `/icon-*.png`, `/apple-touch-icon.png`,
+`/favicon*`, `/mask-icon.svg`) in your proxy avoids it.
 
 ### Tail it in your terminal
 
