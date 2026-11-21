@@ -16,8 +16,11 @@
     <link rel="mask-icon" href="/mask-icon.svg" color="#ffc23d" />
 
     <!-- Installable: manifest for Chromium/Firefox, the apple-* meta for iOS,
-         which still ignores most of the manifest when adding to the home screen. -->
-    <link rel="manifest" href="/manifest.webmanifest" />
+         which still ignores most of the manifest when adding to the home screen.
+         <link rel="manifest"> omits credentials by default even on the same
+         origin, which breaks installs behind HTTP Basic Auth or auth proxies
+         unless crossorigin="use-credentials" is set. -->
+    <link rel="manifest" href="/manifest.webmanifest" crossorigin="use-credentials" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
