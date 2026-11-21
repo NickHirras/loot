@@ -385,14 +385,16 @@ type DropQuery struct {
 	// Limit caps the page; 0 means DefaultDropLimit, and anything larger than
 	// MaxDropLimit is clamped to it.
 	Limit int
-	// Before returns only drops older than this drop id (ULIDs sort by time).
+	// Before returns only drops older than this drop id in feed order
+	// (events.occurred_at DESC, drops.id DESC).
 	Before string
 	// IncludeUnrevealed lets drops still sitting in an unopened chest through.
 	// The feed leaves it false: an unopened chest must not spoil itself.
 	IncludeUnrevealed bool
 }
 
-// ListDrops returns the most recent drops, newest first. Drops held in an
+// ListDrops returns the most recent drops, newest first by event time
+// (events.occurred_at DESC, tie-broken by drops.id DESC). Drops held in an
 // unopened chest are excluded unless q.IncludeUnrevealed is set.
 func (s *Store) ListDrops(ctx context.Context, q DropQuery) ([]DropView, error) {
 	limit := ClampDropLimit(q.Limit)
@@ -400,8 +402,22 @@ func (s *Store) ListDrops(ctx context.Context, q DropQuery) ([]DropView, error) 
 	where := []string{}
 	args := []any{}
 	if q.Before != "" {
-		where = append(where, `d.id < ?`)
-		args = append(args, q.Before)
+		var cursorAt int64
+		err := s.q.QueryRowContext(ctx, `
+            SELECT e.occurred_at
+            FROM drops d
+            JOIN events e ON e.id = d.event_id
+            WHERE d.id = ?`, q.Before).Scan(&cursorAt)
+		switch {
+		case err == nil:
+			where = append(where, `(e.occurred_at < ? OR (e.occurred_at = ? AND d.id < ?))`)
+			args = append(args, cursorAt, cursorAt, q.Before)
+		case errors.Is(err, sql.ErrNoRows):
+			where = append(where, `d.id < ?`)
+			args = append(args, q.Before)
+		default:
+			return nil, fmt.Errorf("lookup drop cursor: %w", err)
+		}
 	}
 	if !q.IncludeUnrevealed {
 		where = append(where, `NOT `+unrevealed)
@@ -417,7 +433,7 @@ func (s *Store) ListDrops(ctx context.Context, q DropQuery) ([]DropView, error) 
 	if len(where) > 0 {
 		query += ` WHERE ` + strings.Join(where, ` AND `)
 	}
-	query += ` ORDER BY d.id DESC LIMIT ?`
+	query += ` ORDER BY e.occurred_at DESC, d.id DESC LIMIT ?`
 	args = append(args, limit)
 
 	rows, err := s.q.QueryContext(ctx, query, args...)

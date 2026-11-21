@@ -71,6 +71,15 @@ function readMuted(): boolean {
 const emptyByRarity = (): Record<Rarity, number> =>
   Object.fromEntries(RARITIES.map((r) => [r, 0])) as Record<Rarity, number>
 
+/** Matches store.ListDrops: newest event occurred_at first, drop id descending on ties. */
+function compareFeedOrder(a: Drop, b: Drop): number {
+  const ta = Date.parse(a.occurred_at || a.created_at) || 0
+  const tb = Date.parse(b.occurred_at || b.created_at) || 0
+  if (tb !== ta) return tb - ta
+  if (a.id === b.id) return 0
+  return a.id < b.id ? 1 : -1
+}
+
 /**
  * The single source of truth for the dashboard: the drop feed, aggregate stats,
  * source health, the daily chest, the websocket connection and the sound
@@ -156,6 +165,11 @@ class LootState {
   /** True when the server is serving synthetic demo data. */
   get demo(): boolean {
     return this.stats?.demo ?? false
+  }
+
+  /** Build version reported by the running Loot server. */
+  get version(): string {
+    return this.stats?.version ?? ''
   }
 
   /**
@@ -332,8 +346,8 @@ class LootState {
   /**
    * Folds a freshly fetched first page into the feed. A reconnect (or any
    * other catch-up refresh) must not throw away pages the user scrolled back
-   * to load, so unseen drops are prepended and the existing tail — and the
-   * cursor that continues it — are left alone.
+   * to load, so unseen drops are merged in chronological order and the
+   * existing tail — and the cursor that continues it — are left alone.
    */
   #mergeHead(head: Drop[], nextBefore: string): void {
     if (this.drops.length === 0) {
@@ -342,8 +356,19 @@ class LootState {
       return
     }
     const known = new Set(this.drops.map((d) => d.id))
-    const unseen = head.filter((d) => !known.has(d.id))
-    if (unseen.length) this.drops = [...unseen, ...this.drops]
+    const tail = this.drops[this.drops.length - 1]
+    const unseen = head.filter(
+      (d) => !known.has(d.id) && (this.nextBefore === '' || compareFeedOrder(d, tail) <= 0),
+    )
+    if (unseen.length) {
+      const merged = [...unseen, ...this.drops].sort(compareFeedOrder)
+      if (!this.#paged && merged.length > MAX_DROPS) {
+        this.drops = merged.slice(0, MAX_DROPS)
+        this.nextBefore = this.drops[this.drops.length - 1].id
+      } else {
+        this.drops = merged
+      }
+    }
     // `nextBefore` is left as it is on purpose: it already points past
     // everything still loaded, which a fresh head page cannot improve on, and
     // an empty one means the whole hoard is in hand.
@@ -373,7 +398,9 @@ class LootState {
     this.loadingMore = true
     try {
       const page = await fetchDrops(100, this.nextBefore)
-      this.drops = [...this.drops, ...page.drops]
+      const known = new Set(this.drops.map((d) => d.id))
+      const unseen = page.drops.filter((d) => !known.has(d.id))
+      if (unseen.length) this.drops = [...this.drops, ...unseen]
       this.nextBefore = page.next_before
       this.#paged = true
     } catch (err) {
@@ -490,9 +517,21 @@ class LootState {
     if (this.drops.some((d) => d.id === drop.id)) return
 
     const fresh: FeedDrop = { ...drop, fresh: true }
-    const next = [fresh, ...this.drops]
-    // Only trim a feed still sitting on its first page; see `#paged`.
-    this.drops = this.#paged ? next : next.slice(0, MAX_DROPS)
+    const belongsInUnloadedTail =
+      this.drops.length > 0 &&
+      this.nextBefore !== '' &&
+      compareFeedOrder(fresh, this.drops[this.drops.length - 1]) > 0
+
+    if (!belongsInUnloadedTail) {
+      const next = [...this.drops, fresh].sort(compareFeedOrder)
+      // Only trim a feed still sitting on its first page; see `#paged`.
+      if (!this.#paged && next.length > MAX_DROPS) {
+        this.drops = next.slice(0, MAX_DROPS)
+        this.nextBefore = this.drops[this.drops.length - 1].id
+      } else {
+        this.drops = next
+      }
+    }
     this.#bumpStats(drop)
     // Money that landed changes what the vault would answer.
     if (drop.amount_base || drop.amount) vault.markStale()

@@ -539,3 +539,84 @@ func TestRevealChestIsAtomicUnderConcurrentOpens(t *testing.T) {
 		t.Fatalf("%d openers handed out %d drops between them, want exactly %d", openers, total, held)
 	}
 }
+
+func TestListDropsOrdersByOccurredAtAndPaginates(t *testing.T) {
+	ctx := context.Background()
+	st := newStore(t)
+
+	type row struct {
+		key string
+		at  time.Time
+	}
+	// Insert in scrambled ingestion order, including two events sharing the
+	// exact same OccurredAt timestamp to verify the d.id DESC tie-breaker.
+	tNov := time.Date(2026, 11, 6, 12, 0, 0, 0, time.UTC)
+	tOct20 := time.Date(2026, 10, 20, 12, 0, 0, 0, time.UTC)
+	tOct01 := time.Date(2026, 10, 1, 12, 0, 0, 0, time.UTC)
+
+	inputs := []row{
+		{key: "oct20-older-id", at: tOct20},
+		{key: "nov06", at: tNov},
+		{key: "oct01", at: tOct01},
+		{key: "oct20-newer-id", at: tOct20},
+	}
+	dropIDs := make(map[string]string, len(inputs))
+	for _, in := range inputs {
+		ev := sampleEvent(in.key)
+		ev.OccurredAt = in.at
+		ev.ObservedAt = time.Now().UTC()
+		if _, err := st.InsertEvent(ctx, ev); err != nil {
+			t.Fatalf("insert event %s: %v", in.key, err)
+		}
+		d := core.Drop{
+			ID:        core.NewID(),
+			EventID:   ev.ID,
+			Rarity:    core.Rare,
+			Title:     in.key,
+			XP:        100,
+			CreatedAt: ev.ObservedAt,
+		}
+		if err := st.InsertDrop(ctx, d); err != nil {
+			t.Fatalf("insert drop %s: %v", in.key, err)
+		}
+		dropIDs[in.key] = d.ID
+		time.Sleep(2 * time.Millisecond) // keep ULIDs strictly ordered
+	}
+
+	wantOrder := []string{
+		dropIDs["nov06"],
+		dropIDs["oct20-newer-id"],
+		dropIDs["oct20-older-id"],
+		dropIDs["oct01"],
+	}
+
+	all, err := st.ListDrops(ctx, store.DropQuery{})
+	if err != nil {
+		t.Fatalf("list all: %v", err)
+	}
+	if len(all) != len(wantOrder) {
+		t.Fatalf("got %d drops, want %d", len(all), len(wantOrder))
+	}
+	for i, wantID := range wantOrder {
+		if all[i].ID != wantID {
+			t.Fatalf("all[%d] = %s (%s), want %s", i, all[i].ID, all[i].Title, wantID)
+		}
+	}
+
+	// Paginate across the tied 2026-10-20 timestamp without overlaps or gaps.
+	page1, err := st.ListDrops(ctx, store.DropQuery{Limit: 2})
+	if err != nil {
+		t.Fatalf("page 1: %v", err)
+	}
+	if len(page1) != 2 || page1[0].ID != wantOrder[0] || page1[1].ID != wantOrder[1] {
+		t.Fatalf("page 1 = %v, want [%s %s]", []string{page1[0].ID, page1[1].ID}, wantOrder[0], wantOrder[1])
+	}
+
+	page2, err := st.ListDrops(ctx, store.DropQuery{Limit: 2, Before: page1[1].ID})
+	if err != nil {
+		t.Fatalf("page 2: %v", err)
+	}
+	if len(page2) != 2 || page2[0].ID != wantOrder[2] || page2[1].ID != wantOrder[3] {
+		t.Fatalf("page 2 = %v, want [%s %s]", []string{page2[0].ID, page2[1].ID}, wantOrder[2], wantOrder[3])
+	}
+}

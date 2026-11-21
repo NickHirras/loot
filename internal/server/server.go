@@ -36,6 +36,7 @@ type Server struct {
 	Sources  []core.Source
 	Static   fs.FS
 	Logger   *slog.Logger
+	Version  string
 
 	// Quests and Mysteries are optional: without them the endpoints answer
 	// empty rather than 404, so a UI built against them never has to ask
@@ -224,6 +225,7 @@ func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {
 		// demo tells the dashboard to wear its "synthetic data" pill, so
 		// nobody mistakes a demo for their own numbers.
 		"demo":      s.Cfg.Demo.Enabled,
+		"version":   s.Version,
 		"listeners": s.Bus.Subscribers(),
 	})
 }

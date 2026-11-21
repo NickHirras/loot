@@ -438,6 +438,7 @@ func runServe(args []string) error {
 	cfg.Apps = products
 
 	srv := server.New(cfg, st, b, pipe, sources, web.DistFS(), log)
+	srv.Version = version
 	srv.Quests = questSvc
 	srv.Mysteries = mysterySvc
 	srv.Codex = codexSvc

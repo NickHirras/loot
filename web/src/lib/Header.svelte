@@ -125,7 +125,10 @@
         <div class="xp-fill" style="width: {progress}%"></div>
       </div>
       <div class="xp-sub">
-        {m.header_xp_sub({ drops: integer(totalDrops), countries })}
+        <span>{m.header_xp_sub({ drops: integer(totalDrops), countries })}</span>
+        {#if loot.version}
+          <span class="version mono" title={loot.version}>{loot.version}</span>
+        {/if}
       </div>
     </div>
 
@@ -410,8 +413,19 @@
 
   .xp-sub {
     margin-top: 0.28rem;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.2rem 0.5rem;
     font-size: 0.72rem;
     color: var(--text-faint);
+  }
+
+  .version {
+    font-size: 0.66rem;
+    opacity: 0.75;
+    white-space: nowrap;
   }
 
   .rarities {

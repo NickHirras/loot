@@ -49,9 +49,10 @@ func (f fixedRates) Convert(amount float64, from, to string) (float64, bool) {
 }
 
 type harness struct {
-	srv   *httptest.Server
-	store *store.Store
-	bus   *bus.Bus
+	srv    *httptest.Server
+	server *server.Server
+	store  *store.Store
+	bus    *bus.Bus
 }
 
 func newHarness(t *testing.T, dev bool) *harness {
@@ -98,7 +99,7 @@ func newHarnessWith(t *testing.T, cfg config.Config, static fs.FS) *harness {
 	ts := httptest.NewServer(s.Handler())
 	t.Cleanup(ts.Close)
 
-	return &harness{srv: ts, store: st, bus: b}
+	return &harness{srv: ts, server: s, store: st, bus: b}
 }
 
 func (h *harness) get(t *testing.T, path string) (*http.Response, map[string]any) {
@@ -905,5 +906,18 @@ func TestChestOpenAlwaysReportsWhatIsLeft(t *testing.T) {
 	}
 	if drops, ok := again["drops"].([]any); !ok || len(drops) != 0 {
 		t.Errorf("drops = %v, want an empty list", again["drops"])
+	}
+}
+
+func TestStatsIncludesVersion(t *testing.T) {
+	h := newHarness(t, false)
+	h.server.Version = "edge-1234567"
+
+	resp, body := h.get(t, "/api/stats")
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want 200", resp.StatusCode)
+	}
+	if body["version"] != "edge-1234567" {
+		t.Fatalf("version = %v, want %q", body["version"], "edge-1234567")
 	}
 }

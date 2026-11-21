@@ -15,7 +15,8 @@
     now = Date.now(),
   }: { drop: FeedDrop; index?: number; now?: number } = $props()
 
-  const ago = $derived(timeAgo(drop.created_at, now))
+  const happenedAt = $derived(drop.occurred_at || drop.created_at)
+  const ago = $derived(timeAgo(happenedAt, now))
   const flashy = $derived(isFlashy(drop.rarity))
   const amount = $derived(money(drop.amount, drop.currency))
   const flag = $derived(flagEmoji(drop.country))
@@ -63,7 +64,7 @@
       {/if}
       <span class="spacer"></span>
       <span class="xp">{m.drop_xp({ xp: drop.xp })}</span>
-      <time class="ago" datetime={drop.created_at} title={new Date(drop.created_at).toLocaleString()}>
+      <time class="ago" datetime={happenedAt} title={new Date(happenedAt).toLocaleString()}>
         {ago}
       </time>
       <!-- The affordance: faint until the card is hovered or focused, so a
