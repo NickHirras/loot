@@ -6,10 +6,12 @@
   import Header from './lib/Header.svelte'
   import HearthPage from './lib/HearthPage.svelte'
   import QuestsPage from './lib/QuestsPage.svelte'
+  import RoadPage from './lib/RoadPage.svelte'
   import VaultPage from './lib/VaultPage.svelte'
   import { router } from './lib/route.svelte'
   import { scope } from './lib/scope.svelte'
   import { loot } from './lib/state.svelte'
+  import { road } from './lib/road.svelte'
   import { slots } from './lib/markup'
   import { m } from './paraglide/messages'
 
@@ -17,6 +19,10 @@
     void loot.start()
     return () => loot.stop()
   })
+
+  // Whether there is a Road tab at all depends on whether an ads source has
+  // ever reported, so it is asked once up front rather than on first visit.
+  $effect(() => road.watch())
 
   $effect(() => {
     const stopRouter = router.start()
@@ -69,6 +75,8 @@
   <HearthPage />
 {:else if router.tab === 'vault'}
   <VaultPage />
+{:else if router.tab === 'road'}
+  <RoadPage />
 {:else if router.tab === 'quests'}
   <QuestsPage />
 {:else if router.tab === 'codex'}

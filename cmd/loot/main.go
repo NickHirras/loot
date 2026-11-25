@@ -19,6 +19,7 @@ Usage:
   loot check [flags]        Verify every configured source and exit
   loot apps  [remap]        Show which apps map to which product, or recompute them
   loot chest [open [date]]  List the daily chests waiting, or open one
+  loot funnel [flags]       Print the ad funnel: yesterday, the last 7 days, and its notes
   loot fx    [recompute]    Show exchange rates, or re-convert stored amounts
   loot demo  reset          Delete the demo database (data/demo.db); see "loot serve --demo"
   loot version              Print the version
@@ -48,6 +49,8 @@ func main() {
 		err = runApps(args)
 	case "chest":
 		err = runChest(args)
+	case "funnel":
+		err = runFunnel(args)
 	case "fx":
 		err = runFX(args)
 	case "demo":

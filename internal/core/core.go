@@ -266,19 +266,21 @@ func IsWarning(err error) bool {
 
 // sourceDisplayNames maps source identifiers to the names people use.
 var sourceDisplayNames = map[string]string{
-	"appstore":       "App Store",
-	"googleplay":     "Google Play",
-	"microsoftstore": "Microsoft Store",
-	"snapcraft":      "Snapcraft",
-	"flathub":        "Flathub",
-	"revenuecat":     "RevenueCat",
-	"github":         "GitHub",
-	"webhook":        "webhook",
-	"playvitals":     "Play vitals",
-	"sentry":         "Sentry",
-	"crash":          "crash reports",
-	"loot":           "Loot",
-	"dev":            "dev",
+	"appstore":            "App Store",
+	"googleplay":          "Google Play",
+	"microsoftstore":      "Microsoft Store",
+	"snapcraft":           "Snapcraft",
+	"flathub":             "Flathub",
+	"revenuecat":          "RevenueCat",
+	"github":              "GitHub",
+	"webhook":             "webhook",
+	"playvitals":          "Play vitals",
+	"sentry":              "Sentry",
+	"crash":               "crash reports",
+	"metaads":             "Meta ads",
+	"cloudflareanalytics": "Cloudflare analytics",
+	"loot":                "Loot",
+	"dev":                 "dev",
 }
 
 // SourceDisplayName returns the human name for a source id, or the id itself.

@@ -4,6 +4,7 @@
   import ScopeSelect from './ScopeSelect.svelte'
   import { scope } from './scope.svelte'
   import { loot } from './state.svelte'
+  import { road } from './road.svelte'
   import { RARITIES, integer } from './types'
   import { rarityLabel, tabLabel } from './labels'
   import { m } from '../paraglide/messages'
@@ -32,6 +33,14 @@
    * breakpoint the summary is hidden and the list is simply always there.
    */
   let sourcesOpen = $state(false)
+
+  /**
+   * The Road only exists once an ads source has reported something. Until the
+   * first answer it stays hidden, so a Loot without ads never sees the tab
+   * appear and vanish; one that does have ads sees it arrive once. Being on
+   * the page keeps it, so its own tab never disappears from under you.
+   */
+  const tabs = $derived(TABS.filter((t) => t.id !== 'road' || road.enabled === true || router.tab === 'road'))
   const brokenSources = $derived(loot.sources.filter((s) => !!s.last_error).length)
 </script>
 
@@ -64,7 +73,7 @@
     <div class="scope-slot"><ScopeSelect /></div>
 
     <nav class="tabs" aria-label={m.header_nav_label()}>
-      {#each TABS as tab (tab.id)}
+      {#each tabs as tab (tab.id)}
         <a
           class="tab"
           class:current={router.tab === tab.id}

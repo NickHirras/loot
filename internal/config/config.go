@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"gopkg.in/yaml.v3"
 )
@@ -62,6 +63,7 @@ type Config struct {
 
 	FX      FX      `yaml:"fx"`
 	Chest   Chest   `yaml:"chest"`
+	Funnel  Funnel  `yaml:"funnel"`
 	Sources Sources `yaml:"sources"`
 	Dev     Dev     `yaml:"dev"`
 	Demo    Demo    `yaml:"demo"`
@@ -91,6 +93,46 @@ type Chest struct {
 	AutoOpenAfterHours *int `yaml:"auto_open_after_hours"`
 }
 
+// Funnel configures the acquisition funnel: how the page names its stages and
+// when it points something out. It has nothing to switch on; the page appears
+// by itself once a funnel source has reported anything.
+type Funnel struct {
+	// ConversionLabel is your own name for the conversion the ad platform
+	// counts ("Store button tap"). Empty uses the generic word.
+	ConversionLabel string `yaml:"conversion_label"`
+	// SiteEvent is the name of the website event, as your site analytics
+	// reports it, to show as its own stage. Empty leaves the stage out.
+	SiteEvent string      `yaml:"site_event"`
+	Notes     FunnelNotes `yaml:"notes"`
+}
+
+// FunnelNotes are the thresholds behind the funnel's notes. Every note is a
+// plain observation about the numbers; these only decide when one is worth
+// saying.
+type FunnelNotes struct {
+	// SpendWithoutConversion is how much (display currency) a tracked ad may
+	// spend with no conversion before the page mentions it. Defaults to 20.
+	SpendWithoutConversion float64 `yaml:"spend_without_conversion"`
+	// ConcentrationPct is the share of spend (percent) one ad must take, out
+	// of three or more, before the page says so. Defaults to 80.
+	ConcentrationPct float64 `yaml:"concentration_pct"`
+	// CheckpointSpend is a total spend in the range at which the page
+	// compares the conversion rate against MinConversionsPer100Views.
+	// 0 (the default) leaves that check off.
+	CheckpointSpend float64 `yaml:"checkpoint_spend"`
+	// MinConversionsPer100Views is the conversion rate the checkpoint
+	// compares against. Defaults to 2.
+	MinConversionsPer100Views float64 `yaml:"min_conversions_per_100_views"`
+}
+
+// Funnel defaults. They are deliberately quiet: a note that fires every day
+// stops being read.
+const (
+	DefaultFunnelSpendWithoutConversion    = 20
+	DefaultFunnelConcentrationPct          = 80
+	DefaultFunnelMinConversionsPer100Views = 2
+)
+
 // Sources holds per-source configuration.
 type Sources struct {
 	RevenueCat RevenueCat `yaml:"revenuecat"`
@@ -106,6 +148,78 @@ type Sources struct {
 	PlayVitals PlayVitals `yaml:"playvitals"`
 	Sentry     Sentry     `yaml:"sentry"`
 	Crash      Crash      `yaml:"crash"`
+	// The acquisition funnel's sources: what ads cost and how far people got.
+	MetaAds             MetaAds             `yaml:"metaads"`
+	CloudflareAnalytics CloudflareAnalytics `yaml:"cloudflareanalytics"`
+}
+
+// MetaAds configures the Meta (Facebook and Instagram) ads source: per-ad
+// daily delivery from the Marketing API. See docs/sources/metaads.md.
+type MetaAds struct {
+	// AccessToken is a token with the ads_read permission. Prefer
+	// AccessTokenPath so the secret stays out of the config file.
+	AccessToken string `yaml:"access_token"`
+	// AccessTokenPath is a file holding the token and nothing else. It wins
+	// over AccessToken when both are set.
+	AccessTokenPath string `yaml:"access_token_path"`
+	// AdAccountID is the ad account to read, with or without the act_ prefix.
+	AdAccountID string `yaml:"ad_account_id"`
+	// App is the app these ads sell: the name their events are filed under,
+	// resolved through `apps:` like every other source's.
+	App string `yaml:"app"`
+	// PixelID turns on per-event daily counts from that pixel. Optional.
+	PixelID string `yaml:"pixel_id"`
+	// ConversionActions are the insights action types that count as "the
+	// conversion" on the funnel. Empty means conversions are not credited.
+	ConversionActions []string `yaml:"conversion_actions"`
+	// APIVersion pins the Graph API version. Empty uses the source's default.
+	APIVersion   string        `yaml:"api_version"`
+	BackfillDays int           `yaml:"backfill_days"`
+	LookbackDays int           `yaml:"lookback_days"`
+	PollInterval time.Duration `yaml:"poll_interval"`
+}
+
+// Configured reports whether the source has enough to start.
+func (m MetaAds) Configured() bool {
+	return (m.AccessToken != "" || m.AccessTokenPath != "") && m.AdAccountID != "" && m.App != ""
+}
+
+// CloudflareAnalytics configures the tracked-link source: one SQL query
+// against the Workers Analytics Engine. See
+// docs/sources/cloudflareanalytics.md.
+type CloudflareAnalytics struct {
+	// APIToken needs Account Analytics: Read and nothing else. Prefer
+	// APITokenPath so the secret stays out of the config file.
+	APIToken string `yaml:"api_token"`
+	// APITokenPath is a file holding the token and nothing else. It wins over
+	// APIToken when both are set.
+	APITokenPath string `yaml:"api_token_path"`
+	AccountID    string `yaml:"account_id"`
+	// App is the app the links lead to.
+	App string `yaml:"app"`
+	// SQL must return three columns: day, label and n.
+	SQL          string        `yaml:"sql"`
+	PollInterval time.Duration `yaml:"poll_interval"`
+}
+
+// Configured reports whether the source has enough to start.
+func (c CloudflareAnalytics) Configured() bool {
+	return (c.APIToken != "" || c.APITokenPath != "") && c.AccountID != "" && c.App != "" && strings.TrimSpace(c.SQL) != ""
+}
+
+// Secret returns the secret a source should use: the trimmed contents of path
+// when one is set, otherwise inline. A token file exists so a secret never
+// has to sit in the same file as everything else, and a trailing newline in
+// it is an editor's habit, not part of the token.
+func Secret(inline, path string) (string, error) {
+	if path == "" {
+		return strings.TrimSpace(inline), nil
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(data)), nil
 }
 
 // PlayVitals configures the Android vitals source: daily crash and ANR counts
@@ -318,6 +432,11 @@ func Default() Config {
 		Listen:          ":8080",
 		DataDir:         "./data",
 		DisplayCurrency: DefaultDisplayCurrency,
+		Funnel: Funnel{Notes: FunnelNotes{
+			SpendWithoutConversion:    DefaultFunnelSpendWithoutConversion,
+			ConcentrationPct:          DefaultFunnelConcentrationPct,
+			MinConversionsPer100Views: DefaultFunnelMinConversionsPer100Views,
+		}},
 		Sources: Sources{
 			Flathub:        Flathub{BackfillDays: 7},
 			AppStore:       AppStore{BackfillDays: 30},
@@ -402,6 +521,19 @@ func Load(path string, explicit bool) (Config, error) {
 		if _, err := os.Stat(cfg.Sources.GooglePlay.ServiceAccountJSONPath); err != nil {
 			return cfg, fmt.Errorf("sources.googleplay.service_account_json_path %s: %w", cfg.Sources.GooglePlay.ServiceAccountJSONPath, err)
 		}
+	}
+	if p := cfg.Sources.MetaAds.AccessTokenPath; p != "" {
+		if _, err := os.Stat(p); err != nil {
+			return cfg, fmt.Errorf("sources.metaads.access_token_path %s: %w", p, err)
+		}
+	}
+	if p := cfg.Sources.CloudflareAnalytics.APITokenPath; p != "" {
+		if _, err := os.Stat(p); err != nil {
+			return cfg, fmt.Errorf("sources.cloudflareanalytics.api_token_path %s: %w", p, err)
+		}
+	}
+	if err := cfg.Funnel.normalize(); err != nil {
+		return cfg, err
 	}
 	if cfg.RulesPath != "" {
 		if _, err := os.Stat(cfg.RulesPath); err != nil {
@@ -726,4 +858,40 @@ func (c Config) ChestAutoOpenAfterHours() int {
 		return 0
 	}
 	return *c.Chest.AutoOpenAfterHours
+}
+
+// normalize trims the funnel's names and checks its thresholds. A zero
+// threshold that has a default is read as "not set" rather than "fire
+// always", because an explicit 0 there would turn a note into noise; a
+// negative one is a typo and is rejected so it is noticed.
+func (f *Funnel) normalize() error {
+	f.ConversionLabel = strings.TrimSpace(f.ConversionLabel)
+	f.SiteEvent = strings.TrimSpace(f.SiteEvent)
+	n := &f.Notes
+	for _, v := range []struct {
+		name  string
+		value float64
+	}{
+		{"spend_without_conversion", n.SpendWithoutConversion},
+		{"concentration_pct", n.ConcentrationPct},
+		{"checkpoint_spend", n.CheckpointSpend},
+		{"min_conversions_per_100_views", n.MinConversionsPer100Views},
+	} {
+		if v.value < 0 {
+			return fmt.Errorf("funnel.notes.%s must not be negative, got %v", v.name, v.value)
+		}
+	}
+	if n.ConcentrationPct > 100 {
+		return fmt.Errorf("funnel.notes.concentration_pct is a percentage, got %v", n.ConcentrationPct)
+	}
+	if n.SpendWithoutConversion == 0 {
+		n.SpendWithoutConversion = DefaultFunnelSpendWithoutConversion
+	}
+	if n.ConcentrationPct == 0 {
+		n.ConcentrationPct = DefaultFunnelConcentrationPct
+	}
+	if n.MinConversionsPer100Views == 0 {
+		n.MinConversionsPer100Views = DefaultFunnelMinConversionsPer100Views
+	}
+	return nil
 }

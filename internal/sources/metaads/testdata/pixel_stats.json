@@ -1,0 +1,23 @@
+{
+  "data": [
+    {
+      "start_time": "2026-11-24T07:00:00+0000",
+      "aggregation": "event",
+      "data": [{"value": "PageView", "count": 5}]
+    },
+    {
+      "start_time": "2026-11-24T08:00:00+0000",
+      "aggregation": "event",
+      "data": [
+        {"value": "PageView", "count": 7},
+        {"value": "Lead", "count": "2"}
+      ]
+    },
+    {
+      "start_time": "2026-11-25T19:00:00+0000",
+      "aggregation": "event",
+      "data": [{"value": "PageView", "count": 1}]
+    }
+  ],
+  "paging": {"cursors": {"before": "a", "after": "b"}}
+}

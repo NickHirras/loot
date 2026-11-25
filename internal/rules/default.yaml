@@ -186,6 +186,22 @@ rules:
       subtitle: "{{.App}}"
       xp: 10
 
+  # ------------------------------------------------------------ Ads day total
+  # Ad sources emit one `ads_day` per product after each day is over (see
+  # internal/core/funnel.go). It is a modest morning summary, not a prize: ad
+  # traffic is bought, so it is common, and its XP is small.
+  # Spend sits in the payload in the ad account's currency (the event's own
+  # amount stays zero so it never reaches the vault), so it is printed from
+  # there. Payload numbers decode as floats, hence printf "%.0f" for counts.
+  - name: ads-day
+    match:
+      kind: ads_day
+    then:
+      rarity: common
+      title: '{{if .Payload.landing_page_views}}{{printf "%.0f" .Payload.landing_page_views}} landing page view{{if ne (printf "%.0f" .Payload.landing_page_views) "1"}}s{{end}} from ads{{else}}A day of ads{{end}}{{if .Payload.spend}} · {{printf "%.2f" .Payload.spend}} {{.Payload.currency}}{{end}}'
+      subtitle: '{{if .Payload.conversions}}{{printf "%.0f" .Payload.conversions}} conversion{{if ne (printf "%.0f" .Payload.conversions) "1"}}s{{end}} · {{end}}{{if .Payload.top_ad}}top ad: {{.Payload.top_ad}} · {{end}}{{if .App}}{{.App}}{{end}}'
+      xp: 5
+
   # ------------------------------------------------------ Audience milestones
   # Sources that report their own installed base (Snapcraft's weekly devices,
   # Google Play's active devices) store it as silent `audience` snapshots. The

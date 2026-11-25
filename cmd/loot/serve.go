@@ -380,6 +380,26 @@ func runServe(args []string) error {
 				"packages", src.Packages, "backfill_days", src.BackfillDays)
 		}
 	}
+	if !cfg.Demo.Enabled && cfg.Sources.MetaAds.Configured() {
+		src, err := newMetaAds(cfg.Sources.MetaAds, log)
+		if err != nil {
+			log.Warn("meta ads source unavailable", "error", err)
+		} else {
+			sources = append(sources, src)
+			log.Info("meta ads source configured", "app", cfg.Sources.MetaAds.App,
+				"pixel", cfg.Sources.MetaAds.PixelID != "",
+				"conversion_actions", len(cfg.Sources.MetaAds.ConversionActions))
+		}
+	}
+	if !cfg.Demo.Enabled && cfg.Sources.CloudflareAnalytics.Configured() {
+		src, err := newCloudflareAnalytics(cfg.Sources.CloudflareAnalytics, log)
+		if err != nil {
+			log.Warn("cloudflare analytics source unavailable", "error", err)
+		} else {
+			sources = append(sources, src)
+			log.Info("cloudflare analytics source configured", "app", cfg.Sources.CloudflareAnalytics.App)
+		}
+	}
 	if !cfg.Demo.Enabled && cfg.Sources.Sentry.Enabled {
 		src, err := sentry.New(cfg.Sources.Sentry, log)
 		if err != nil {

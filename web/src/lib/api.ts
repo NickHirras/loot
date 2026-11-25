@@ -8,6 +8,10 @@ import type {
   ChestSummary,
   CodexBoard,
   Drop,
+  FunnelAd,
+  FunnelDay,
+  FunnelNote,
+  FunnelReport,
   Hearth,
   HearthCountry,
   HearthDrop,
@@ -22,6 +26,7 @@ import type {
   Recap,
   RecapPeriod,
   RecapResponse,
+  RoadRange,
   SourceInfo,
   Stats,
   TrendPoint,
@@ -368,4 +373,49 @@ export async function slayBoss(id: string): Promise<Boss> {
   const res = await postJSON(`/api/bosses/${encodeURIComponent(id)}/slay`, {})
   const data = (await res.json()) as { boss: Boss }
   return data.boss
+}
+
+// ----------------------------------------------------------------- funnel
+
+/** A day with every reading missing: what `totals` is when the server sent none. */
+const EMPTY_FUNNEL_DAY: FunnelDay = {
+  day: '',
+  spend: null,
+  impressions: null,
+  link_clicks: null,
+  landing_page_views: null,
+  conversions: null,
+  link_visits: null,
+  site_events: null,
+  installs: null,
+  purchases: null,
+  revenue: null,
+}
+
+/**
+ * The acquisition funnel over the last `days` days.
+ *
+ * Lists are defaulted (Go sends an empty slice as null) but pointer fields are
+ * left exactly as they came: a null there means "no reading", and turning it
+ * into 0 here would be the one mistake the page exists not to make.
+ */
+export async function fetchFunnel(days: RoadRange): Promise<FunnelReport> {
+  const params = withScope(new URLSearchParams({ days: String(days) }))
+  const data = await getJSON<
+    Omit<FunnelReport, 'days' | 'ads' | 'notes' | 'as_of' | 'totals'> & {
+      days: FunnelDay[] | null
+      ads: (Omit<FunnelAd, 'series'> & { series: number[] | null })[] | null
+      notes: FunnelNote[] | null
+      as_of: FunnelReport['as_of'] | null
+      totals: FunnelDay | null
+    }
+  >(`/api/funnel?${params}`)
+  return {
+    ...data,
+    days: data.days ?? [],
+    ads: (data.ads ?? []).map((ad) => ({ ...ad, series: ad.series ?? [] })),
+    notes: data.notes ?? [],
+    as_of: data.as_of ?? {},
+    totals: data.totals ?? { ...EMPTY_FUNNEL_DAY },
+  }
 }
