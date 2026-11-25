@@ -1,0 +1,38 @@
+{
+  "data": [
+    {
+      "id": "101",
+      "name": "Morning reel",
+      "effective_status": "ACTIVE",
+      "creative": {
+        "id": "5001",
+        "object_story_spec": {
+          "page_id": "42",
+          "link_data": {
+            "link": "https://example.com/get/?a=morning",
+            "message": "An example ad",
+            "picture": "https://scontent.xx.fbcdn.net/v/example.jpg",
+            "call_to_action": {
+              "type": "LEARN_MORE",
+              "value": {"link": "https://example.com/get/?a=morning"}
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "202",
+      "name": "Static photo",
+      "effective_status": "PAUSED",
+      "creative": {
+        "id": "5002",
+        "asset_feed_spec": {
+          "link_urls": [{"website_url": "https://example.org/b", "display_url": "example.org"}],
+          "images": [{"url": "https://example.org/img.png", "hash": "abc"}]
+        },
+        "object_url": "http://example.net/plain"
+      }
+    }
+  ],
+  "paging": {"cursors": {"before": "MQ", "after": "Mg"}}
+}

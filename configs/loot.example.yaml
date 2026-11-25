@@ -58,6 +58,28 @@ chest:
   # by itself around noon today. 0 waits for you to open it.
   auto_open_after_hours: 36
 
+# The acquisition funnel: ad spend, link visits, site events, store installs
+# and sales for the same days, on one page. There is nothing to switch on: the
+# page appears once an ads or link-analytics source has reported something.
+# See docs/funnel.md.
+# funnel:
+#   # Your name for the conversion the ad platform counts. Empty uses the
+#   # generic word.
+#   conversion_label: "Store button tap"
+#   # A website event (as your site analytics names it) to show as its own
+#   # stage. It counts every visitor, paid or not.
+#   site_event: ""
+#   notes:
+#     # Mention a tracked ad that has spent this much (display currency)
+#     # without a single conversion.
+#     spend_without_conversion: 20
+#     # Mention it when one ad, out of three or more, takes this share of spend.
+#     concentration_pct: 80
+#     # Once total spend in the range reaches this, compare the conversion rate
+#     # with min_conversions_per_100_views. 0 leaves the check off.
+#     checkpoint_spend: 0
+#     min_conversions_per_100_views: 2
+
 sources:
   revenuecat:
     # The webhook is mounted at POST /hooks/revenuecat unless disabled.
@@ -195,6 +217,45 @@ sources:
     # Resolving an issue in Sentry slays the boss in Loot.
     enabled: false
     client_secret: ""
+
+  metaads:
+    # Meta (Facebook and Instagram) ads: what each ad spent and delivered per
+    # day, read from the Marketing API with a read-only token. This is the top
+    # of the Road page's funnel. See docs/sources/metaads.md.
+    #
+    # A file holding the token and nothing else. Keep it outside the repo.
+    access_token_path: ""
+    # access_token: ""
+    # The ad account to read, with or without the act_ prefix.
+    ad_account_id: ""
+    # The app these ads sell, as named under `apps:`.
+    app: ""
+    # Optional: count this pixel's events per day, for every visitor.
+    pixel_id: ""
+    # Which insights action types count as "the conversion" (a store button
+    # tap, say). Empty means conversions are not credited to ads.
+    conversion_actions: []
+    # - offsite_conversion.custom.1234567890
+    backfill_days: 30
+    lookback_days: 7
+    poll_interval: 1h
+
+  cloudflareanalytics:
+    # Visits to your own tracked links, counted by a Cloudflare Worker that
+    # writes to the Workers Analytics Engine. One read-only SQL query; it
+    # must return the columns day, label and n. See
+    # docs/sources/cloudflareanalytics.md.
+    api_token_path: ""
+    # api_token: ""
+    account_id: ""
+    app: ""
+    sql: ""
+    # sql: |
+    #   SELECT toDate(timestamp) AS day, blob1 AS label, SUM(_sample_interval) AS n
+    #   FROM my_links
+    #   WHERE timestamp > NOW() - INTERVAL '14' DAY
+    #   GROUP BY day, label
+    poll_interval: 1h
 
   crash:
     # Generic crash receiver at POST /hooks/crash, for everything else —

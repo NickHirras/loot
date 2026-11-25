@@ -1056,6 +1056,185 @@
   "recap_unit_year": "year",
   "recap_units": "units",
   "recap_xp": "XP",
+  "road_ads_hint": "most spent first",
+  "road_ads_none": "No ad spent anything in this range.",
+  "road_ads_title": "By ad",
+  "road_col_ad": "Ad",
+  "road_col_cost_per_view": "Per view",
+  "road_col_day": "Day",
+  "road_col_impressions": "Shown",
+  "road_col_installs": "Installs",
+  "road_col_link_visits": "Link visits",
+  "road_col_purchases": "Purchases",
+  "road_col_spend": "Spent",
+  "road_col_status": "Status",
+  "road_col_taps": "Taps",
+  "road_col_trend": "Views per day",
+  "road_col_views": "Page views",
+  "road_conversion_generic": "Conversions",
+  "road_conversion_generic_inline": "conversion",
+  "road_cost_each": "{cost} each",
+  "road_cost_per_thousand": "{cost} per {n}",
+  "road_day_conversions": "{label}: {count} credited to your ads.",
+  "road_day_heading": "Latest full day",
+  "road_day_installs": [
+    {
+      "declarations": [
+        "input count",
+        "input countText",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "The stores counted {countText} new install that day, from everyone, not only people the ads sent.",
+        "countPlural=other": "The stores counted {countText} new installs that day, from everyone, not only people the ads sent."
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "road_day_no_ads": "No ads ran that day.",
+  "road_day_none": "There's no full day of ad results in this range yet.",
+  "road_day_partial": "so far",
+  "road_day_purchases": [
+    {
+      "declarations": [
+        "input count",
+        "input countText",
+        "input revenue",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "{countText} purchase came in, worth {revenue}.",
+        "countPlural=other": "{countText} purchases came in, worth {revenue}."
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "road_day_spent": [
+    {
+      "declarations": [
+        "input count",
+        "input countText",
+        "input spend",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "Your ads cost {spend} and were shown {countText} time.",
+        "countPlural=other": "Your ads cost {spend} and were shown {countText} times."
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "road_day_store_pending": "The stores haven't reported that day yet, so installs aren't known.",
+  "road_day_taps": [
+    {
+      "declarations": [
+        "input count",
+        "input countText",
+        "input views",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "There was {countText} tap on an ad's link, and {views} reached your page.",
+        "countPlural=other": "There were {countText} taps on your ads' links, and {views} of them reached your page."
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "road_day_taps_only": [
+    {
+      "declarations": [
+        "input count",
+        "input countText",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "There was {countText} tap on an ad's link.",
+        "countPlural=other": "There were {countText} taps on your ads' links."
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "road_day_yesterday": "yesterday, {day}",
+  "road_days_hint": "newest first · — means no reading yet",
+  "road_days_title": "By day",
+  "road_everyone": "Everyone, not only people the ads sent: no store says which ad a customer came from.",
+  "road_explain_conversions": "Times someone did the thing you chose to count, and the ad platform credited it to an ad.",
+  "road_explain_hide": "Hide explanations",
+  "road_explain_impressions": "How many times the ad platform put one of your ads on a screen. One person can see an ad more than once.",
+  "road_explain_installs": "New installs counted by the stores.",
+  "road_explain_landing_page_views": "Taps where your page finished loading, counted by the ad platform. Some people leave before it does.",
+  "road_explain_link_clicks": "Taps on the link in an ad, counted by the ad platform.",
+  "road_explain_link_visits": "Visits your own links counted, not the ad platform: a second opinion on the taps.",
+  "road_explain_purchases": "Purchases counted by the stores, and what they brought in.",
+  "road_explain_show": "Explain each step",
+  "road_explain_site_events": "Every time this fired on your site, counted by your site, from any visitor, ad or not.",
+  "road_explain_spend": "What the ad platform charged you.",
+  "road_fresh_ads": "ads {day}",
+  "road_fresh_installs": "store installs {day}",
+  "road_fresh_links": "your links {day}",
+  "road_fresh_sales": "store sales {day}",
+  "road_fresh_site_events": "your site {day}",
+  "road_fresh_title": "Latest readings",
+  "road_funnel_bars": "Bars are to scale with each other, from link taps down.",
+  "road_funnel_title": "How far people got",
+  "road_loading": "Reading the road…",
+  "road_no_data": "no data",
+  "road_not_tracked": "not tracked",
+  "road_note_budget_check": "You've spent {spend} in this range, and every 100 page views brought {rate} {label}. That's below the line you set, so this is a good moment to decide: keep going, change the ad or the page, or pause.",
+  "road_note_concentrated": "{ad} took {share} of your spend. The ad platform tends to send money to the ad it thinks works best, so the others are getting little chance to show what they can do.",
+  "road_note_cost_rising": "A page view cost {cost} on {day}, against about {usual} on the days before. One pricey day is common; if it stays up, people may be tiring of the ad.",
+  "road_note_spend_no_conversions": "{ad} has spent {spend} without a single {label} credited to it. Often that means people tap the ad but the page doesn't move them on yet, or it's still early days.",
+  "road_note_store_lag": "The stores have reported up to {day}. Installs and purchases for the days after fill in when they report, usually within a day or two.",
+  "road_note_untracked": "None of your ads report {label} back, so there's no telling which ad led to one. That's usually a tracking setting on the ads, not a sign they aren't working.",
+  "road_notes_none": "Nothing needs a decision right now.",
+  "road_notes_title": "Worth a look",
+  "road_off_body": "This page lights up once an ads source is set up and has reported a day. Then it shows what your ads cost, how far people got and which ad is doing the work. Setting one up is covered in {doc}.",
+  "road_off_title": "No ads on the road yet.",
+  "road_range_label": "Time range",
+  "road_range_option": [
+    {
+      "declarations": [
+        "input count",
+        "input countText",
+        "local countPlural = count: plural"
+      ],
+      "match": {
+        "countPlural=one": "{countText} day",
+        "countPlural=other": "{countText} days"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "road_rate_of_shown": "{rate} of showings",
+  "road_rate_of_taps": "{rate} of taps",
+  "road_rate_of_views": "{rate} of page views",
+  "road_spark_label": "Page views per day, {from} to {to}: {values}",
+  "road_stage_impressions": "Times shown",
+  "road_stage_installs": "Installs",
+  "road_stage_landing_page_views": "Page views",
+  "road_stage_link_clicks": "Link taps",
+  "road_stage_link_visits": "Visits through your links",
+  "road_stage_purchases": "Purchases",
+  "road_stage_site_events": "{event} on your site",
+  "road_stage_spend": "Spent",
+  "road_status_active": "running",
+  "road_status_paused": "paused",
+  "road_subtitle": "from ad to install",
+  "road_through": "through {day}",
+  "road_title": "Road",
+  "road_worth": "worth {revenue}",
   "scope_all_apps": "All apps",
   "scope_all_apps_meta": "everything you ship",
   "scope_elsewhere": "+{count} elsewhere",
@@ -1073,6 +1252,7 @@
   "tab_feed": "Feed",
   "tab_hearth": "Hearth",
   "tab_quests": "Quests",
+  "tab_road": "Road",
   "tab_vault": "Vault",
   "tier_city": "city",
   "tier_hamlet": "hamlet",

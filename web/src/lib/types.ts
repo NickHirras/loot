@@ -1095,3 +1095,102 @@ export interface BossBoard {
   alive: Boss[]
   recent: Boss[]
 }
+
+// ----------------------------------------------------------------- funnel types
+//
+// Mirrors core.FunnelReport (internal/core/funnel.go) field for field. Every
+// `number | null` is a Go pointer: null means Loot has no reading for it,
+// which is not the same as zero and must never be drawn as zero.
+
+/** The day ranges the Road page offers; sent as `?days=`. */
+export const ROAD_RANGES = [7, 14, 30] as const
+
+export type RoadRange = (typeof ROAD_RANGES)[number]
+
+/** One day of the funnel, top to bottom. `totals` reuses it with day "". */
+export interface FunnelDay {
+  day: string
+  spend: number | null
+  impressions: number | null
+  link_clicks: number | null
+  landing_page_views: number | null
+  /** The ones the ad platform attributed to an ad. */
+  conversions: number | null
+  /** Counted by the operator's own redirector. */
+  link_visits: number | null
+  /** The configured website event across all visitors, paid or not. */
+  site_events: number | null
+  /** From the stores, for every customer, not only the ones an ad sent. */
+  installs: number | null
+  purchases: number | null
+  revenue: number | null
+}
+
+/** One ad's totals over the report's days. */
+export interface FunnelAd {
+  source: string
+  ad_id: string
+  ad: string
+  adset: string
+  campaign: string
+  /** The platform's own delivery word ("ACTIVE", "PAUSED", ...), verbatim. */
+  status: string
+  spend: number
+  impressions: number
+  link_clicks: number
+  landing_page_views: number
+  conversions: number
+  /** False when the platform never reported the chosen conversion for it. */
+  tracked: boolean
+  /** null when no tracked link could be tied to this ad. */
+  link_visits: number | null
+  /** Landing page views per day, aligned with FunnelReport.days. */
+  series: number[]
+}
+
+/**
+ * One thing worth a look, as a code plus the numbers its sentence needs. The
+ * page owns the sentence (see noteText in RoadPage.svelte); the server owns
+ * when to say it. The params each code reads:
+ *
+ *   untracked             ads (count; unused by the sentence)
+ *   spend_no_conversions  spend (money); names an ad
+ *   concentrated          pct (0..100, share of spend); names an ad
+ *   cost_rising           day, cost (money), previous (money)
+ *   store_lag             installs_as_of (day), days (count; unused)
+ *   budget_check          spend (money), rate (conversions per 100 page views)
+ *
+ * These are the names internal/funnel/notes.go emits.
+ *
+ * Money params are in FunnelReport.currency. A note missing a param its
+ * sentence needs is skipped rather than said with a hole in it.
+ */
+export interface FunnelNote {
+  code: string
+  ad_id?: string
+  ad?: string
+  params?: Record<string, unknown>
+}
+
+/** The stages `as_of` is keyed by. */
+export type FunnelStageSource = 'ads' | 'links' | 'site_events' | 'installs' | 'sales'
+
+/** The whole of GET /api/funnel. */
+export interface FunnelReport {
+  /** False when no funnel source has ever reported anything in scope. */
+  enabled: boolean
+  product: string
+  from: string
+  to: string
+  currency: string
+  /** The operator's name for the chosen conversion, or "" for the generic word. */
+  conversion_label: string
+  /** The website event counted in site_events, or "" when none is configured. */
+  site_event: string
+  days: FunnelDay[]
+  ads: FunnelAd[]
+  totals: FunnelDay
+  notes: FunnelNote[]
+  /** Newest day each stage has any reading for; a stage never heard from is absent. */
+  as_of: Partial<Record<FunnelStageSource, string>>
+}

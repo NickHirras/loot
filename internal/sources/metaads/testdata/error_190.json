@@ -1,0 +1,9 @@
+{
+  "error": {
+    "message": "Error validating access token: Session has expired. Request: /v27.0/act_1234567890?access_token={{TOKEN}}",
+    "type": "OAuthException",
+    "code": 190,
+    "error_subcode": 463,
+    "fbtrace_id": "AFakeTraceId"
+  }
+}

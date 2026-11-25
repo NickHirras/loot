@@ -1,0 +1,49 @@
+{
+  "data": [
+    {
+      "ad_id": "101",
+      "ad_name": "Morning reel",
+      "adset_id": "11",
+      "adset_name": "Broad",
+      "campaign_id": "1",
+      "campaign_name": "Example launch",
+      "spend": "10.50",
+      "impressions": "1000",
+      "reach": "800",
+      "inline_link_clicks": "40",
+      "actions": [
+        {"action_type": "link_click", "value": "42"},
+        {"action_type": "landing_page_view", "value": "30"},
+        {"action_type": "offsite_conversion.custom.999", "value": "3"}
+      ],
+      "account_currency": "USD",
+      "date_start": "2026-11-23",
+      "date_stop": "2026-11-23"
+    },
+    {
+      "ad_id": "101",
+      "ad_name": "Morning reel",
+      "adset_id": "11",
+      "adset_name": "Broad",
+      "campaign_id": "1",
+      "campaign_name": "Example launch",
+      "spend": "5.25",
+      "impressions": "500",
+      "reach": "450",
+      "inline_link_clicks": "15",
+      "actions": [
+        {"action_type": "link_click", "value": "16"},
+        {"action_type": "landing_page_view", "value": "12"},
+        {"action_type": "offsite_conversion.custom.999", "value": "1"},
+        {"action_type": "offsite_conversion.fb_pixel_custom", "value": "2"}
+      ],
+      "account_currency": "USD",
+      "date_start": "2026-11-24",
+      "date_stop": "2026-11-24"
+    }
+  ],
+  "paging": {
+    "cursors": {"before": "QkVGT1JF", "after": "QUZURVI"},
+    "next": "{{BASE}}/v27.0/act_1234567890/insights?access_token={{TOKEN}}&level=ad&limit=500&after=QUZURVI"
+  }
+}

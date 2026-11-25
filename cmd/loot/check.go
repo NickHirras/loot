@@ -13,10 +13,12 @@ import (
 	"github.com/nickhirras/loot/internal/config"
 	"github.com/nickhirras/loot/internal/core"
 	"github.com/nickhirras/loot/internal/sources/appstore"
+	"github.com/nickhirras/loot/internal/sources/cloudflareanalytics"
 	"github.com/nickhirras/loot/internal/sources/crash"
 	"github.com/nickhirras/loot/internal/sources/flathub"
 	"github.com/nickhirras/loot/internal/sources/github"
 	"github.com/nickhirras/loot/internal/sources/googleplay"
+	"github.com/nickhirras/loot/internal/sources/metaads"
 	"github.com/nickhirras/loot/internal/sources/microsoftstore"
 	"github.com/nickhirras/loot/internal/sources/playvitals"
 	"github.com/nickhirras/loot/internal/sources/revenuecat"
@@ -110,6 +112,22 @@ func runCheck(args []string) error {
 			cfg.Sources.GooglePlay.ServiceAccountJSONPath, cfg.PlayVitalsPackages(), quiet)
 		candidates = append(candidates, candidate{name: playvitals.Name, source: src, err: err,
 			note: fmt.Sprintf("%d package(s)", len(cfg.PlayVitalsPackages()))})
+	}
+	if cfg.Sources.MetaAds.Configured() {
+		src, err := newMetaAds(cfg.Sources.MetaAds, quiet)
+		c := candidate{name: metaads.Name, err: err, note: "app " + cfg.Sources.MetaAds.App}
+		if err == nil {
+			c.source = src
+		}
+		candidates = append(candidates, c)
+	}
+	if cfg.Sources.CloudflareAnalytics.Configured() {
+		src, err := newCloudflareAnalytics(cfg.Sources.CloudflareAnalytics, quiet)
+		c := candidate{name: cloudflareanalytics.Name, err: err, note: "app " + cfg.Sources.CloudflareAnalytics.App}
+		if err == nil {
+			c.source = src
+		}
+		candidates = append(candidates, c)
 	}
 	if cfg.Sources.Sentry.Enabled {
 		src, err := sentry.New(cfg.Sources.Sentry, quiet)

@@ -151,6 +151,7 @@ var areaHints = map[string]string{
 	"tier":      "A settlement tier (outpost → metropolis) or an achievement tier (bronze → legendary).",
 	"time":      "A short relative time, often a single letter beside a number (3d, 2h).",
 	"vault":     "The Vault tab: revenue, units, refunds and the charts over them.",
+	"road":      "The Road tab: the path from an ad to an install. What ads cost, how many people tapped, reached the page and went on to the store, per day and per ad, in plain words for someone new to advertising.",
 	"vessel":    "A ship's name on the globe, one per store. These are jokes; keep them jokes.",
 }
 

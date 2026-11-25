@@ -1,0 +1,49 @@
+{
+  "data": [
+    {
+      "ad_id": "202",
+      "ad_name": "Static photo",
+      "adset_id": "11",
+      "adset_name": "Broad",
+      "campaign_id": "1",
+      "campaign_name": "Example launch",
+      "spend": "7.00",
+      "impressions": "900",
+      "reach": "700",
+      "actions": [
+        {"action_type": "link_click", "value": "25"},
+        {"action_type": "landing_page_view", "value": "20"}
+      ],
+      "account_currency": "USD",
+      "date_start": "2026-11-24",
+      "date_stop": "2026-11-24"
+    },
+    {
+      "ad_id": "101",
+      "ad_name": "Morning reel",
+      "spend": "1.00",
+      "impressions": "90",
+      "reach": "80",
+      "inline_link_clicks": "2",
+      "actions": [{"action_type": "landing_page_view", "value": "1"}],
+      "account_currency": "USD",
+      "date_start": "2026-11-25",
+      "date_stop": "2026-11-25"
+    },
+    {
+      "ad_id": "202",
+      "ad_name": "Static photo",
+      "spend": "2.00",
+      "impressions": "150",
+      "reach": "140",
+      "inline_link_clicks": "4",
+      "actions": [{"action_type": "landing_page_view", "value": "3"}],
+      "account_currency": "USD",
+      "date_start": "2026-11-25",
+      "date_stop": "2026-11-25"
+    }
+  ],
+  "paging": {
+    "cursors": {"before": "QUZURVI", "after": "RU5E"}
+  }
+}
