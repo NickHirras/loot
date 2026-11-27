@@ -1,12 +1,10 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -41,7 +39,7 @@ func runChest(args []string) error {
 	}
 
 	fs := flag.NewFlagSet("chest", flag.ExitOnError)
-	rawURL := fs.String("url", "http://localhost:8080", "Loot server base URL")
+	cf := bindClientFlags(fs)
 	plain := fs.Bool("no-color", false, "disable ANSI colors")
 	all := fs.Bool("all", false, "open every chest waiting, oldest first")
 	fs.Usage = func() {
@@ -52,7 +50,7 @@ func runChest(args []string) error {
 		return err
 	}
 
-	base, err := baseURL(*rawURL)
+	client, err := cf.client()
 	if err != nil {
 		return err
 	}
@@ -71,9 +69,9 @@ func runChest(args []string) error {
 	ctx := context.Background()
 	switch sub {
 	case "", "list":
-		return listChests(ctx, base)
+		return listChests(ctx, client)
 	case "open":
-		return openChest(ctx, base, date, *all, *plain)
+		return openChest(ctx, client, date, *all, *plain)
 	default:
 		return fmt.Errorf("unknown chest command %q\n\n%s", sub, chestUsage)
 	}
@@ -83,9 +81,9 @@ type chestListResponse struct {
 	Chests []core.ChestSummary `json:"chests"`
 }
 
-func listChests(ctx context.Context, base string) error {
+func listChests(ctx context.Context, client *lootClient) error {
 	var out chestListResponse
-	if err := httpJSON(ctx, http.MethodGet, base+"/api/chest", nil, &out); err != nil {
+	if err := client.requestJSON(ctx, http.MethodGet, client.BaseURL+"/api/chest", nil, &out); err != nil {
 		return err
 	}
 	if len(out.Chests) == 0 {
@@ -120,7 +118,7 @@ type chestOpenResponse struct {
 // openChest opens one chest, or — with all — every chest waiting. The bulk
 // haul comes back as one flat list already grouped by day in reveal order, so
 // it is printed chest by chest with a grand total underneath.
-func openChest(ctx context.Context, base, date string, all, plain bool) error {
+func openChest(ctx context.Context, client *lootClient, date string, all, plain bool) error {
 	req := map[string]any{}
 	if all {
 		req["all"] = true
@@ -133,7 +131,7 @@ func openChest(ctx context.Context, base, date string, all, plain bool) error {
 	}
 
 	var out chestOpenResponse
-	if err := httpJSON(ctx, http.MethodPost, base+"/api/chest/open", body, &out); err != nil {
+	if err := client.requestJSON(ctx, http.MethodPost, client.BaseURL+"/api/chest/open", body, &out); err != nil {
 		return err
 	}
 	if out.Count == 0 {
@@ -207,38 +205,6 @@ func rarityBreakdown(byRarity map[string]int) string {
 		}
 	}
 	return strings.Join(parts, ", ")
-}
-
-// httpJSON performs one JSON request against the server.
-func httpJSON(ctx context.Context, method, url string, body []byte, out any) error {
-	var reader io.Reader
-	if body != nil {
-		reader = bytes.NewReader(body)
-	}
-	req, err := http.NewRequestWithContext(ctx, method, url, reader)
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Accept", "application/json")
-	if body != nil {
-		req.Header.Set("Content-Type", "application/json")
-	}
-
-	client := &http.Client{Timeout: 30 * time.Second}
-	resp, err := client.Do(req)
-	if err != nil {
-		return fmt.Errorf("%s %s: %w", method, url, err)
-	}
-	defer resp.Body.Close()
-
-	data, err := io.ReadAll(io.LimitReader(resp.Body, 8<<20))
-	if err != nil {
-		return fmt.Errorf("read %s: %w", url, err)
-	}
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("%s %s: %s: %s", method, url, resp.Status, strings.TrimSpace(string(data)))
-	}
-	return json.Unmarshal(data, out)
 }
 
 // baseURL normalizes a --url flag into a scheme://host prefix.

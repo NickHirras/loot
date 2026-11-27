@@ -817,16 +817,60 @@ make dist VERSION=v0.1.0  # with the version string the tag would stamp in
 
 Adding a source means implementing `core.Source` (and optionally `core.WebhookHandler`) and registering it in `cmd/loot/serve.go`. Everything downstream (dedupe, rarity, feed, sounds, tail) comes for free.
 
+### CLI, API & AI agents (MCP)
+
+Every metric and report in Loot can be pulled programmatically — by scripts, cron jobs, or AI agents — without scraping the web UI. See [docs/api.md](docs/api.md) for the complete integration guide.
+
+- **CLI reports (`loot report`):** pull a combined executive overview or any individual view (`vault`, `hearth`, `trend`, `reviews`, `funnel`, `recap`, `codex`, `stats`, `drops`, `quests`, `mysteries`, `bosses`, `sources`, `apps`) in plain text or `--json`:
+
+```bash
+export LOOT_URL=https://loot.example.com
+export LOOT_API_TOKEN=your-read-only-token   # optional; also supports LOOT_API_HEADERS
+
+loot report                                  # combined overview: revenue, audience, ratings, funnel, alerts
+loot report --app Nistis --range 30d --json  # single-app JSON snapshot
+loot report vault --range 90d --json         # revenue, units, breakdowns, scorecards
+loot report reviews --stars low --json       # 1-2★ reviews across stores
+loot report trend --metric audience --product Nistis --range 30d --json
+```
+
+- **Built-in MCP server (`loot mcp`):** the same `loot` binary runs a zero-dependency Model Context Protocol stdio server (**read-only by default**; pass `--allow-writes` to also enable action tools) exposing 16 metric/report tools (`loot_report`, `loot_vault`, `loot_hearth`, `loot_trend`, `loot_reviews`, `loot_funnel`, `loot_recap`, `loot_codex`, `loot_drops`, `loot_stats`, `loot_quests`, `loot_mysteries`, `loot_bosses`, `loot_sources`, `loot_apps`, `loot_chests`) to Claude Code, Codex, Cursor, Claude Desktop, or any MCP client:
+
+```json
+{
+  "mcpServers": {
+    "loot": {
+      "command": "/usr/local/bin/loot",
+      "args": ["mcp"],
+      "env": {
+        "LOOT_URL": "https://loot.example.com",
+        "LOOT_API_TOKEN": "your-read-only-token"
+      }
+    }
+  }
+}
+```
+
+- **Scoped API tokens:** configure `api.read_tokens` / `api.write_tokens` (or `*_path` / `LOOT_API_READ_TOKENS` / `LOOT_API_WRITE_TOKENS`) to protect `/api/*` and `/ws` with `Authorization: Bearer <token>` or `X-API-Key: <token>`. Read-only tokens allow `GET`/`HEAD` and `/ws` and reject writes with `403`.
+
 ### HTTP API
+
+Every read endpoint accepts `?app=<product>` to scope results to one app. See [docs/api.md](docs/api.md) for all query parameters, write endpoints and `curl` examples.
 
 | endpoint | purpose |
 |---|---|
-| `GET /api/drops?limit=100&before=<id>` | recent drops, newest first, with joined event fields; excludes unopened chests |
-| `GET /api/stats` | XP total, drop counts by rarity and source, countries seen, chests waiting |
-| `GET /api/sources` | source list with last poll time and last error |
-| `GET /api/vault/summary?range=30d` | revenue, units, series and breakdowns in the display currency |
-| `GET /api/hearth` | the globe: settlements with population and tier, capital, era, recent arrivals |
+| `GET /api/report?range=30d` | combined executive report: stats, vault revenue & scorecards, audience, ratings/reviews, funnel, open alerts, source health |
+| `GET /api/vault/summary?range=30d` | revenue, units, refunds, daily series, breakdowns, active subscriptions and per-app scorecards |
+| `GET /api/hearth` | settlements with population and tier, audience per product & store, GitHub downloads, fleet, capital, era, recent arrivals |
 | `GET /api/hearth/trend?metric=population&range=30d` | daily time series for one Hearth metric (`audience`, `population`, `settlements`, `revenue`, `fleet`, `downloads`, `country`, `xp`) over `7d`, `30d`, `90d`, `ytd`, `1y` or `all` |
+| `GET /api/reviews?range=90d` | rating averages, per-app/store breakdown, star distribution, daily rating trend and written reviews (`source`, `stars=1..5\|low`, `limit`) |
+| `GET /api/funnel?days=14` | acquisition funnel: ad spend, impressions, clicks, conversions, installs, revenue, `as_of` lag and automated notes |
+| `GET /api/recap?month=YYYY-MM` | monthly or yearly (`?season=YYYY`) recap with period deltas and highlights |
+| `GET /api/codex` | achievements, lifetime totals and all-time records |
+| `GET /api/stats` | XP total, drop counts by rarity and source, countries seen, chests waiting, badge counts, known apps |
+| `GET /api/drops?limit=100&before=<id>` | recent drops, newest first, with joined event fields; excludes unopened chests |
+| `GET /api/quests`, `/api/mysteries`, `/api/bosses` | active/recent goals, detected anomalies, and crash-spike bosses |
+| `GET /api/sources`, `/api/apps`, `/api/healthz` | source poll status & errors, canonical product mappings, and unauthenticated health check |
 | `GET /api/chest` | the chests waiting to be opened, oldest first |
 | `POST /api/chest/open` | `{"date":"2026-08-17"}` (or `{}` for the oldest, `{"all":true}` for every chest waiting); reveals and returns the cascade |
 | `GET /ws` | websocket stream, see below |
@@ -853,7 +897,7 @@ In dev mode, `POST /api/dev/fake` takes `{"rarity","kind","app","country","amoun
 
 Demo mode is the one exception worth stating plainly: it is safe to run anywhere, because it reads no credentials and writes only to `demo.db`.
 
-Loot has no authentication of its own. The RevenueCat webhook secret protects that one endpoint, but the dashboard and API are open to anyone who can reach the port. Put it behind a reverse proxy with TLS and basic auth (or a tunnel like Tailscale) before exposing it to the internet, and keep `dev.enabled` off in production.
+By default, Loot leaves its dashboard and API open (relying on localhost, Tailscale, or an authenticating reverse proxy with TLS). For programmatic and agent access, you can configure built-in read-only and read-write API tokens under `api:` (`read_tokens`, `write_tokens`, `read_tokens_path`, `write_tokens_path`, or `LOOT_API_*` env vars — see [docs/api.md](docs/api.md)). When any API token is configured, `/api/*` (except `/api/healthz`) and `/ws` require `Authorization: Bearer <token>` or `X-API-Key: <token>`. Always keep `dev.enabled` off in production and put TLS in front of any internet-facing deployment.
 
 ## Roadmap
 

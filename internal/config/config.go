@@ -64,6 +64,7 @@ type Config struct {
 	FX      FX      `yaml:"fx"`
 	Chest   Chest   `yaml:"chest"`
 	Funnel  Funnel  `yaml:"funnel"`
+	API     API     `yaml:"api"`
 	Sources Sources `yaml:"sources"`
 	Dev     Dev     `yaml:"dev"`
 	Demo    Demo    `yaml:"demo"`
@@ -490,6 +491,73 @@ type Dev struct {
 	Enabled bool `yaml:"enabled"`
 }
 
+// API configures optional bearer / API-key authentication for /api/* and /ws.
+// Leave every field empty to keep the API open (the default, for localhost or
+// deployments behind an authenticating reverse proxy or Tailscale).
+type API struct {
+	// ReadTokens grant read-only access to GET/HEAD /api/* and GET /ws.
+	// Mutating requests (POST, DELETE, …) receive 403 Forbidden.
+	ReadTokens []string `yaml:"read_tokens"`
+	// WriteTokens grant full read and write access to /api/* and /ws.
+	WriteTokens []string `yaml:"write_tokens"`
+	// ReadTokensPath optionally points at a file containing one read-only
+	// token per line (blank lines and lines starting with '#' are ignored).
+	ReadTokensPath string `yaml:"read_tokens_path"`
+	// WriteTokensPath optionally points at a file containing one read-write
+	// token per line (blank lines and lines starting with '#' are ignored).
+	WriteTokensPath string `yaml:"write_tokens_path"`
+}
+
+// Configured reports whether any API token source is configured.
+func (a API) Configured() bool {
+	return len(a.ReadTokens) > 0 || len(a.WriteTokens) > 0 ||
+		strings.TrimSpace(a.ReadTokensPath) != "" || strings.TrimSpace(a.WriteTokensPath) != ""
+}
+
+// Resolve loads and deduplicates the read-only and read-write API tokens from
+// both inline config/env lists and optional token files.
+func (a API) Resolve() (readTokens, writeTokens []string, err error) {
+	readTokens, err = loadTokenList(a.ReadTokens, a.ReadTokensPath)
+	if err != nil {
+		return nil, nil, fmt.Errorf("api.read_tokens: %w", err)
+	}
+	writeTokens, err = loadTokenList(a.WriteTokens, a.WriteTokensPath)
+	if err != nil {
+		return nil, nil, fmt.Errorf("api.write_tokens: %w", err)
+	}
+	return readTokens, writeTokens, nil
+}
+
+func loadTokenList(inline []string, path string) ([]string, error) {
+	seen := map[string]bool{}
+	var out []string
+	add := func(tok string) {
+		tok = strings.TrimSpace(tok)
+		if tok == "" || seen[tok] {
+			return
+		}
+		seen[tok] = true
+		out = append(out, tok)
+	}
+	for _, tok := range inline {
+		add(tok)
+	}
+	if p := strings.TrimSpace(path); p != "" {
+		data, err := os.ReadFile(p)
+		if err != nil {
+			return nil, err
+		}
+		for _, line := range strings.Split(string(data), "\n") {
+			line = strings.TrimSpace(line)
+			if line == "" || strings.HasPrefix(line, "#") {
+				continue
+			}
+			add(line)
+		}
+	}
+	return out, nil
+}
+
 // Default returns the configuration used when no file and no env are present.
 func Default() Config {
 	return Config{
@@ -624,6 +692,16 @@ func Load(path string, explicit bool) (Config, error) {
 	if cfg.RulesPath != "" {
 		if _, err := os.Stat(cfg.RulesPath); err != nil {
 			return cfg, fmt.Errorf("rules_path %s: %w", cfg.RulesPath, err)
+		}
+	}
+	if p := strings.TrimSpace(cfg.API.ReadTokensPath); p != "" {
+		if _, err := os.Stat(p); err != nil {
+			return cfg, fmt.Errorf("api.read_tokens_path %s: %w", p, err)
+		}
+	}
+	if p := strings.TrimSpace(cfg.API.WriteTokensPath); p != "" {
+		if _, err := os.Stat(p); err != nil {
+			return cfg, fmt.Errorf("api.write_tokens_path %s: %w", p, err)
 		}
 	}
 	return cfg, nil
@@ -816,6 +894,18 @@ func applyEnv(cfg *Config) {
 	}
 	if v := os.Getenv("LOOT_CRASH_SECRET"); v != "" {
 		cfg.Sources.Crash.Secret = v
+	}
+	if v := os.Getenv("LOOT_API_READ_TOKENS"); v != "" {
+		cfg.API.ReadTokens = splitList(v)
+	}
+	if v := os.Getenv("LOOT_API_WRITE_TOKENS"); v != "" {
+		cfg.API.WriteTokens = splitList(v)
+	}
+	if v := os.Getenv("LOOT_API_READ_TOKENS_PATH"); v != "" {
+		cfg.API.ReadTokensPath = v
+	}
+	if v := os.Getenv("LOOT_API_WRITE_TOKENS_PATH"); v != "" {
+		cfg.API.WriteTokensPath = v
 	}
 }
 

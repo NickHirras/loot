@@ -470,6 +470,19 @@ func runServe(args []string) error {
 	go codexSvc.Run(ctx)
 	go bossSvc.Run(ctx)
 
+	// Validate API token files up front so a typo fails at startup instead of
+	// answering 503 on the first API request.
+	if cfg.API.Configured() {
+		readToks, writeToks, err := cfg.API.Resolve()
+		if err != nil {
+			return err
+		}
+		if len(readToks) > 0 || len(writeToks) > 0 {
+			log.Info("api token authentication enabled",
+				"read_tokens", len(readToks), "write_tokens", len(writeToks))
+		}
+	}
+
 	// The server resolves products for the rows that have no product column of
 	// their own (bosses, mysteries) and lists the scope selector's options.
 	cfg.Apps = products

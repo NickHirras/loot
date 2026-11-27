@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"net/http"
 	"net/url"
 	"os"
 	"os/signal"
@@ -33,8 +34,8 @@ const ansiDim = "\033[2m"
 
 func runTail(args []string) error {
 	fs := flag.NewFlagSet("tail", flag.ExitOnError)
+	cf := bindClientFlags(fs)
 	var (
-		rawURL = fs.String("url", "http://localhost:8080", "Loot server base URL")
 		noBell = fs.Bool("no-bell", false, "do not ring the terminal bell for rare+ drops")
 		plain  = fs.Bool("no-color", false, "disable ANSI colors")
 	)
@@ -46,10 +47,15 @@ func runTail(args []string) error {
 		return err
 	}
 
-	wsURL, err := websocketURL(*rawURL)
+	client, err := cf.client()
 	if err != nil {
 		return err
 	}
+	wsURL, err := websocketURL(*cf.rawURL)
+	if err != nil {
+		return err
+	}
+	wsHeaders := client.WebSocketHeader(wsURL)
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -59,7 +65,7 @@ func runTail(args []string) error {
 	// Reconnect forever: a tail that dies when the server restarts is useless.
 	backoff := time.Second
 	for {
-		err := streamDrops(ctx, wsURL, *noBell, *plain)
+		err := streamDrops(ctx, wsURL, wsHeaders, *noBell, *plain)
 		if ctx.Err() != nil {
 			return nil
 		}
@@ -76,8 +82,12 @@ func runTail(args []string) error {
 	}
 }
 
-func streamDrops(ctx context.Context, wsURL string, noBell, plain bool) error {
-	conn, _, err := websocket.Dial(ctx, wsURL, nil)
+func streamDrops(ctx context.Context, wsURL string, headers http.Header, noBell, plain bool) error {
+	var opts *websocket.DialOptions
+	if len(headers) > 0 {
+		opts = &websocket.DialOptions{HTTPHeader: headers}
+	}
+	conn, _, err := websocket.Dial(ctx, wsURL, opts)
 	if err != nil {
 		return err
 	}

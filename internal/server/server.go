@@ -9,7 +9,6 @@ import (
 	"io/fs"
 	"log/slog"
 	"net/http"
-	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -82,6 +81,7 @@ func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /api/healthz", s.handleHealth)
+	mux.HandleFunc("GET /api/report", s.handleReport)
 	mux.HandleFunc("GET /api/drops", s.handleDrops)
 	mux.HandleFunc("GET /api/stats", s.handleStats)
 	mux.HandleFunc("GET /api/sources", s.handleSources)
@@ -113,7 +113,7 @@ func (s *Server) Handler() http.Handler {
 
 	mux.Handle("GET /", s.spaHandler())
 
-	return logRequests(s.Logger, mux)
+	return logRequests(s.Logger, s.apiAuthMiddleware(mux))
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
@@ -243,30 +243,11 @@ type sourceInfo struct {
 }
 
 func (s *Server) handleSources(w http.ResponseWriter, r *http.Request) {
-	states, err := s.Store.SourceStates(r.Context())
+	out, err := s.collectSourceInfos(r.Context())
 	if err != nil {
 		s.fail(w, "source states", err)
 		return
 	}
-
-	out := make([]sourceInfo, 0, len(s.Sources))
-	for _, src := range s.Sources {
-		info := sourceInfo{Name: src.Name(), Mode: "webhook"}
-		if d := src.PollInterval(); d > 0 {
-			info.Mode = "poll"
-			info.PollInterval = d.String()
-		}
-		if st, ok := states[src.Name()]; ok {
-			info.LastPollAt = st.LastPollAt
-			info.LastError = st.LastError
-		}
-		if n, err := s.Store.EventCount(r.Context(), src.Name()); err == nil {
-			info.Events = n
-		}
-		out = append(out, info)
-	}
-	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
-
 	writeJSON(w, http.StatusOK, map[string]any{"sources": out})
 }
 

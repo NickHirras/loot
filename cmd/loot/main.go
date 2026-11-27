@@ -14,15 +14,17 @@ var version = "dev"
 const usage = `loot — a gamified dashboard for indie app metrics
 
 Usage:
-  loot serve [flags]        Run the API, websocket stream, sources and dashboard (default)
-  loot tail  [flags]        Stream drops into your terminal
-  loot check [flags]        Verify every configured source and exit
-  loot apps  [remap]        Show which apps map to which product, or recompute them
-  loot chest [open [date]]  List the daily chests waiting, or open one
-  loot funnel [flags]       Print the ad funnel: yesterday, the last 7 days, and its notes
-  loot fx    [recompute]    Show exchange rates, or re-convert stored amounts
-  loot demo  reset          Delete the demo database (data/demo.db); see "loot serve --demo"
-  loot version              Print the version
+  loot serve  [flags]        Run the API, websocket stream, sources and dashboard (default)
+  loot report [section]      Pull metrics and reports from a running server (--json for agents)
+  loot mcp    [flags]        Run an MCP stdio server exposing Loot metrics to AI agents
+  loot tail   [flags]        Stream drops into your terminal
+  loot check  [flags]        Verify every configured source and exit
+  loot apps   [remap]        Show which apps map to which product, or recompute them
+  loot chest  [open [date]]  List the daily chests waiting, or open one
+  loot funnel [flags]        Print the ad funnel: yesterday, the last 7 days, and its notes
+  loot fx     [recompute]    Show exchange rates, or re-convert stored amounts
+  loot demo   reset          Delete the demo database (data/demo.db); see "loot serve --demo"
+  loot version               Print the version
 
 Run "loot <command> -h" for the flags of a command.
 `
@@ -41,6 +43,10 @@ func main() {
 	switch cmd {
 	case "serve":
 		err = runServe(args)
+	case "report":
+		err = runReport(args)
+	case "mcp":
+		err = runMCP(args)
 	case "tail":
 		err = runTail(args)
 	case "check":

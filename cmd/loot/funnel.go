@@ -27,7 +27,7 @@ Flags:
 // funnel config, and a morning summary should say exactly what the page says.
 func runFunnel(args []string) error {
 	fs := flag.NewFlagSet("funnel", flag.ExitOnError)
-	rawURL := fs.String("url", "http://localhost:8080", "Loot server base URL")
+	cf := bindClientFlags(fs)
 	days := fs.Int("days", 14, "how many days to fetch, counting today (1-90)")
 	app := fs.String("app", "", "narrow to one product")
 	asJSON := fs.Bool("json", false, "print the server's JSON instead of the summary")
@@ -38,7 +38,7 @@ func runFunnel(args []string) error {
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
-	base, err := baseURL(*rawURL)
+	client, err := cf.client()
 	if err != nil {
 		return err
 	}
@@ -48,10 +48,9 @@ func runFunnel(args []string) error {
 	if *app != "" {
 		q.Set("app", *app)
 	}
-	endpoint := base + "/api/funnel?" + q.Encode()
 
-	var raw json.RawMessage
-	if err := httpJSON(context.Background(), http.MethodGet, endpoint, nil, &raw); err != nil {
+	raw, err := client.DoJSON(context.Background(), http.MethodGet, "/api/funnel", q, nil)
+	if err != nil {
 		return err
 	}
 	if *asJSON {
