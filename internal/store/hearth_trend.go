@@ -160,11 +160,12 @@ type audienceDayPlaced struct {
 // in chronological order so a single forward sweep can evaluate what Hearth()
 // would have shown on any historical day.
 type audienceAppHistory struct {
-	source  string
-	app     string
-	product string
-	totals  []audienceDayTotal
-	placed  []audienceDayPlaced
+	source        string
+	app           string
+	product       string
+	coversAndroid bool
+	totals        []audienceDayTotal
+	placed        []audienceDayPlaced
 }
 
 type audienceCursor struct {
@@ -246,7 +247,8 @@ func (s *Store) audienceHistory(ctx context.Context, product, source string) (ap
 	}
 
 	rows, err := s.q.QueryContext(ctx, `
-        SELECT e.source, e.app, e.product, e.country, e.quantity, e.day
+        SELECT e.source, e.app, e.product, e.country, e.quantity, e.day,
+               COALESCE(json_extract(e.payload, '$.covers_android'), -1)
         FROM events e
         `+cond.String()+`
         ORDER BY e.source, e.app, e.day, e.country`, args...)
@@ -259,9 +261,9 @@ func (s *Store) audienceHistory(ctx context.Context, product, source string) (ap
 	for rows.Next() {
 		var (
 			src, app, prod, cc, day string
-			qty                     int
+			qty, rawCovers          int
 		)
-		if err := rows.Scan(&src, &app, &prod, &cc, &qty, &day); err != nil {
+		if err := rows.Scan(&src, &app, &prod, &cc, &qty, &day, &rawCovers); err != nil {
 			return nil, "", "", fmt.Errorf("scan audience history: %w", err)
 		}
 		if day == "" {
@@ -276,7 +278,13 @@ func (s *Store) audienceHistory(ctx context.Context, product, source string) (ap
 		key := src + "\x1f" + app
 		h, ok := index[key]
 		if !ok {
-			h = &audienceAppHistory{source: src, app: app, product: prod}
+			covers := rawCovers == 1
+			if src == "revenuecat" {
+				covers = true
+			} else if src == "googleanalytics" {
+				covers = rawCovers != 0
+			}
+			h = &audienceAppHistory{source: src, app: app, product: prod, coversAndroid: covers}
 			index[key] = h
 			apps = append(apps, h)
 		}
@@ -537,6 +545,39 @@ func (s *Store) trendAudience(ctx context.Context, q HearthTrendQuery, today str
 		return HearthTrend{}, err
 	}
 	if len(apps) > 0 {
+		// When viewing a whole product (no source filter), drop superseded
+		// googleplay series if a cross-platform active source covers Android,
+		// so the trend's right edge agrees with ProductAudience.Current.
+		if q.Source == "" {
+			coversAndroid := false
+			for _, a := range apps {
+				if a.coversAndroid {
+					coversAndroid = true
+					break
+				}
+			}
+			if coversAndroid {
+				filtered := make([]*audienceAppHistory, 0, len(apps))
+				firstDay, lastDay = "", ""
+				for _, a := range apps {
+					if a.source == "googleplay" {
+						continue
+					}
+					filtered = append(filtered, a)
+					for _, t := range a.totals {
+						firstDay = minDay(firstDay, t.day)
+						lastDay = maxDay(lastDay, t.day)
+					}
+					for _, p := range a.placed {
+						firstDay = minDay(firstDay, p.day)
+						lastDay = maxDay(lastDay, p.day)
+					}
+				}
+				if len(filtered) > 0 {
+					apps = filtered
+				}
+			}
+		}
 		return buildAudienceLevelTrend(q, today, apps, firstDay, lastDay)
 	}
 	return s.trendAudienceArrivals(ctx, q, today)

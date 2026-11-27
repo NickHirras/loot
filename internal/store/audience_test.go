@@ -340,3 +340,97 @@ func TestStaleAudienceSnapshotsAreDropped(t *testing.T) {
 		t.Errorf("scorecards = %+v, want active=12", sc)
 	}
 }
+
+func TestCrossPlatformActiveUsersSupersedeGooglePlayWithoutDoubleCounting(t *testing.T) {
+	ctx := context.Background()
+	st := newStore(t)
+
+	gaEvent := func(app, product, day, country string, qty int, coversAndroid bool) core.Event {
+		ev := audienceEvent("googleanalytics", app, product, day, country, qty)
+		ev.Payload, _ = json.Marshal(map[string]any{"covers_android": coversAndroid})
+		return ev
+	}
+	rcAud := audienceEvent("revenuecat", "Nistis", "Nistis", "2026-11-27", "", 45)
+	rcAud.Payload, _ = json.Marshal(map[string]any{"covers_android": true})
+
+	insertAll(t, st,
+		// 1. Nistis: RevenueCat 28d active users (45, iOS+Android) + Play (7 active).
+		// Play must be marked Superseded and NOT added to Current (45, not 52).
+		rcAud,
+		audienceEvent("googleplay", "com.nistis.app", "Nistis", "2026-11-27", "US", 5),
+		audienceEvent("googleplay", "com.nistis.app", "Nistis", "2026-11-27", "", 7),
+
+		// 2. Macro Trainer: GA4 iOS-only (covers_android=false, 18) + Play (12) + Snapcraft (26).
+		// All three are disjoint platforms -> Current = 56, Play NOT superseded.
+		audienceEvent("snapcraft", "macro-trainer", "Macro Trainer", "2026-11-27", "", 26),
+		audienceEvent("googleplay", "com.mt.app", "Macro Trainer", "2026-11-27", "US", 10),
+		audienceEvent("googleplay", "com.mt.app", "Macro Trainer", "2026-11-27", "", 12),
+		gaEvent("Macro Trainer", "Macro Trainer", "2026-11-27", "US", 15, false),
+		gaEvent("Macro Trainer", "Macro Trainer", "2026-11-27", "", 18, false),
+
+		// 3. Reson8: GA4 unfiltered (covers_android=true, 50) + Play (11) + Snapcraft (177).
+		// Play is superseded -> Current = 177 + 50 = 227 (not 238).
+		audienceEvent("snapcraft", "reson8", "Reson8", "2026-11-27", "", 177),
+		audienceEvent("googleplay", "com.reson8.app", "Reson8", "2026-11-27", "DE", 11),
+		audienceEvent("googleplay", "com.reson8.app", "Reson8", "2026-11-27", "", 11),
+		gaEvent("Reson8", "Reson8", "2026-11-27", "DE", 20, true),
+		gaEvent("Reson8", "Reson8", "2026-11-27", "", 50, true),
+	)
+
+	h, err := st.HearthAt(ctx, "", "USD", "2026-11-27")
+	if err != nil {
+		t.Fatalf("hearth: %v", err)
+	}
+
+	nistis := productAudience(t, h, "Nistis")
+	if nistis.Current != 45 {
+		t.Errorf("Nistis current = %d, want 45 (RevenueCat supersedes Play)", nistis.Current)
+	}
+	if len(nistis.Sources) != 2 || nistis.Sources[0].Source != "revenuecat" ||
+		nistis.Sources[0].Basis != core.BasisActiveUsers || nistis.Sources[0].Superseded ||
+		nistis.Sources[1].Source != "googleplay" || !nistis.Sources[1].Superseded {
+		t.Errorf("Nistis sources = %+v", nistis.Sources)
+	}
+	// RevenueCat overview must not spawn a phantom ship at sea.
+	for _, v := range h.Fleet {
+		if v.Source == "revenuecat" {
+			t.Errorf("unexpected revenuecat fleet vessel: %+v", v)
+		}
+	}
+
+	mt := productAudience(t, h, "Macro Trainer")
+	if mt.Current != 56 {
+		t.Errorf("Macro Trainer current = %d, want 56 (26 snap + 12 play + 18 ga4 iOS)", mt.Current)
+	}
+	for _, s := range mt.Sources {
+		if s.Superseded {
+			t.Errorf("Macro Trainer iOS-only GA4 should not supersede %+v", s)
+		}
+	}
+
+	r8 := productAudience(t, h, "Reson8")
+	if r8.Current != 227 {
+		t.Errorf("Reson8 current = %d, want 227 (177 snap + 50 ga4, Play superseded)", r8.Current)
+	}
+	// DE on globe should have Reson8 GA4's 20 (NOT 20 + 11 Play double-count).
+	if got := settlement(t, h, "DE").Population; got != 20 {
+		t.Errorf("DE population = %d, want 20 (GA4 supersedes Play country rows)", got)
+	}
+	// US on globe should have Nistis Play (5) + MT Play (10) + MT GA4 iOS (15) = 30.
+	if got := settlement(t, h, "US").Population; got != 30 {
+		t.Errorf("US population = %d, want 30", got)
+	}
+
+	// AppScorecards must match Hearth Current 1-to-1.
+	sc, err := st.AppScorecards(ctx, "2026-11-27")
+	if err != nil {
+		t.Fatalf("scorecards: %v", err)
+	}
+	gotActive := map[string]int{}
+	for _, row := range sc {
+		gotActive[row.Product] = row.Active
+	}
+	if gotActive["Nistis"] != 45 || gotActive["Macro Trainer"] != 56 || gotActive["Reson8"] != 227 {
+		t.Errorf("scorecards active = %+v, want Nistis=45 Macro Trainer=56 Reson8=227", gotActive)
+	}
+}

@@ -25,7 +25,7 @@ const Name = "revenuecat"
 // maxBody caps the webhook body. RevenueCat payloads are a few KB.
 const maxBody = 1 << 20
 
-// Source implements core.Source and core.WebhookHandler.
+// Source implements core.Source, core.WebhookHandler and core.Checker.
 type Source struct {
 	// Secret, when non-empty, must be presented as `Authorization: Bearer <secret>`.
 	Secret string
@@ -36,6 +36,23 @@ type Source struct {
 	// IncludeSandbox lets SANDBOX-environment events mint drops and found
 	// settlements. Off by default: a TestFlight purchase is not a customer.
 	IncludeSandbox bool
+
+	// Optional REST API v2 polling for project overview active users (28d).
+	// When APIKey and Projects are set, Poll fetches GET /v2/projects/{id}/metrics/overview
+	// on PollEvery and emits silent `audience` snapshots.
+	APIKey    string
+	Projects  []Project
+	PollEvery time.Duration
+	// BaseURL, Client and Now are swappable for tests.
+	BaseURL string
+	Client  *http.Client
+	Now     func() time.Time
+}
+
+// Project maps one RevenueCat v2 project ID to a Loot app name.
+type Project struct {
+	ID  string
+	App string
 }
 
 // New returns a RevenueCat webhook source.
@@ -49,18 +66,35 @@ func New(secret string, log *slog.Logger) *Source {
 // Name implements core.Source.
 func (s *Source) Name() string { return Name }
 
-// Poll implements core.Source. RevenueCat pushes, so there is nothing to pull.
-func (s *Source) Poll(context.Context, []byte) ([]core.Event, []byte, error) {
-	return nil, nil, nil
+// Poll implements core.Source. When v2 API credentials and projects are set,
+// it fetches each project's 28-day active users from /metrics/overview;
+// otherwise RevenueCat is webhook-only and Poll does nothing.
+func (s *Source) Poll(ctx context.Context, rawState []byte) ([]core.Event, []byte, error) {
+	if !s.pollingEnabled() {
+		return nil, rawState, nil
+	}
+	return s.pollOverview(ctx, rawState)
 }
 
 // PollInterval implements core.Source; 0 marks this source as webhook-only.
-func (s *Source) PollInterval() time.Duration { return 0 }
+func (s *Source) PollInterval() time.Duration {
+	if !s.pollingEnabled() {
+		return 0
+	}
+	if s.PollEvery > 0 {
+		return s.PollEvery
+	}
+	return defaultPollInterval
+}
 
-// Check implements core.Checker. There is nothing to call — RevenueCat pushes
-// to us — so the only thing worth reporting is whether the endpoint is
-// protected.
-func (s *Source) Check(context.Context) error {
+// Check implements core.Checker. Verifies webhook secret configuration and,
+// when v2 metrics polling is enabled, checks the API key against each project.
+func (s *Source) Check(ctx context.Context) error {
+	if s.pollingEnabled() {
+		if err := s.checkOverview(ctx); err != nil {
+			return err
+		}
+	}
 	if s.Secret == "" {
 		return core.Warning{Msg: "no secret set: anyone who can reach /hooks/revenuecat can inject drops"}
 	}

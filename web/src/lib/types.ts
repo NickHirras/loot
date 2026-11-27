@@ -524,11 +524,11 @@ export interface HearthDrop {
 }
 
 /**
- * What an audience figure measures. Two of these are a level — how many are
+ * What an audience figure measures. Three of these are a level — how many are
  * there now — and one is a running total that can only grow; the UI never adds
  * the two kinds together.
  */
-export type AudienceBasis = 'weekly_devices' | 'active_devices' | 'arrivals'
+export type AudienceBasis = 'weekly_devices' | 'active_devices' | 'active_users' | 'arrivals'
 
 /** One store's reading of one product's audience. */
 export interface AudienceSource {
@@ -537,6 +537,8 @@ export interface AudienceSource {
   basis: AudienceBasis
   /** Lifetime installs for an active-basis store that also reports installs (Google Play). */
   all_time?: number
+  /** True when a cross-platform active source (RevenueCat or unfiltered GA4) already includes this store's users. */
+  superseded?: boolean
   /** The business day the snapshot describes; absent for `arrivals`. */
   as_of?: string
 }

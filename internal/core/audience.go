@@ -48,6 +48,9 @@ const (
 	// BasisActiveDevices: devices that have the app installed and were active
 	// in the store's own trailing window (Google Play's active device installs).
 	BasisActiveDevices AudienceBasis = "active_devices"
+	// BasisActiveUsers: distinct active users reported by an analytics or
+	// subscription SDK over its trailing window (Firebase / GA4, RevenueCat).
+	BasisActiveUsers AudienceBasis = "active_users"
 	// BasisArrivals: the store reports no current base at all, so the figure
 	// is every arrival it has ever reported — downloads, installs, purchases —
 	// and it can only grow. An honest fallback, labelled as such.
@@ -58,8 +61,10 @@ const (
 // missing from it that emits KindAudience anyway is read as active devices,
 // which is the most generic true description.
 var audienceBasis = map[string]AudienceBasis{
-	"snapcraft":  BasisWeeklyDevices,
-	"googleplay": BasisActiveDevices,
+	"snapcraft":       BasisWeeklyDevices,
+	"googleplay":      BasisActiveDevices,
+	"googleanalytics": BasisActiveUsers,
+	"revenuecat":      BasisActiveUsers,
 }
 
 // AudienceBasisFor returns what source's audience snapshots measure.

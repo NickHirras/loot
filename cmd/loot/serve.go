@@ -29,6 +29,7 @@ import (
 	"github.com/nickhirras/loot/internal/sources/crash"
 	"github.com/nickhirras/loot/internal/sources/flathub"
 	"github.com/nickhirras/loot/internal/sources/github"
+	"github.com/nickhirras/loot/internal/sources/googleanalytics"
 	"github.com/nickhirras/loot/internal/sources/googleplay"
 	"github.com/nickhirras/loot/internal/sources/microsoftstore"
 	"github.com/nickhirras/loot/internal/sources/playvitals"
@@ -294,13 +295,18 @@ func runServe(args []string) error {
 				"spawned", len(res.Spawned), "slain", len(res.Slain), "faded", len(res.Faded))
 		}
 	}
-	if !cfg.Demo.Enabled && cfg.RevenueCatEnabled() {
-		rc := revenuecat.New(cfg.Sources.RevenueCat.Secret, log)
-		rc.Apps = cfg.RevenueCatApps()
-		rc.IncludeSandbox = cfg.Sources.RevenueCat.IncludeSandbox
-		sources = append(sources, rc)
-		if cfg.Sources.RevenueCat.Secret == "" {
-			log.Warn("revenuecat webhook has no secret; anyone who can reach /hooks/revenuecat can post drops")
+	if !cfg.Demo.Enabled && (cfg.RevenueCatEnabled() || cfg.RevenueCatPollingConfigured()) {
+		rc, err := newRevenueCat(cfg, log)
+		if err != nil {
+			log.Warn("revenuecat source unavailable", "error", err)
+		} else {
+			sources = append(sources, rc)
+			if cfg.RevenueCatEnabled() && cfg.Sources.RevenueCat.Secret == "" {
+				log.Warn("revenuecat webhook has no secret; anyone who can reach /hooks/revenuecat can post drops")
+			}
+			if len(rc.Projects) > 0 {
+				log.Info("revenuecat overview polling configured", "projects", len(rc.Projects))
+			}
 		}
 	}
 	if !cfg.Demo.Enabled && len(cfg.Sources.Flathub.Apps) > 0 {
@@ -378,6 +384,17 @@ func runServe(args []string) error {
 			sources = append(sources, src)
 			log.Info("play vitals source configured",
 				"packages", src.Packages, "backfill_days", src.BackfillDays)
+		}
+	}
+	if !cfg.Demo.Enabled && cfg.GoogleAnalyticsConfigured() {
+		src, err := googleanalytics.New(cfg.Sources.GoogleAnalytics, cfg.GoogleAnalyticsServiceAccountPath(), log)
+		if err != nil {
+			log.Warn("google analytics source unavailable", "error", err)
+		} else {
+			src.Since = cfg.Since
+			sources = append(sources, src)
+			log.Info("google analytics source configured",
+				"properties", len(src.Properties), "window_days", src.WindowDays)
 		}
 	}
 	if !cfg.Demo.Enabled && cfg.Sources.MetaAds.Configured() {
@@ -484,6 +501,26 @@ func removeDemoDB(cfg config.Config) error {
 		}
 	}
 	return nil
+}
+
+// newRevenueCat constructs the RevenueCat source, loading the optional v2 API
+// key when overview metrics polling is configured.
+func newRevenueCat(cfg config.Config, log *slog.Logger) (*revenuecat.Source, error) {
+	rc := revenuecat.New(cfg.Sources.RevenueCat.Secret, log)
+	rc.Apps = cfg.RevenueCatApps()
+	rc.IncludeSandbox = cfg.Sources.RevenueCat.IncludeSandbox
+	if cfg.RevenueCatPollingConfigured() {
+		key, err := config.Secret(cfg.Sources.RevenueCat.APIKey, cfg.Sources.RevenueCat.APIKeyPath)
+		if err != nil {
+			return nil, fmt.Errorf("revenuecat api_key: %w", err)
+		}
+		rc.APIKey = key
+		rc.PollEvery = cfg.Sources.RevenueCat.PollInterval
+		for _, p := range cfg.Sources.RevenueCat.Projects {
+			rc.Projects = append(rc.Projects, revenuecat.Project{ID: p.ID, App: p.App})
+		}
+	}
+	return rc, nil
 }
 
 // flagSet reports whether the named flag was actually provided on the command

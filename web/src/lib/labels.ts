@@ -371,6 +371,7 @@ export function questErrorLabel(code: string, fallback: string, value = ""): str
 const SOURCE_NAMES: Record<string, string> = {
   appstore: 'App Store',
   googleplay: 'Google Play',
+  googleanalytics: 'Firebase / GA4',
   microsoftstore: 'Microsoft Store',
   snapcraft: 'Snapcraft',
   flathub: 'Flathub',
@@ -389,6 +390,8 @@ export function audienceBasisLabel(basis: string): string {
       return m.hearth_audience_weekly_devices()
     case 'active_devices':
       return m.hearth_audience_active_devices()
+    case 'active_users':
+      return m.hearth_audience_active_users()
     default:
       return m.hearth_audience_arrivals()
   }

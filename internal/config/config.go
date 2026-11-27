@@ -151,6 +151,39 @@ type Sources struct {
 	// The acquisition funnel's sources: what ads cost and how far people got.
 	MetaAds             MetaAds             `yaml:"metaads"`
 	CloudflareAnalytics CloudflareAnalytics `yaml:"cloudflareanalytics"`
+	// Active-user analytics (Firebase / GA4 Data API).
+	GoogleAnalytics GoogleAnalytics `yaml:"googleanalytics"`
+}
+
+// GoogleAnalytics configures the Google Analytics 4 (Firebase Analytics) Data
+// API source: rolling active users per app, platform, and country.
+type GoogleAnalytics struct {
+	// ServiceAccountJSONPath points at a Google service-account key file
+	// granted Viewer access to each GA4 property. When empty, falls back to
+	// sources.googleplay.service_account_json_path so one key can serve Play,
+	// Vitals and GA4.
+	ServiceAccountJSONPath string `yaml:"service_account_json_path"`
+	// Properties lists the GA4 properties to poll.
+	Properties []GoogleAnalyticsProperty `yaml:"properties"`
+	// WindowDays selects the rolling active-user metric: 7 (active7DayUsers)
+	// or 28 (active28DayUsers, the default).
+	WindowDays int `yaml:"window_days"`
+	// BackfillDays limits how far back the first run reads. Defaults to 30.
+	BackfillDays int `yaml:"backfill_days"`
+	// PollInterval overrides the default 6h polling interval.
+	PollInterval time.Duration `yaml:"poll_interval"`
+}
+
+// GoogleAnalyticsProperty maps one GA4 property to a Loot app.
+type GoogleAnalyticsProperty struct {
+	// PropertyID is the numeric GA4 property ID (e.g. "456789012"). A leading
+	// "properties/" prefix is accepted and stripped.
+	PropertyID string `yaml:"property_id"`
+	// App is the app name emitted on audience events (resolved through `apps:`).
+	App string `yaml:"app"`
+	// Platforms optionally restricts which GA4 platforms count (e.g. ["iOS"]
+	// or ["iOS", "Android"]). Empty reads all platforms on the property.
+	Platforms []string `yaml:"platforms"`
 }
 
 // MetaAds configures the Meta (Facebook and Instagram) ads source: per-ad
@@ -379,7 +412,8 @@ func (g GooglePlay) Configured() bool {
 	return g.ServiceAccountJSONPath != "" && g.Bucket != ""
 }
 
-// RevenueCat configures the webhook receiver at /hooks/revenuecat.
+// RevenueCat configures the webhook receiver at /hooks/revenuecat and,
+// optionally, REST API v2 polling for project overview active users (28d).
 type RevenueCat struct {
 	// Enabled defaults to true; set false to unmount the webhook.
 	Enabled *bool `yaml:"enabled"`
@@ -390,6 +424,21 @@ type RevenueCat struct {
 	// IncludeSandbox lets SANDBOX events mint drops and settlements. Default
 	// false: sandbox events are stored silently so the webhook visibly works.
 	IncludeSandbox bool `yaml:"include_sandbox"`
+	// APIKey is a RevenueCat v2 secret API key with charts_metrics:overview:read.
+	// Prefer APIKeyPath so the secret stays out of loot.yaml.
+	APIKey string `yaml:"api_key"`
+	// APIKeyPath is a file holding the v2 secret API key. Wins over APIKey.
+	APIKeyPath string `yaml:"api_key_path"`
+	// Projects lists the RevenueCat v2 projects to poll for active users.
+	Projects []RevenueCatProject `yaml:"projects"`
+	// PollInterval overrides the default 6h polling interval.
+	PollInterval time.Duration `yaml:"poll_interval"`
+}
+
+// RevenueCatProject maps one RevenueCat v2 project ID to a Loot app name.
+type RevenueCatProject struct {
+	ID  string `yaml:"id"`
+	App string `yaml:"app"`
 }
 
 // Flathub configures the polling source.
@@ -438,13 +487,14 @@ func Default() Config {
 			MinConversionsPer100Views: DefaultFunnelMinConversionsPer100Views,
 		}},
 		Sources: Sources{
-			Flathub:        Flathub{BackfillDays: 7},
-			AppStore:       AppStore{BackfillDays: 30},
-			GooglePlay:     GooglePlay{BackfillMonths: 2},
-			MicrosoftStore: MicrosoftStore{BackfillDays: 30},
-			Snapcraft:      Snapcraft{BackfillDays: 30},
-			GitHub:         GitHub{BackfillDays: 30},
-			PlayVitals:     PlayVitals{BackfillDays: 30},
+			Flathub:         Flathub{BackfillDays: 7},
+			AppStore:        AppStore{BackfillDays: 30},
+			GooglePlay:      GooglePlay{BackfillMonths: 2},
+			MicrosoftStore:  MicrosoftStore{BackfillDays: 30},
+			Snapcraft:       Snapcraft{BackfillDays: 30},
+			GitHub:          GitHub{BackfillDays: 30},
+			PlayVitals:      PlayVitals{BackfillDays: 30},
+			GoogleAnalytics: GoogleAnalytics{WindowDays: 28, BackfillDays: 30},
 		},
 	}
 }
@@ -532,6 +582,22 @@ func Load(path string, explicit bool) (Config, error) {
 			return cfg, fmt.Errorf("sources.cloudflareanalytics.api_token_path %s: %w", p, err)
 		}
 	}
+	if p := cfg.Sources.RevenueCat.APIKeyPath; p != "" {
+		if _, err := os.Stat(p); err != nil {
+			return cfg, fmt.Errorf("sources.revenuecat.api_key_path %s: %w", p, err)
+		}
+	}
+	if p := cfg.Sources.GoogleAnalytics.ServiceAccountJSONPath; p != "" {
+		if _, err := os.Stat(p); err != nil {
+			return cfg, fmt.Errorf("sources.googleanalytics.service_account_json_path %s: %w", p, err)
+		}
+	}
+	if cfg.Sources.GoogleAnalytics.WindowDays != 7 && cfg.Sources.GoogleAnalytics.WindowDays != 28 {
+		cfg.Sources.GoogleAnalytics.WindowDays = 28
+	}
+	if cfg.Sources.GoogleAnalytics.BackfillDays <= 0 {
+		cfg.Sources.GoogleAnalytics.BackfillDays = 30
+	}
 	if err := cfg.Funnel.normalize(); err != nil {
 		return cfg, err
 	}
@@ -577,9 +643,18 @@ func applyEnv(cfg *Config) {
 	if v := os.Getenv("LOOT_REVENUECAT_SECRET"); v != "" {
 		cfg.Sources.RevenueCat.Secret = v
 	}
+	if v := os.Getenv("LOOT_REVENUECAT_API_KEY"); v != "" {
+		cfg.Sources.RevenueCat.APIKey = v
+	}
+	if v := os.Getenv("LOOT_REVENUECAT_API_KEY_PATH"); v != "" {
+		cfg.Sources.RevenueCat.APIKeyPath = v
+	}
 	if v := os.Getenv("LOOT_REVENUECAT_ENABLED"); v != "" {
 		b := truthy(v)
 		cfg.Sources.RevenueCat.Enabled = &b
+	}
+	if v := os.Getenv("LOOT_GOOGLEANALYTICS_SERVICE_ACCOUNT_JSON_PATH"); v != "" {
+		cfg.Sources.GoogleAnalytics.ServiceAccountJSONPath = v
 	}
 	if v := os.Getenv("LOOT_FLATHUB_APPS"); v != "" {
 		cfg.Sources.Flathub.Apps = splitList(v)
@@ -847,6 +922,30 @@ func (c Config) PlayVitalsConfigured() bool {
 	return c.Sources.PlayVitals.Enabled &&
 		c.Sources.GooglePlay.ServiceAccountJSONPath != "" &&
 		len(c.PlayVitalsPackages()) > 0
+}
+
+// GoogleAnalyticsServiceAccountPath returns the key path GA4 should use: its
+// own when set, otherwise Google Play's so one service account can serve both.
+func (c Config) GoogleAnalyticsServiceAccountPath() string {
+	if p := strings.TrimSpace(c.Sources.GoogleAnalytics.ServiceAccountJSONPath); p != "" {
+		return p
+	}
+	return strings.TrimSpace(c.Sources.GooglePlay.ServiceAccountJSONPath)
+}
+
+// GoogleAnalyticsConfigured reports whether the GA4 source has at least one
+// property and a service-account key file to authenticate with.
+func (c Config) GoogleAnalyticsConfigured() bool {
+	return len(c.Sources.GoogleAnalytics.Properties) > 0 &&
+		c.GoogleAnalyticsServiceAccountPath() != ""
+}
+
+// RevenueCatPollingConfigured reports whether RevenueCat v2 overview polling
+// is configured alongside (or instead of) the webhook.
+func (c Config) RevenueCatPollingConfigured() bool {
+	rc := c.Sources.RevenueCat
+	return (strings.TrimSpace(rc.APIKey) != "" || strings.TrimSpace(rc.APIKeyPath) != "") &&
+		len(rc.Projects) > 0
 }
 
 // ChestAutoOpenAfterHours returns the auto-open delay in hours, or 0 for never.

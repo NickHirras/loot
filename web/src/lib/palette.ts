@@ -23,6 +23,7 @@ export const SERIES_COLORS = [
 /** The sources Loot ships with get a stable slot; anything else hashes in. */
 const ASSIGNED: Record<string, number> = {
   appstore: 0,
+  googleanalytics: 0,
   googleplay: 1,
   revenuecat: 2,
   flathub: 3,

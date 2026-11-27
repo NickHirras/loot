@@ -45,6 +45,10 @@ type AudienceSource struct {
 	// lifetime installs. Zero for stores without lifetime installs (Snapcraft)
 	// and for BasisArrivals rows whose Count is already all-time.
 	AllTime int `json:"all_time,omitempty"`
+	// Superseded is true when a cross-platform active-user source (such as
+	// RevenueCat or unfiltered Firebase / GA4) already includes this store's
+	// users, so this row is shown for reference but not added into Current.
+	Superseded bool `json:"superseded,omitempty"`
 	// AsOf is the business day the snapshot describes (YYYY-MM-DD). Empty for
 	// BasisArrivals, which is not a reading of any one day.
 	AsOf string `json:"as_of,omitempty"`
@@ -97,6 +101,10 @@ type audienceReading struct {
 	Source, App, Product, Country string
 	Quantity                      int
 	Day                           string
+	// CoversAndroid is true for cross-platform active-user sources (RevenueCat
+	// overview, or Firebase / GA4 without an iOS-only filter) whose count
+	// already includes Android users, superseding Google Play in totals.
+	CoversAndroid bool
 }
 
 // audienceRecencyDays is how stale an audience snapshot may be and still be
@@ -128,7 +136,8 @@ func (s *Store) audienceLatest(ctx context.Context, today string) ([]audienceRea
 	args = append(args, outerArgs...)
 
 	rows, err := s.q.QueryContext(ctx, `
-        SELECT e.source, e.app, e.product, e.country, e.quantity, e.day
+        SELECT e.source, e.app, e.product, e.country, e.quantity, e.day,
+               COALESCE(json_extract(e.payload, '$.covers_android'), -1)
         FROM events e
         JOIN (SELECT x.source AS source, x.app AS app, (x.country <> '') AS placed, MAX(x.day) AS day
               FROM events x
@@ -146,9 +155,20 @@ func (s *Store) audienceLatest(ctx context.Context, today string) ([]audienceRea
 
 	var out []audienceReading
 	for rows.Next() {
-		var r audienceReading
-		if err := rows.Scan(&r.Source, &r.App, &r.Product, &r.Country, &r.Quantity, &r.Day); err != nil {
+		var (
+			r         audienceReading
+			rawCovers int
+		)
+		if err := rows.Scan(&r.Source, &r.App, &r.Product, &r.Country, &r.Quantity, &r.Day, &rawCovers); err != nil {
 			return nil, fmt.Errorf("scan audience: %w", err)
+		}
+		switch r.Source {
+		case "revenuecat":
+			r.CoversAndroid = true
+		case "googleanalytics":
+			r.CoversAndroid = rawCovers != 0
+		default:
+			r.CoversAndroid = rawCovers == 1
 		}
 		out = append(out, r)
 	}
@@ -163,10 +183,14 @@ type audienceApp struct {
 	Source, Product string
 	// Total is the store's own total; HasTotal is false when only country rows
 	// have arrived so far, in which case the placed sum stands in for it.
-	Total    int
-	HasTotal bool
-	Placed   int
-	AsOf     string
+	Total         int
+	HasTotal      bool
+	Placed        int
+	AsOf          string
+	CoversAndroid bool
+	// Superseded is true for a googleplay snapshot when the same product also
+	// has a cross-platform active-user reading covering Android.
+	Superseded bool
 }
 
 // Count is the audience this app has on this source.
@@ -188,8 +212,22 @@ func (a audienceApp) Unplaced() int {
 }
 
 // foldAudience turns the newest readings into per-country populations and one
-// summary per (source, app).
+// summary per (source, app). When a product has a cross-platform active-user
+// reading covering Android (e.g. unfiltered GA4 or RevenueCat), Google Play's
+// snapshot for that product is marked Superseded so Android users are not
+// double-counted on the globe or in the active total.
 func foldAudience(readings []audienceReading) (byCountry map[string]int, apps []audienceApp) {
+	coversAndroidByProduct := map[string]bool{}
+	hasCountryCoversAndroid := map[string]bool{}
+	for _, r := range readings {
+		if r.Product != "" && r.CoversAndroid && r.Quantity > 0 {
+			coversAndroidByProduct[r.Product] = true
+			if r.Country != "" {
+				hasCountryCoversAndroid[r.Product] = true
+			}
+		}
+	}
+
 	byCountry = map[string]int{}
 	index := map[string]int{}
 	for _, r := range readings {
@@ -198,7 +236,15 @@ func foldAudience(readings []audienceReading) (byCountry map[string]int, apps []
 		if !ok {
 			i = len(apps)
 			index[key] = i
-			apps = append(apps, audienceApp{Source: r.Source, Product: r.Product})
+			apps = append(apps, audienceApp{
+				Source:        r.Source,
+				Product:       r.Product,
+				CoversAndroid: r.CoversAndroid,
+				Superseded:    r.Source == "googleplay" && coversAndroidByProduct[r.Product],
+			})
+		}
+		if r.CoversAndroid {
+			apps[i].CoversAndroid = true
 		}
 		if r.Country == "" {
 			apps[i].Total, apps[i].HasTotal = r.Quantity, true
@@ -209,7 +255,12 @@ func foldAudience(readings []audienceReading) (byCountry map[string]int, apps []
 			continue
 		}
 		apps[i].Placed += r.Quantity
-		byCountry[r.Country] += r.Quantity
+		// Only skip Google Play's per-country rows when the superseding source
+		// actually supplied per-country rows (e.g. GA4); RevenueCat overview
+		// has no country rows, so Play's placed countries remain useful on the globe.
+		if !(r.Source == "googleplay" && hasCountryCoversAndroid[r.Product]) {
+			byCountry[r.Country] += r.Quantity
+		}
 		if apps[i].AsOf == "" {
 			apps[i].AsOf = r.Day
 		}
@@ -451,7 +502,7 @@ func (s *Store) AppScorecards(ctx context.Context, today string) ([]AppScorecard
 
 	activeByProduct := map[string]int{}
 	for _, a := range apps {
-		if a.Product != "" && a.Count() > 0 {
+		if a.Product != "" && a.Count() > 0 && !a.Superseded {
 			activeByProduct[a.Product] += a.Count()
 		}
 	}
@@ -549,14 +600,18 @@ func (s *Store) audienceFrom(ctx context.Context, apps []audienceApp) ([]Product
 		row, ok := current[k]
 		if !ok {
 			row = &AudienceSource{
-				Source:  a.Source,
-				Basis:   core.AudienceBasisFor(a.Source),
-				AllTime: installs[[2]string{a.Source, a.Product}],
+				Source:     a.Source,
+				Basis:      core.AudienceBasisFor(a.Source),
+				AllTime:    installs[[2]string{a.Source, a.Product}],
+				Superseded: a.Superseded,
 			}
 			current[k] = row
 			order = append(order, k)
 		}
 		row.Count += a.Count()
+		if a.Superseded {
+			row.Superseded = true
+		}
 		if a.AsOf > row.AsOf {
 			row.AsOf = a.AsOf
 		}
@@ -572,7 +627,9 @@ func (s *Store) audienceFrom(ctx context.Context, apps []audienceApp) ([]Product
 
 	for _, k := range order {
 		p := entry(k.product)
-		p.Current += current[k].Count
+		if !current[k].Superseded {
+			p.Current += current[k].Count
+		}
 		p.Sources = append(p.Sources, *current[k])
 	}
 	for k, n := range arrivals {
@@ -607,10 +664,20 @@ func (s *Store) audienceFrom(ctx context.Context, apps []audienceApp) ([]Product
 	for i := range out {
 		list := out[i].Sources
 		sort.Slice(list, func(a, b int) bool {
-			// Current readings before arrivals, then biggest first.
-			ca, cb := list[a].Basis != core.BasisArrivals, list[b].Basis != core.BasisArrivals
-			if ca != cb {
-				return ca
+			// Active contributing readings first, then superseded active rows,
+			// then all-time arrivals, then biggest first.
+			rank := func(s AudienceSource) int {
+				if s.Basis == core.BasisArrivals {
+					return 2
+				}
+				if s.Superseded {
+					return 1
+				}
+				return 0
+			}
+			ra, rb := rank(list[a]), rank(list[b])
+			if ra != rb {
+				return ra < rb
 			}
 			if list[a].Count != list[b].Count {
 				return list[a].Count > list[b].Count

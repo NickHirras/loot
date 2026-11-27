@@ -311,15 +311,19 @@
                             product: app.product,
                             source: row.source,
                           }}
-                          <li>
+                          <li class:all-time={row.superseded}>
                             <button
                               type="button"
                               class="drill-btn store-btn"
                               class:selected={isSelected(storeTarget)}
                               aria-pressed={isSelected(storeTarget)}
-                              title={row.as_of
-                                ? `${m.hearth_audience_as_of({ date: row.as_of })} · ${m.hearth_trend_inspect({ name: `${app.product} ${sourceName(row.source)}` })}`
-                                : m.hearth_trend_inspect({ name: `${app.product} ${sourceName(row.source)}` })}
+                              title={[
+                                row.as_of ? m.hearth_audience_as_of({ date: row.as_of }) : '',
+                                row.superseded ? m.hearth_audience_included_in_active() : '',
+                                m.hearth_trend_inspect({ name: `${app.product} ${sourceName(row.source)}` }),
+                              ]
+                                .filter(Boolean)
+                                .join(' · ')}
                               onclick={() => toggleMetric(storeTarget)}
                             >
                               <span class="store-main">

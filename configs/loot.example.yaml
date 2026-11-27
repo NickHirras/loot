@@ -94,6 +94,13 @@ sources:
     # SANDBOX events (TestFlight, Play test tracks, RevenueCat test pings) are
     # stored silently and never found settlements unless this is true.
     include_sandbox: false
+    # Optional: poll RevenueCat REST API v2 /metrics/overview for 28-day active
+    # users per project (needs a v2 secret key with charts_metrics:overview:read).
+    # api_key_path: /etc/loot/revenuecat-api-key.txt
+    # projects:
+    #   - id: proj1234abcd
+    #     app: "My App"
+    # poll_interval: 6h
 
 
   flathub:
@@ -186,6 +193,23 @@ sources:
   # **boss**: a named monster with a health bar that drains as your fix rolls
   # out, and pays an epic drop when it dies. See docs/bosses.md and
   # docs/sources/crashes.md.
+
+  googleanalytics:
+    # Google Analytics 4 / Firebase Analytics Data API: rolling 28-day (or 7-day)
+    # active users per app, platform and country.
+    # Reuses sources.googleplay.service_account_json_path when left empty; grant
+    # that service account email Viewer access to each GA4 property and enable
+    # analyticsdata.googleapis.com in the service account's Cloud project.
+    service_account_json_path: ""
+    window_days: 28
+    backfill_days: 30
+    poll_interval: 6h
+    properties: []
+    # - property_id: "456789012"
+    #   app: "Macro Trainer"
+    #   # Optional: restrict to specific platforms (e.g. ["iOS"] to complement
+    #   # Google Play on Android, or omit / ["iOS", "Android"] for combined).
+    #   platforms: ["iOS"]
 
   playvitals:
     # Android vitals: daily crash and ANR counts per app version, from the

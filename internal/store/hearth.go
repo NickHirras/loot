@@ -399,6 +399,12 @@ func embarkAudience(fleet []HearthVessel, apps []audienceApp) []HearthVessel {
 		index[v.Source] = i
 	}
 	for _, a := range apps {
+		// RevenueCat overview snapshots carry no country breakdown and mirror
+		// mobile store users who are already placed on the globe; superseded
+		// Google Play snapshots are already covered by GA4.
+		if a.Source == "revenuecat" || a.Superseded {
+			continue
+		}
 		n := a.Unplaced()
 		if n <= 0 {
 			continue

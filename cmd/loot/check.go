@@ -17,6 +17,7 @@ import (
 	"github.com/nickhirras/loot/internal/sources/crash"
 	"github.com/nickhirras/loot/internal/sources/flathub"
 	"github.com/nickhirras/loot/internal/sources/github"
+	"github.com/nickhirras/loot/internal/sources/googleanalytics"
 	"github.com/nickhirras/loot/internal/sources/googleplay"
 	"github.com/nickhirras/loot/internal/sources/metaads"
 	"github.com/nickhirras/loot/internal/sources/microsoftstore"
@@ -62,12 +63,17 @@ func runCheck(args []string) error {
 	}
 	var candidates []candidate
 
-	if cfg.RevenueCatEnabled() {
-		candidates = append(candidates, candidate{
-			name:   revenuecat.Name,
-			source: revenuecat.New(cfg.Sources.RevenueCat.Secret, quiet),
-			note:   "webhook at POST /hooks/revenuecat",
-		})
+	if cfg.RevenueCatEnabled() || cfg.RevenueCatPollingConfigured() {
+		src, err := newRevenueCat(cfg, quiet)
+		note := "webhook at POST /hooks/revenuecat"
+		if err == nil && len(src.Projects) > 0 {
+			note = fmt.Sprintf("webhook + %d project(s)", len(src.Projects))
+		}
+		c := candidate{name: revenuecat.Name, err: err, note: note}
+		if err == nil {
+			c.source = src
+		}
+		candidates = append(candidates, c)
 	}
 	if len(cfg.Sources.Flathub.Apps) > 0 {
 		candidates = append(candidates, candidate{
@@ -112,6 +118,15 @@ func runCheck(args []string) error {
 			cfg.Sources.GooglePlay.ServiceAccountJSONPath, cfg.PlayVitalsPackages(), quiet)
 		candidates = append(candidates, candidate{name: playvitals.Name, source: src, err: err,
 			note: fmt.Sprintf("%d package(s)", len(cfg.PlayVitalsPackages()))})
+	}
+	if cfg.GoogleAnalyticsConfigured() {
+		src, err := googleanalytics.New(cfg.Sources.GoogleAnalytics, cfg.GoogleAnalyticsServiceAccountPath(), quiet)
+		c := candidate{name: googleanalytics.Name, err: err,
+			note: fmt.Sprintf("%d property/properties", len(cfg.Sources.GoogleAnalytics.Properties))}
+		if err == nil {
+			c.source = src
+		}
+		candidates = append(candidates, c)
 	}
 	if cfg.Sources.MetaAds.Configured() {
 		src, err := newMetaAds(cfg.Sources.MetaAds, quiet)

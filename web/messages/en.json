@@ -620,12 +620,14 @@
   "hearth_audience": "Audience",
   "hearth_audience_active_devices": "active devices",
   "hearth_audience_active_total": "{count} active",
+  "hearth_audience_active_users": "28d active users",
   "hearth_audience_all_time_group": "All-time",
   "hearth_audience_all_time_sub": "{count} all-time",
   "hearth_audience_all_time_total": "{count} all-time",
   "hearth_audience_arrivals": "all-time",
   "hearth_audience_as_of": "As of {date}",
-  "hearth_audience_fine": "Active counts current devices (Snapcraft weekly, Google Play active). All-time counts lifetime store acquisitions separately.",
+  "hearth_audience_fine": "Active counts current users/devices (Firebase/GA4, RevenueCat, Snapcraft weekly, Google Play active). All-time counts lifetime store acquisitions separately.",
+  "hearth_audience_included_in_active": "Included in cross-platform active total",
   "hearth_audience_score_downloads": [
     {
       "declarations": [
@@ -1341,7 +1343,7 @@
   "vault_scorecard_active": "Active",
   "vault_scorecard_app": "App",
   "vault_scorecard_downloads": "Downloads",
-  "vault_scorecard_fine": "Active counts current devices where reported (Snapcraft weekly, Google Play active). Downloads counts lifetime store installs and app acquisitions; Snapcraft has no lifetime counter and Microsoft Store does not report refunds.",
+  "vault_scorecard_fine": "Active counts current users/devices where reported (Firebase/GA4, RevenueCat, Snapcraft weekly, Google Play active). Downloads counts lifetime store installs and app acquisitions; Snapcraft has no lifetime counter and Microsoft Store does not report refunds.",
   "vault_scorecard_hint": "active devices now · lifetime store totals",
   "vault_scorecard_purchases": "Purchases",
   "vault_scorecard_refunds": "Refunds",
@@ -1363,6 +1365,7 @@
   "vessel_flathub": "The Flathub Freighter",
   "vessel_generic": "The {source} Vessel",
   "vessel_github": "The Octocat Icebreaker",
+  "vessel_googleanalytics": "The Analytics Schooner",
   "vessel_googleplay": "The Play Trawler",
   "vessel_microsoftstore": "The Redmond Barge",
   "vessel_revenuecat": "The RevenueCat Cutter",

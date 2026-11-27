@@ -38,6 +38,8 @@ const ANCHORAGES: Record<string, Anchorage> = {
   appstore: [-152, 22],
   // The Indian Ocean, west of Sumatra.
   googleplay: [75, -12],
+  // Eastern Pacific, west of Mountain View.
+  googleanalytics: [-128, 34],
   // The South Atlantic, empty water between Brazil and Africa.
   microsoftstore: [-20, -25],
   // The Caribbean, where a cat would rather be.
@@ -69,6 +71,7 @@ const RIGS = new Set(['snapcraft'])
 const SOURCE_NAMES: Record<string, string> = {
   appstore: 'App Store',
   googleplay: 'Google Play',
+  googleanalytics: 'Firebase / GA4',
   microsoftstore: 'Microsoft Store',
   snapcraft: 'Snapcraft',
   flathub: 'Flathub',
@@ -94,6 +97,7 @@ const VESSEL_NAMES: Record<string, () => string> = {
   snapcraft: () => m.vessel_snapcraft(),
   appstore: () => m.vessel_appstore(),
   googleplay: () => m.vessel_googleplay(),
+  googleanalytics: () => m.vessel_googleanalytics(),
   microsoftstore: () => m.vessel_microsoftstore(),
   revenuecat: () => m.vessel_revenuecat(),
   github: () => m.vessel_github(),
