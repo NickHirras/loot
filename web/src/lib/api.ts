@@ -26,6 +26,9 @@ import type {
   Recap,
   RecapPeriod,
   RecapResponse,
+  ReviewsRange,
+  ReviewsSummary,
+  ReviewStarFilter,
   RoadRange,
   SourceInfo,
   Stats,
@@ -158,6 +161,29 @@ export async function fetchApps(): Promise<AppsResponse> {
 export function fetchVaultSummary(range: VaultRange): Promise<VaultSummary> {
   const params = withScope(new URLSearchParams({ range }))
   return getJSON<VaultSummary>(`/api/vault/summary?${params}`)
+}
+
+export async function fetchReviews(
+  range: ReviewsRange,
+  source = '',
+  stars: ReviewStarFilter = 'all',
+): Promise<ReviewsSummary> {
+  const params = withScope(new URLSearchParams({ range }))
+  if (source) params.set('source', source)
+  if (stars !== 'all') params.set('stars', stars)
+  const data = await getJSON<
+    Omit<ReviewsSummary, 'by_app' | 'trend' | 'reviews'> & {
+      by_app: ReviewsSummary['by_app'] | null
+      trend: ReviewsSummary['trend'] | null
+      reviews: ReviewsSummary['reviews'] | null
+    }
+  >(`/api/reviews?${params}`)
+  return {
+    ...data,
+    by_app: data.by_app ?? [],
+    trend: data.trend ?? [],
+    reviews: data.reviews ?? [],
+  }
 }
 
 export async function fetchChests(): Promise<ChestSummary[]> {

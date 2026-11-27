@@ -11,6 +11,7 @@ export const TABS = [
   { id: 'vault', hash: '#/vault' },
   { id: 'road', hash: '#/road' },
   { id: 'hearth', hash: '#/hearth' },
+  { id: 'reviews', hash: '#/reviews' },
   { id: 'quests', hash: '#/quests' },
   { id: 'codex', hash: '#/codex' },
 ] as const
@@ -39,7 +40,9 @@ function parse(hash: string): Route {
         ? 'road'
         : path === 'hearth'
         ? 'hearth'
-        : path === 'quests'
+        : path === 'reviews'
+          ? 'reviews'
+          : path === 'quests'
           ? 'quests'
           : path === 'codex'
             ? 'codex'

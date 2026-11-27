@@ -224,6 +224,9 @@ func (s *Source) Poll(ctx context.Context, raw []byte) ([]core.Event, []byte, er
 		if err != nil && pollError == nil {
 			pollError = err
 		}
+
+		rrEvents, _ := s.collectRatingsAndReviews(ctx, a, from, settled, observed)
+		events = append(events, rrEvents...)
 	}
 
 	st.Seeded = true

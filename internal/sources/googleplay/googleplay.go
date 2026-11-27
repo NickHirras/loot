@@ -156,6 +156,10 @@ type state struct {
 	// their audience snapshots. Until it is set the md5 skip is ignored, or a
 	// month that has stopped changing would never give its snapshots up.
 	AudienceSeeded bool `json:"audience_seeded,omitempty"`
+	// RatingsFiles and ReviewsFiles are md5 skip caches for stats/ratings/ and
+	// reviews/ monthly CSVs.
+	RatingsFiles map[string]string `json:"ratings_files,omitempty"`
+	ReviewsFiles map[string]string `json:"reviews_files,omitempty"`
 }
 
 func decodeState(raw []byte) state {
@@ -182,6 +186,12 @@ func decodeState(raw []byte) state {
 	}
 	if st.AudienceCursor == nil {
 		st.AudienceCursor = map[string]string{}
+	}
+	if st.RatingsFiles == nil {
+		st.RatingsFiles = map[string]string{}
+	}
+	if st.ReviewsFiles == nil {
+		st.ReviewsFiles = map[string]string{}
 	}
 	migrateInstallsCursor(&st)
 	return st
@@ -238,6 +248,18 @@ func (s *Source) Poll(ctx context.Context, raw []byte) ([]core.Event, []byte, er
 		if firstErr == nil {
 			firstErr = err
 		}
+	}
+
+	ratings, err := s.pollRatings(ctx, &st, months, now)
+	events = append(events, ratings...)
+	if err != nil {
+		s.Log.Warn("googleplay: rating statistics failed", "error", err)
+	}
+
+	reviews, err := s.pollReviews(ctx, &st, months, now)
+	events = append(events, reviews...)
+	if err != nil {
+		s.Log.Warn("googleplay: reviews failed", "error", err)
 	}
 
 	out, err := json.Marshal(st)

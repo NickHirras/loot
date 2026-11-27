@@ -268,6 +268,7 @@ func IsWarning(err error) bool {
 var sourceDisplayNames = map[string]string{
 	"appstore":            "App Store",
 	"googleplay":          "Google Play",
+	"googleanalytics":     "Firebase / GA4",
 	"microsoftstore":      "Microsoft Store",
 	"snapcraft":           "Snapcraft",
 	"flathub":             "Flathub",

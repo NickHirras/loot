@@ -131,6 +131,12 @@ sources:
     # Sales reports are available for roughly a year; 30 gives the vault some
     # history without a flood. Override once with `loot serve --since`.
     backfill_days: 30
+    # Optional: App Manager (or Admin) API key for customer reviews via
+    # GET /v1/apps/{id}/customerReviews and daily iTunes rating snapshots.
+    # reviews_issuer_id defaults to issuer_id when omitted.
+    # reviews_key_id: ""
+    # reviews_issuer_id: ""
+    # reviews_private_key_path: ""
 
   googleplay:
     # Google Play reports. Play has no sales API: it writes monthly CSV reports

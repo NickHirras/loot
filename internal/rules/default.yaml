@@ -236,6 +236,48 @@ rules:
       subtitle: "{{.App}} · audience milestone"
       xp: 150
 
+  # --------------------------------------------------------- Ratings & Reviews
+  # Customer reviews from App Store, Google Play and Microsoft Store.
+  # Quantity is the star rating (1..5), so rules are ordered highest first.
+  - name: review-five-star
+    match:
+      kind: review
+      min_quantity: 5
+    then:
+      rarity: rare
+      title: "5★ review on {{.SourceName}}"
+      subtitle: "{{if .Payload.title}}“{{.Payload.title}}”{{if .App}} · {{.App}}{{end}}{{else}}{{.App}}{{end}}"
+      xp: 80
+
+  - name: review-four-star
+    match:
+      kind: review
+      min_quantity: 4
+    then:
+      rarity: uncommon
+      title: "4★ review on {{.SourceName}}"
+      subtitle: "{{if .Payload.title}}“{{.Payload.title}}”{{if .App}} · {{.App}}{{end}}{{else}}{{.App}}{{end}}"
+      xp: 35
+
+  - name: review-three-star
+    match:
+      kind: review
+      min_quantity: 3
+    then:
+      rarity: common
+      title: "3★ review on {{.SourceName}}"
+      subtitle: "{{if .Payload.title}}“{{.Payload.title}}”{{if .App}} · {{.App}}{{end}}{{else}}{{.App}}{{end}}"
+      xp: 15
+
+  - name: review-low-star
+    match:
+      kind: review
+    then:
+      rarity: cursed
+      title: "{{.Quantity}}★ review on {{.SourceName}}"
+      subtitle: "{{if .Payload.title}}“{{.Payload.title}}”{{if .App}} · {{.App}}{{end}}{{else}}{{.App}}{{end}}"
+      xp: 5
+
   # -------------------------------------------------------------- Settlements
   # The pipeline synthesizes one of these the first time an event carries a
   # country Loot has never seen, including from silent ledger rows.

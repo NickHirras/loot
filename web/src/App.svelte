@@ -6,6 +6,7 @@
   import Header from './lib/Header.svelte'
   import HearthPage from './lib/HearthPage.svelte'
   import QuestsPage from './lib/QuestsPage.svelte'
+  import ReviewsPage from './lib/ReviewsPage.svelte'
   import RoadPage from './lib/RoadPage.svelte'
   import VaultPage from './lib/VaultPage.svelte'
   import { router } from './lib/route.svelte'
@@ -73,6 +74,8 @@
 
 {#if router.tab === 'hearth'}
   <HearthPage />
+{:else if router.tab === 'reviews'}
+  <ReviewsPage />
 {:else if router.tab === 'vault'}
   <VaultPage />
 {:else if router.tab === 'road'}

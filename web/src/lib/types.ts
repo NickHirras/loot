@@ -632,6 +632,71 @@ export interface TrendPoint {
   by_series?: Record<string, number>
 }
 
+/** The ranges GET /api/reviews accepts. */
+export const REVIEWS_RANGES = ['30d', '90d', '1y', 'all'] as const
+
+export type ReviewsRange = (typeof REVIEWS_RANGES)[number]
+
+export type ReviewStarFilter = 'all' | '5' | '4' | '3' | 'low'
+
+export interface ReviewItem {
+  id: string
+  source: string
+  product: string
+  country?: string
+  rating: number
+  title?: string
+  body?: string
+  author?: string
+  app_version?: string
+  device?: string
+  language?: string
+  reply_text?: string
+  reply_date?: string
+  url?: string
+  day: string
+  occurred_at: string
+}
+
+export interface StoreRatingSummary {
+  source: string
+  average_rating: number
+  rating_count: number
+  review_count: number
+  as_of?: string
+}
+
+export interface AppRatingSummary {
+  product: string
+  average_rating: number
+  rating_count: number
+  review_count: number
+  distribution: [number, number, number, number, number]
+  stores: StoreRatingSummary[]
+}
+
+export interface RatingTrendPoint {
+  day: string
+  average_rating: number | null
+  review_count: number
+  rating_count: number
+}
+
+export interface ReviewsSummary {
+  range: string
+  from: string
+  to: string
+  average_rating: number
+  total_ratings: number
+  total_reviews: number
+  low_reviews: number
+  five_star_share: number
+  distribution: [number, number, number, number, number]
+  by_app: AppRatingSummary[]
+  trend: RatingTrendPoint[]
+  reviews: ReviewItem[]
+}
+
 /** The whole of GET /api/hearth/trend. */
 export interface HearthTrend {
   metric: TrendMetric

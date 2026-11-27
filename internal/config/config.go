@@ -385,6 +385,21 @@ type AppStore struct {
 	Apps []string `yaml:"apps"`
 	// BackfillDays limits how far back the first run reads. Defaults to 30.
 	BackfillDays int `yaml:"backfill_days"`
+	// Optional App Manager / Admin API key for reading customerReviews and
+	// listing apps via GET /v1/apps. ReviewsIssuerID defaults to IssuerID.
+	ReviewsKeyID          string `yaml:"reviews_key_id"`
+	ReviewsIssuerID       string `yaml:"reviews_issuer_id"`
+	ReviewsPrivateKeyPath string `yaml:"reviews_private_key_path"`
+}
+
+// ReviewsConfigured reports whether an App Manager / Admin key is configured
+// for App Store Connect customer reviews.
+func (a AppStore) ReviewsConfigured() bool {
+	issuer := a.ReviewsIssuerID
+	if issuer == "" {
+		issuer = a.IssuerID
+	}
+	return a.ReviewsKeyID != "" && issuer != "" && a.ReviewsPrivateKeyPath != ""
 }
 
 // Configured reports whether every field the source cannot run without is set.
@@ -565,6 +580,11 @@ func Load(path string, explicit bool) (Config, error) {
 	if cfg.Sources.AppStore.PrivateKeyPath != "" {
 		if _, err := os.Stat(cfg.Sources.AppStore.PrivateKeyPath); err != nil {
 			return cfg, fmt.Errorf("sources.appstore.private_key_path %s: %w", cfg.Sources.AppStore.PrivateKeyPath, err)
+		}
+	}
+	if cfg.Sources.AppStore.ReviewsPrivateKeyPath != "" {
+		if _, err := os.Stat(cfg.Sources.AppStore.ReviewsPrivateKeyPath); err != nil {
+			return cfg, fmt.Errorf("sources.appstore.reviews_private_key_path %s: %w", cfg.Sources.AppStore.ReviewsPrivateKeyPath, err)
 		}
 	}
 	if cfg.Sources.GooglePlay.ServiceAccountJSONPath != "" {
@@ -750,6 +770,15 @@ func applyEnv(cfg *Config) {
 		if n, err := strconv.Atoi(v); err == nil {
 			cfg.Sources.AppStore.BackfillDays = n
 		}
+	}
+	if v := os.Getenv("LOOT_APPSTORE_REVIEWS_KEY_ID"); v != "" {
+		cfg.Sources.AppStore.ReviewsKeyID = v
+	}
+	if v := os.Getenv("LOOT_APPSTORE_REVIEWS_ISSUER_ID"); v != "" {
+		cfg.Sources.AppStore.ReviewsIssuerID = v
+	}
+	if v := os.Getenv("LOOT_APPSTORE_REVIEWS_PRIVATE_KEY_PATH"); v != "" {
+		cfg.Sources.AppStore.ReviewsPrivateKeyPath = v
 	}
 	if v := os.Getenv("LOOT_GOOGLEPLAY_SERVICE_ACCOUNT_JSON_PATH"); v != "" {
 		cfg.Sources.GooglePlay.ServiceAccountJSONPath = v

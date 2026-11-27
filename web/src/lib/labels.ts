@@ -163,6 +163,8 @@ export function tabLabel(tab: Tab | string): string {
       return m.tab_road()
     case 'hearth':
       return m.tab_hearth()
+    case 'reviews':
+      return m.tab_reviews()
     case 'quests':
       return m.tab_quests()
     case 'codex':

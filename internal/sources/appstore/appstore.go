@@ -105,6 +105,7 @@ type state struct {
 	SubsUnavailableStreak int                   `json:"subs_unavailable_streak,omitempty"`
 	SubsDisabledSince     string                `json:"subs_disabled_since,omitempty"`
 	SubsDay               string                `json:"subs_day,omitempty"`
+	RatingDay             string                `json:"rating_day,omitempty"`
 	Seeded                bool                  `json:"seeded"`
 }
 
@@ -129,13 +130,15 @@ type Source struct {
 	// (YYYY-MM-DD), overriding BackfillDays. Set by `loot serve --since`.
 	Since string
 
-	BaseURL string
-	Client  *http.Client
-	Log     *slog.Logger
+	BaseURL   string
+	LookupURL string
+	Client    *http.Client
+	Log       *slog.Logger
 	// Now is swappable for tests.
 	Now func() time.Time
 
-	tokens *tokenCache
+	tokens       *tokenCache
+	reviewTokens *tokenCache
 }
 
 // New returns an App Store Connect source for cfg. The caller checks
@@ -153,6 +156,19 @@ func New(cfg config.AppStore, log *slog.Logger) (*Source, error) {
 		return nil, err
 	}
 
+	var revTokens *tokenCache
+	if cfg.ReviewsConfigured() {
+		revKey, err := LoadPrivateKey(cfg.ReviewsPrivateKeyPath)
+		if err != nil {
+			return nil, fmt.Errorf("appstore reviews key: %w", err)
+		}
+		issuer := cfg.ReviewsIssuerID
+		if issuer == "" {
+			issuer = cfg.IssuerID
+		}
+		revTokens = &tokenCache{keyID: cfg.ReviewsKeyID, issuerID: issuer, key: revKey}
+	}
+
 	backfill := cfg.BackfillDays
 	if backfill <= 0 {
 		backfill = defaultBackfillDays
@@ -168,10 +184,12 @@ func New(cfg config.AppStore, log *slog.Logger) (*Source, error) {
 		Apps:         cfg.Apps,
 		BackfillDays: backfill,
 		BaseURL:      DefaultBaseURL,
+		LookupURL:    DefaultLookupURL,
 		Client:       &http.Client{Timeout: 60 * time.Second},
 		Log:          log,
 		Now:          time.Now,
 		tokens:       &tokenCache{keyID: cfg.KeyID, issuerID: cfg.IssuerID, key: key},
+		reviewTokens: revTokens,
 	}, nil
 }
 
@@ -217,7 +235,7 @@ func (s *Source) Check(ctx context.Context) error {
 		_, err := s.fetchReport(ctx, salesSummaryDaily, day)
 		switch {
 		case err == nil, errors.Is(err, errNoSales):
-			return nil
+			return s.checkReviews(ctx)
 		case errors.Is(err, errNotReady):
 			lastErr = nil
 		case errors.Is(err, errCredentials):
@@ -231,7 +249,7 @@ func (s *Source) Check(ctx context.Context) error {
 	}
 	// Both days answered "no report". Credentials were accepted, so this is a
 	// working configuration that has not sold anything yet.
-	return nil
+	return s.checkReviews(ctx)
 }
 
 // Poll fetches every report day between the cursor and yesterday.
@@ -325,6 +343,17 @@ func (s *Source) Poll(ctx context.Context, raw []byte) ([]core.Event, []byte, er
 			pollError = err
 		}
 		events = append(events, subEvents...)
+	}
+
+	if s.reviewTokens != nil {
+		revEvents, err := s.pollReviewsAndRatings(ctx, &st, today, observed)
+		if err != nil {
+			s.log().Warn("appstore: reviews/ratings failed", "error", err)
+			if pollError == nil {
+				pollError = err
+			}
+		}
+		events = append(events, revEvents...)
 	}
 
 	out, err := json.Marshal(st)
