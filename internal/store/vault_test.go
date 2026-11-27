@@ -382,3 +382,42 @@ func TestVaultByAppGroupsByProduct(t *testing.T) {
 		t.Fatalf("second row = %+v, want the unmapped raw name", sum.ByApp[1])
 	}
 }
+
+func TestVaultSummaryIncludesAllTimeAppScorecards(t *testing.T) {
+	ctx := context.Background()
+	st := newStore(t)
+
+	// Insert historical data outside the 7d window so we verify Scorecards are all-time.
+	dl := ledgerRow("appstore", "Nistis: Fasting Timer", "2026-01-10", "US", 10, 0, "as:dl1")
+	dl.Kind = "download"
+	dl.Product = "Nistis"
+	sale := ledgerRow("appstore", "Nistis: Fasting Timer", "2026-01-12", "US", 2, 19.98, "as:sale1")
+	sale.Product = "Nistis"
+	ref := ledgerRow("appstore", "Nistis: Fasting Timer", "2026-01-15", "US", -1, -9.99, "as:ref1")
+	ref.Kind = "refund"
+	ref.Product = "Nistis"
+	playAud := core.Event{
+		ID: core.NewID(), Source: "googleplay", Kind: core.KindAudience,
+		App: "com.nistis.app", Product: "Nistis", Day: "2026-08-18",
+		OccurredAt: time.Now().UTC(), ObservedAt: time.Now().UTC(),
+		Quantity: 7, Silent: true, DedupeKey: "gp:aud:1",
+	}
+	for _, ev := range []core.Event{dl, sale, ref, playAud} {
+		if _, err := st.InsertEvent(ctx, ev); err != nil {
+			t.Fatalf("insert: %v", err)
+		}
+	}
+
+	sum, err := st.VaultSummary(ctx, "2026-08-12", "2026-08-18", "USD", "2026-08-18")
+	if err != nil {
+		t.Fatalf("summary: %v", err)
+	}
+	if len(sum.Scorecards) != 1 {
+		t.Fatalf("scorecards = %+v, want 1 row", sum.Scorecards)
+	}
+	got := sum.Scorecards[0]
+	if got.Product != "Nistis" || got.Active != 7 || got.Downloads != 12 ||
+		got.Purchases != 2 || got.Refunds != 1 || got.RevenueBase != 9.99 {
+		t.Errorf("scorecard = %+v, want Nistis active=7 downloads=12 purchases=2 refunds=1 revenue=9.99", got)
+	}
+}

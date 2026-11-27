@@ -220,6 +220,13 @@ type Hearth struct {
 // homeCountry pins the capital; empty means "pick the largest settlement",
 // which is almost always the right guess and never needs configuring.
 func (s *Store) Hearth(ctx context.Context, homeCountry, displayCurrency string) (Hearth, error) {
+	return s.HearthAt(ctx, homeCountry, displayCurrency, "")
+}
+
+// HearthAt is Hearth evaluated on a given business day (YYYY-MM-DD). When
+// today is non-empty, audience snapshots older than audienceRecencyDays are
+// ignored so retired or unpolled stores do not freeze at their final count.
+func (s *Store) HearthAt(ctx context.Context, homeCountry, displayCurrency, today string) (Hearth, error) {
 	out := Hearth{
 		DisplayCurrency: displayCurrency,
 		Fleet:           []HearthVessel{},
@@ -245,7 +252,7 @@ func (s *Store) Hearth(ctx context.Context, homeCountry, displayCurrency string)
 	// Sources that report an installed base contributed nothing above: their
 	// population is their newest snapshot, placed where the store placed it,
 	// with whatever it could not place put to sea.
-	readings, err := s.audienceLatest(ctx)
+	readings, err := s.audienceLatest(ctx, today)
 	if err != nil {
 		return out, err
 	}

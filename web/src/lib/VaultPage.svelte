@@ -65,6 +65,7 @@
 
   const subsAsOf = $derived(summary?.subscriptions?.as_of ?? '')
   const rangeLabel = $derived(summary ? `${summary.range.from} → ${summary.range.to}` : '')
+  const scorecards = $derived(summary?.scorecards ?? [])
 
   // Three inline elements in one sentence, and two more in the small print
   // below it; see lib/markup.ts for why each sentence stays whole.
@@ -181,6 +182,42 @@
       </div>
     {/if}
 
+    {#if scorecards.length > 0}
+      <div class="card scorecard-card">
+        <div class="card-head">
+          <h3>{m.vault_scorecard_title()}</h3>
+          <span class="hint">{m.vault_scorecard_hint()}</span>
+        </div>
+        <div class="table-wrap">
+          <table class="scorecard">
+            <thead>
+              <tr>
+                <th class="col-app">{m.vault_scorecard_app()}</th>
+                <th class="num">{m.vault_scorecard_active()}</th>
+                <th class="num">{m.vault_scorecard_downloads()}</th>
+                <th class="num">{m.vault_scorecard_purchases()}</th>
+                <th class="num">{m.vault_scorecard_refunds()}</th>
+                <th class="num">{m.vault_scorecard_revenue()}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {#each scorecards as row (row.product)}
+                <tr>
+                  <td class="col-app">{row.product}</td>
+                  <td class="num active-val">{row.active > 0 ? integer(row.active) : '—'}</td>
+                  <td class="num">{row.downloads > 0 ? integer(row.downloads) : '—'}</td>
+                  <td class="num">{integer(row.purchases)}</td>
+                  <td class="num" class:refund-val={row.refunds > 0}>{integer(row.refunds)}</td>
+                  <td class="num rev-val">{currency(row.revenue_base, code)}</td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+        </div>
+        <p class="scorecard-fine">{m.vault_scorecard_fine()}</p>
+      </div>
+    {/if}
+
     {#if vault.error}
       <p class="note error">{vault.error}</p>
     {/if}
@@ -286,6 +323,76 @@
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr));
     gap: 0.6rem;
+    margin-bottom: 0.9rem;
+  }
+
+  .scorecard-card {
+    margin-top: 0.9rem;
+    padding-bottom: 0.85rem;
+  }
+
+  .table-wrap {
+    overflow-x: auto;
+  }
+
+  .scorecard {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.82rem;
+  }
+
+  .scorecard th {
+    padding: 0.4rem 0.55rem;
+    border-bottom: 1px solid var(--border-soft);
+    font-size: 0.68rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-faint);
+    white-space: nowrap;
+  }
+
+  .scorecard td {
+    padding: 0.5rem 0.55rem;
+    border-bottom: 1px solid color-mix(in oklab, var(--border-soft) 55%, transparent);
+    color: var(--text-dim);
+    white-space: nowrap;
+  }
+
+  .scorecard tbody tr:last-child td {
+    border-bottom: 0;
+  }
+
+  .scorecard .col-app {
+    text-align: left;
+    color: var(--text);
+    font-weight: 600;
+  }
+
+  .scorecard .num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .scorecard .active-val {
+    color: var(--accent);
+    font-weight: 600;
+  }
+
+  .scorecard .refund-val {
+    color: var(--cursed);
+  }
+
+  .scorecard .rev-val {
+    color: var(--text);
+    font-weight: 500;
+  }
+
+  .scorecard-fine {
+    margin: 0.6rem 0 0;
+    font-size: 0.72rem;
+    color: var(--text-faint);
+    line-height: 1.45;
   }
 
   .empty {

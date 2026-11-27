@@ -278,6 +278,16 @@ export interface VaultRealtime {
   revenuecat_amount_base_today: number
 }
 
+/** All-time per-app business summary, mirroring store.AppScorecard. */
+export interface AppScorecard {
+  product: string
+  active: number
+  downloads: number
+  purchases: number
+  refunds: number
+  revenue_base: number
+}
+
 /** The whole of GET /api/vault/summary. */
 export interface VaultSummary {
   display_currency: string
@@ -290,6 +300,7 @@ export interface VaultSummary {
   by_country: CountrySlice[]
   subscriptions: VaultSubscriptions
   realtime: VaultRealtime
+  scorecards?: AppScorecard[]
 }
 
 // ----------------------------------------------------------------- formatting
@@ -524,6 +535,8 @@ export interface AudienceSource {
   source: string
   count: number
   basis: AudienceBasis
+  /** Lifetime installs for an active-basis store that also reports installs (Google Play). */
+  all_time?: number
   /** The business day the snapshot describes; absent for `arrivals`. */
   as_of?: string
 }
@@ -532,6 +545,14 @@ export interface AudienceSource {
 export interface AssetDownloads {
   format: string
   count: number
+}
+
+/** All-time business summary for one product, mirroring store.ProductScorecard. */
+export interface ProductScorecard {
+  downloads: number
+  purchases: number
+  refunds: number
+  revenue_base: number
 }
 
 /** Who has one product now, store by store, mirroring store.ProductAudience. */
@@ -543,6 +564,7 @@ export interface ProductAudience {
   arrivals: number
   sources: AudienceSource[]
   downloads: AssetDownloads[]
+  scorecard?: ProductScorecard
 }
 
 /** The whole of GET /api/hearth. */

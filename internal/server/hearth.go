@@ -79,7 +79,8 @@ func (s *Server) handleHearth(w http.ResponseWriter, r *http.Request) {
 
 	// Settlements, population and the arrivals ticker narrow to the product;
 	// the era and the XP behind it never do. See internal/store/hearth.go.
-	hearth, err := s.scoped(r).Hearth(r.Context(), s.Cfg.HomeCountry, s.displayCurrency())
+	today := core.DayOf(time.Now().UTC())
+	hearth, err := s.scoped(r).HearthAt(r.Context(), s.Cfg.HomeCountry, s.displayCurrency(), today)
 	if err != nil {
 		s.fail(w, "hearth", err)
 		return

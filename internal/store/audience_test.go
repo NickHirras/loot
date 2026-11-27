@@ -228,3 +228,115 @@ func TestHighestAudienceMilestone(t *testing.T) {
 		t.Errorf("another app's milestones leaked: %d", got)
 	}
 }
+
+func TestAudiencePlayAllTimeScorecardAndRevenueCatDedupe(t *testing.T) {
+	st := newStore(t)
+
+	mk := func(source, kind, app, product, day, country string, qty int, amt float64, ledger bool, key string) core.Event {
+		ev := hearthEvent(source, kind, day, country, qty, amt, ledger, key)
+		ev.App, ev.Product = app, product
+		return ev
+	}
+
+	insertAll(t, st,
+		// Macro Trainer: Snapcraft weekly 26, Google Play active 12 (with 45 lifetime installs),
+		// App Store 20 free downloads + 3 paid subs + 1 refund, Microsoft Store 1 free download,
+		// plus RevenueCat purchases (which must be hidden because Play/App Store are present).
+		audienceEvent("snapcraft", "macro-trainer", "Macro Trainer", "2026-11-18", "", 26),
+		audienceEvent("googleplay", "com.mt.app", "Macro Trainer", "2026-11-18", "", 12),
+		mk("googleplay", "install", "com.mt.app", "Macro Trainer", "2026-11-17", "", 30, 0, false, "gp:i1"),
+		mk("googleplay", "install", "com.mt.app", "Macro Trainer", "2026-11-18", "", 15, 0, false, "gp:i2"),
+		mk("googleplay", "subscription", "com.mt.app", "Macro Trainer", "2026-11-18", "US", 2, 19.98, true, "gp:sub"),
+		mk("appstore", "download", "Macro Trainer", "Macro Trainer", "2026-11-18", "US", 20, 0, true, "as:dl"),
+		mk("appstore", "subscription", "Macro Trainer", "Macro Trainer", "2026-11-18", "US", 3, 29.97, true, "as:sub"),
+		mk("appstore", "refund", "Macro Trainer", "Macro Trainer", "2026-11-18", "US", -1, -9.99, true, "as:ref"),
+		mk("microsoftstore", "download", "9NBLGGH4R315", "Macro Trainer", "2026-11-18", "US", 1, 0, true, "ms:dl"),
+		mk("revenuecat", "purchase", "rc_mt", "Macro Trainer", "2026-11-18", "US", 1, 9.99, false, "rc:1"),
+		mk("revenuecat", "purchase", "rc_mt", "Macro Trainer", "2026-11-18", "US", 1, 9.99, false, "rc:2"),
+		// Standalone RevenueCat-only product: RevenueCat stays as the fallback.
+		mk("revenuecat", "purchase", "rc_solo", "Solo App", "2026-11-18", "US", 1, 4.99, false, "rc:solo1"),
+	)
+
+	h := hearthOf(t, st, "")
+	mt := productAudience(t, h, "Macro Trainer")
+	if mt.Current != 38 {
+		t.Errorf("Macro Trainer current = %d, want 38 (26 snap + 12 play)", mt.Current)
+	}
+	if mt.Arrivals != 24 {
+		t.Errorf("Macro Trainer arrivals = %d, want 24 (23 appstore + 1 msstore, excluding revenuecat)", mt.Arrivals)
+	}
+	var sawPlay, sawRC bool
+	for _, src := range mt.Sources {
+		if src.Source == "googleplay" {
+			sawPlay = true
+			if src.Count != 12 || src.AllTime != 45 {
+				t.Errorf("googleplay source = %+v, want count=12 all_time=45", src)
+			}
+		}
+		if src.Source == "snapcraft" && src.AllTime != 0 {
+			t.Errorf("snapcraft all_time = %d, want 0", src.AllTime)
+		}
+		if src.Source == "revenuecat" {
+			sawRC = true
+		}
+	}
+	if !sawPlay {
+		t.Fatalf("missing googleplay in sources: %+v", mt.Sources)
+	}
+	if sawRC {
+		t.Errorf("revenuecat should be omitted when appstore/googleplay are present: %+v", mt.Sources)
+	}
+	if mt.Scorecard == nil {
+		t.Fatalf("Macro Trainer scorecard is nil")
+	}
+	// Downloads = 45 (Play installs) + 20 (App Store free download) + 1 (MS Store download) = 66
+	// Purchases = 2 (Play sub) + 3 (App Store sub) = 5
+	// Refunds = 1
+	// Revenue = 19.98 + 29.97 - 9.99 = 39.96
+	if mt.Scorecard.Downloads != 66 || mt.Scorecard.Purchases != 5 || mt.Scorecard.Refunds != 1 || mt.Scorecard.RevenueBase != 39.96 {
+		t.Errorf("Macro Trainer scorecard = %+v, want downloads=66 purchases=5 refunds=1 revenue=39.96", mt.Scorecard)
+	}
+
+	solo := productAudience(t, h, "Solo App")
+	if solo.Arrivals != 1 || len(solo.Sources) != 1 || solo.Sources[0].Source != "revenuecat" {
+		t.Errorf("Solo App should keep revenuecat fallback: %+v", solo)
+	}
+}
+
+func TestStaleAudienceSnapshotsAreDropped(t *testing.T) {
+	ctx := context.Background()
+	st := newStore(t)
+
+	insertAll(t, st,
+		// Stale: 15 days before today (2026-11-27 -> floor is 2026-11-14).
+		audienceEvent("snapcraft", "macro-trainer", "Macro Trainer", "2026-11-12", "US", 20),
+		audienceEvent("snapcraft", "macro-trainer", "Macro Trainer", "2026-11-12", "", 26),
+		// Fresh: on the exact floor day (13 days ago = within the 14-day window).
+		audienceEvent("googleplay", "com.mt.app", "Macro Trainer", "2026-11-14", "US", 10),
+		audienceEvent("googleplay", "com.mt.app", "Macro Trainer", "2026-11-14", "", 12),
+	)
+
+	h, err := st.HearthAt(ctx, "", "USD", "2026-11-27")
+	if err != nil {
+		t.Fatalf("hearth at: %v", err)
+	}
+	mt := productAudience(t, h, "Macro Trainer")
+	if mt.Current != 12 {
+		t.Errorf("current = %d, want 12 (stale snapcraft dropped, fresh googleplay kept)", mt.Current)
+	}
+	if len(mt.Sources) != 1 || mt.Sources[0].Source != "googleplay" {
+		t.Errorf("sources = %+v, want only googleplay", mt.Sources)
+	}
+	if h.Population != 10 {
+		t.Errorf("population = %d, want 10 (stale snapcraft US devices dropped)", h.Population)
+	}
+
+	// Scorecards use the same 14-day staleness cutoff.
+	sc, err := st.AppScorecards(ctx, "2026-11-27")
+	if err != nil {
+		t.Fatalf("scorecards: %v", err)
+	}
+	if len(sc) != 1 || sc[0].Active != 12 {
+		t.Errorf("scorecards = %+v, want active=12", sc)
+	}
+}

@@ -764,6 +764,30 @@ func (s *Store) trendAudienceArrivals(ctx context.Context, q HearthTrendQuery, t
 		return HearthTrend{}, err
 	}
 
+	// RevenueCat webhooks mirror App Store / Google Play purchases. When the
+	// product-level arrivals view already includes a real store, drop
+	// revenuecat so the chart matches ProductAudience.Arrivals.
+	if q.Source == "" {
+		hasStore := false
+		for _, bySrc := range dailyBySource {
+			if bySrc["appstore"] > 0 || bySrc["googleplay"] > 0 {
+				hasStore = true
+				break
+			}
+		}
+		if hasStore {
+			for d, bySrc := range dailyBySource {
+				if rc := bySrc["revenuecat"]; rc > 0 {
+					dailyTotal[d] -= rc
+					if dailyTotal[d] <= 0 {
+						delete(dailyTotal, d)
+					}
+					delete(bySrc, "revenuecat")
+				}
+			}
+		}
+	}
+
 	return buildCumulativeTrend(q.Metric, q.Range, "count", "", core.BasisArrivals, today, dailyTotal, dailyBySource, false)
 }
 

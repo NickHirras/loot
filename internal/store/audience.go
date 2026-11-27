@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"time"
 
 	"github.com/nickhirras/loot/internal/core"
 )
@@ -39,6 +40,11 @@ type AudienceSource struct {
 	// the source has ever reported for BasisArrivals.
 	Count int                `json:"count"`
 	Basis core.AudienceBasis `json:"basis"`
+	// AllTime is lifetime installs recorded by an active-basis store (such as
+	// Google Play) when the store reports both a current installed base and
+	// lifetime installs. Zero for stores without lifetime installs (Snapcraft)
+	// and for BasisArrivals rows whose Count is already all-time.
+	AllTime int `json:"all_time,omitempty"`
 	// AsOf is the business day the snapshot describes (YYYY-MM-DD). Empty for
 	// BasisArrivals, which is not a reading of any one day.
 	AsOf string `json:"as_of,omitempty"`
@@ -51,6 +57,26 @@ type AssetDownloads struct {
 	Count  int    `json:"count"`
 }
 
+// ProductScorecard is the all-time business summary for one product:
+// lifetime store downloads/installs, paid purchases, refunds, and net revenue.
+type ProductScorecard struct {
+	Downloads   int     `json:"downloads"`
+	Purchases   int     `json:"purchases"`
+	Refunds     int     `json:"refunds"`
+	RevenueBase float64 `json:"revenue_base"`
+}
+
+// AppScorecard is one row of the all-time per-app business summary shown in
+// the Vault: current active devices alongside lifetime store metrics.
+type AppScorecard struct {
+	Product     string  `json:"product"`
+	Active      int     `json:"active"`
+	Downloads   int     `json:"downloads"`
+	Purchases   int     `json:"purchases"`
+	Refunds     int     `json:"refunds"`
+	RevenueBase float64 `json:"revenue_base"`
+}
+
 // ProductAudience is everything Loot knows about who has one product.
 type ProductAudience struct {
 	Product string `json:"product"`
@@ -60,9 +86,10 @@ type ProductAudience struct {
 	// Arrivals is the sum of the sources that only report arrivals. It is kept
 	// apart from Current because it is a different kind of number, and adding
 	// them would be the mistake this whole file exists to undo.
-	Arrivals  int              `json:"arrivals"`
-	Sources   []AudienceSource `json:"sources"`
-	Downloads []AssetDownloads `json:"downloads"`
+	Arrivals  int               `json:"arrivals"`
+	Sources   []AudienceSource  `json:"sources"`
+	Downloads []AssetDownloads  `json:"downloads"`
+	Scorecard *ProductScorecard `json:"scorecard,omitempty"`
 }
 
 // audienceReading is one row of the newest audience snapshot.
@@ -72,29 +99,46 @@ type audienceReading struct {
 	Day                           string
 }
 
+// audienceRecencyDays is how stale an audience snapshot may be and still be
+// counted as current. Matches subscriptionRecencyDays in vault.go: a store
+// that stops reporting (for example, a retired desktop build removed from
+// config) must not stay frozen at its final device count forever.
+const audienceRecencyDays = 14
+
 // audienceLatest returns the newest audience snapshot of every (source, app):
-// its total row, and its per-country rows.
+// its total row, and its per-country rows. When today (YYYY-MM-DD) is given,
+// snapshots older than audienceRecencyDays are ignored.
 //
 // The two are looked up separately because sources publish them separately —
 // Google Play's overview and country reports are different files that land at
 // different times — and pairing a Tuesday total with Monday's countries is far
 // better than showing a Tuesday on which everybody is momentarily "at sea".
-func (s *Store) audienceLatest(ctx context.Context) ([]audienceReading, error) {
+func (s *Store) audienceLatest(ctx context.Context, today string) ([]audienceReading, error) {
 	inner, innerArgs := s.scopeStrict("x")
 	outer, outerArgs := s.scopeStrict("e")
+
+	floorClause := ""
+	var args []any
+	if t, err := time.Parse(core.DayLayout, today); err == nil {
+		floor := core.DayOf(t.AddDate(0, 0, -(audienceRecencyDays - 1)))
+		floorClause = " AND x.day >= ?"
+		args = append(args, floor)
+	}
+	args = append(args, innerArgs...)
+	args = append(args, outerArgs...)
 
 	rows, err := s.q.QueryContext(ctx, `
         SELECT e.source, e.app, e.product, e.country, e.quantity, e.day
         FROM events e
         JOIN (SELECT x.source AS source, x.app AS app, (x.country <> '') AS placed, MAX(x.day) AS day
               FROM events x
-              WHERE x.kind = 'audience'`+inner+`
+              WHERE x.kind = 'audience'`+floorClause+inner+`
               GROUP BY x.source, x.app, (x.country <> '')) l
           ON l.source = e.source AND l.app = e.app
          AND l.placed = (e.country <> '') AND l.day = e.day
         WHERE e.kind = 'audience'`+outer+`
         ORDER BY e.source, e.app, e.country`,
-		append(innerArgs, outerArgs...)...)
+		args...)
 	if err != nil {
 		return nil, fmt.Errorf("audience latest: %w", err)
 	}
@@ -270,13 +314,189 @@ func (s *Store) assetDownloads(ctx context.Context) (map[string][]AssetDownloads
 
 // Audience returns one entry per product: who has it now, per store, and how
 // often its release files have been downloaded. Biggest audience first.
-func (s *Store) Audience(ctx context.Context) ([]ProductAudience, error) {
-	readings, err := s.audienceLatest(ctx)
+func (s *Store) Audience(ctx context.Context, today string) ([]ProductAudience, error) {
+	readings, err := s.audienceLatest(ctx, today)
 	if err != nil {
 		return nil, err
 	}
 	_, apps := foldAudience(readings)
 	return s.audienceFrom(ctx, apps)
+}
+
+// installTotals returns lifetime deduped installs per (source, product),
+// including sources that also emit audience snapshots (such as Google Play).
+// Snapcraft emits no `install` events, so it does not appear here.
+func (s *Store) installTotals(ctx context.Context) (map[[2]string]int, error) {
+	strict, strictArgs := s.scopeStrict("e")
+	rows, err := s.q.QueryContext(ctx, `
+        SELECT source, product, COALESCE(SUM(v), 0) FROM (
+            SELECT e.source AS source,
+                   MAX(COALESCE(NULLIF(e.product, ''), e.app)) AS product,
+                   `+installValue+` AS v
+            FROM events e
+            WHERE e.kind = 'install'`+strict+`
+            GROUP BY e.source, e.app, e.day)
+        GROUP BY source, product`, strictArgs...)
+	if err != nil {
+		return nil, fmt.Errorf("install totals: %w", err)
+	}
+	defer rows.Close()
+
+	out := map[[2]string]int{}
+	for rows.Next() {
+		var (
+			source, product string
+			n               int
+		)
+		if err := rows.Scan(&source, &product, &n); err != nil {
+			return nil, fmt.Errorf("scan install totals: %w", err)
+		}
+		if n > 0 && product != "" {
+			out[[2]string{source, product}] += n
+		}
+	}
+	return out, rows.Err()
+}
+
+type ledgerProductRow struct {
+	Source       string
+	Product      string
+	AppDownloads int
+	Purchases    int
+	Refunds      int
+	RevenueBase  float64
+}
+
+// productLedgerBySource aggregates all-time ledger counts per (source, product).
+// AppDownloads counts free and paid app acquisitions (download + sale);
+// Purchases counts paid ledger units (sale + iap + subscription); Refunds
+// counts refunded units as a positive count; RevenueBase nets signed revenue.
+func (s *Store) productLedgerBySource(ctx context.Context) ([]ledgerProductRow, error) {
+	strict, strictArgs := s.scopeStrict("e")
+	rows, err := s.q.QueryContext(ctx, `
+        SELECT e.source,
+               COALESCE(NULLIF(e.product, ''), e.app) AS product,
+               COALESCE(SUM(CASE WHEN e.kind IN ('download', 'sale') AND e.quantity > 0 THEN e.quantity ELSE 0 END), 0),
+               COALESCE(SUM(CASE WHEN `+isPaidUnit+` THEN e.quantity ELSE 0 END), 0),
+               COALESCE(SUM(CASE WHEN `+isRefund+` THEN ABS(e.quantity) ELSE 0 END), 0),
+               COALESCE(SUM(e.amount_base), 0)
+        FROM events e
+        WHERE `+ledgerRows+strict+`
+        GROUP BY 1, 2`, strictArgs...)
+	if err != nil {
+		return nil, fmt.Errorf("product ledger: %w", err)
+	}
+	defer rows.Close()
+
+	var out []ledgerProductRow
+	for rows.Next() {
+		var r ledgerProductRow
+		if err := rows.Scan(&r.Source, &r.Product, &r.AppDownloads, &r.Purchases, &r.Refunds, &r.RevenueBase); err != nil {
+			return nil, fmt.Errorf("scan product ledger: %w", err)
+		}
+		if r.Product == "" {
+			continue
+		}
+		out = append(out, r)
+	}
+	return out, rows.Err()
+}
+
+// buildScorecards folds lifetime installs and ledger rows into one
+// ProductScorecard per product. When a (source, product) has dedicated install
+// events (e.g. Google Play), those represent its app downloads rather than its
+// ledger `sale` rows so paid apps are not counted twice.
+func buildScorecards(installs map[[2]string]int, ledger []ledgerProductRow) map[string]ProductScorecard {
+	out := map[string]ProductScorecard{}
+	for k, n := range installs {
+		if n <= 0 || k[1] == "" {
+			continue
+		}
+		sc := out[k[1]]
+		sc.Downloads += n
+		out[k[1]] = sc
+	}
+	for _, r := range ledger {
+		sc := out[r.Product]
+		if installs[[2]string{r.Source, r.Product}] == 0 {
+			sc.Downloads += r.AppDownloads
+		}
+		sc.Purchases += r.Purchases
+		sc.Refunds += r.Refunds
+		sc.RevenueBase = round2(sc.RevenueBase + r.RevenueBase)
+		out[r.Product] = sc
+	}
+	return out
+}
+
+// AppScorecards returns the all-time business summary for every product:
+// current active devices (where reported and not stale), lifetime store
+// downloads/installs, paid purchases, refunds, and net revenue.
+func (s *Store) AppScorecards(ctx context.Context, today string) ([]AppScorecard, error) {
+	readings, err := s.audienceLatest(ctx, today)
+	if err != nil {
+		return nil, err
+	}
+	_, apps := foldAudience(readings)
+
+	installs, err := s.installTotals(ctx)
+	if err != nil {
+		return nil, err
+	}
+	ledger, err := s.productLedgerBySource(ctx)
+	if err != nil {
+		return nil, err
+	}
+	scMap := buildScorecards(installs, ledger)
+
+	activeByProduct := map[string]int{}
+	for _, a := range apps {
+		if a.Product != "" && a.Count() > 0 {
+			activeByProduct[a.Product] += a.Count()
+		}
+	}
+
+	products := map[string]bool{}
+	for p := range activeByProduct {
+		products[p] = true
+	}
+	for p := range scMap {
+		products[p] = true
+	}
+
+	out := make([]AppScorecard, 0, len(products))
+	for p := range products {
+		sc := scMap[p]
+		row := AppScorecard{
+			Product:     p,
+			Active:      activeByProduct[p],
+			Downloads:   sc.Downloads,
+			Purchases:   sc.Purchases,
+			Refunds:     sc.Refunds,
+			RevenueBase: sc.RevenueBase,
+		}
+		if row.Active == 0 && row.Downloads == 0 && row.Purchases == 0 && row.Refunds == 0 && row.RevenueBase == 0 {
+			continue
+		}
+		out = append(out, row)
+	}
+	sort.Slice(out, func(i, j int) bool {
+		a, b := out[i], out[j]
+		if a.RevenueBase != b.RevenueBase {
+			return a.RevenueBase > b.RevenueBase
+		}
+		if a.Purchases != b.Purchases {
+			return a.Purchases > b.Purchases
+		}
+		if a.Active != b.Active {
+			return a.Active > b.Active
+		}
+		if a.Downloads != b.Downloads {
+			return a.Downloads > b.Downloads
+		}
+		return a.Product < b.Product
+	})
+	return out, nil
 }
 
 // audienceFrom builds the per-product summary from already-folded snapshots,
@@ -286,6 +506,16 @@ func (s *Store) audienceFrom(ctx context.Context, apps []audienceApp) ([]Product
 	if err != nil {
 		return nil, err
 	}
+	installs, err := s.installTotals(ctx)
+	if err != nil {
+		return nil, err
+	}
+	ledger, err := s.productLedgerBySource(ctx)
+	if err != nil {
+		return nil, err
+	}
+	scorecards := buildScorecards(installs, ledger)
+
 	downloads, err := s.assetDownloads(ctx)
 	if err != nil {
 		return nil, err
@@ -309,6 +539,7 @@ func (s *Store) audienceFrom(ctx context.Context, apps []audienceApp) ([]Product
 	// Play packages mapped to one product) are one line, not two.
 	type pair struct{ source, product string }
 	current := map[pair]*AudienceSource{}
+	hasMobileStore := map[string]bool{}
 	var order []pair
 	for _, a := range apps {
 		if a.Product == "" || a.Count() <= 0 {
@@ -317,7 +548,11 @@ func (s *Store) audienceFrom(ctx context.Context, apps []audienceApp) ([]Product
 		k := pair{a.Source, a.Product}
 		row, ok := current[k]
 		if !ok {
-			row = &AudienceSource{Source: a.Source, Basis: core.AudienceBasisFor(a.Source)}
+			row = &AudienceSource{
+				Source:  a.Source,
+				Basis:   core.AudienceBasisFor(a.Source),
+				AllTime: installs[[2]string{a.Source, a.Product}],
+			}
 			current[k] = row
 			order = append(order, k)
 		}
@@ -325,7 +560,16 @@ func (s *Store) audienceFrom(ctx context.Context, apps []audienceApp) ([]Product
 		if a.AsOf > row.AsOf {
 			row.AsOf = a.AsOf
 		}
+		if a.Source == "googleplay" || a.Source == "appstore" {
+			hasMobileStore[a.Product] = true
+		}
 	}
+	for k := range arrivals {
+		if k[0] == "appstore" || k[0] == "googleplay" {
+			hasMobileStore[k[1]] = true
+		}
+	}
+
 	for _, k := range order {
 		p := entry(k.product)
 		p.Current += current[k].Count
@@ -338,12 +582,26 @@ func (s *Store) audienceFrom(ctx context.Context, apps []audienceApp) ([]Product
 		if _, ok := current[pair{k[0], k[1]}]; ok {
 			continue
 		}
+		// RevenueCat is a webhook layer over App Store and Google Play, not a
+		// separate storefront. Keep it only when a product has no mobile store
+		// reporting directly, so paying users are not double-counted beside
+		// App Store or Google Play.
+		if k[0] == "revenuecat" && hasMobileStore[k[1]] {
+			continue
+		}
 		p := entry(k[1])
 		p.Arrivals += n
 		p.Sources = append(p.Sources, AudienceSource{Source: k[0], Count: n, Basis: core.BasisArrivals})
 	}
 	for product, list := range downloads {
 		entry(product).Downloads = list
+	}
+	for i := range out {
+		if sc, ok := scorecards[out[i].Product]; ok &&
+			(sc.Downloads > 0 || sc.Purchases > 0 || sc.Refunds > 0 || sc.RevenueBase != 0) {
+			cp := sc
+			out[i].Scorecard = &cp
+		}
 	}
 
 	for i := range out {

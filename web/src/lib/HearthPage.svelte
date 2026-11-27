@@ -267,14 +267,17 @@
           </button>
 
           {#if audience.length}
-            <!-- The plain reading of what the globe draws: one number per app
-                 per store, each labelled with what it actually counts. -->
+            <!-- The plain reading of what the globe draws: active installed base
+                 explicitly separated from lifetime all-time store acquisitions. -->
             <div class="card">
               <h3>{m.hearth_audience()}</h3>
               <ul class="audience">
                 {#each audience as app (app.product)}
                   {@const appTarget = { metric: 'audience' as const, product: app.product }}
-                  <li>
+                  {@const activeSources = app.sources.filter((r) => r.basis !== 'arrivals')}
+                  {@const allTimeSources = app.sources.filter((r) => r.basis === 'arrivals')}
+                  {@const sc = app.scorecard}
+                  <li class="app-block">
                     <button
                       type="button"
                       class="drill-btn app-line"
@@ -286,38 +289,107 @@
                       <span class="app-name">{app.product}</span>
                       <span class="app-right">
                         {#if app.current > 0}
-                          <span class="app-total">{integer(app.current)}</span>
+                          <span class="app-total">
+                            {m.hearth_audience_active_total({ count: integer(app.current) })}
+                          </span>
+                        {:else if app.arrivals > 0}
+                          <span class="app-total all-time-total">
+                            {m.hearth_audience_all_time_total({ count: integer(app.arrivals) })}
+                          </span>
                         {/if}
                         <svg class="spark-cue" viewBox="0 0 14 10" width="14" height="10" aria-hidden="true">
                           <path d="M1 8.5 L4.5 5 L7.5 6.5 L13 1.5" />
                         </svg>
                       </span>
                     </button>
-                    <ul class="stores">
-                      {#each app.sources as row (row.source)}
-                        {@const storeTarget = {
-                          metric: 'audience' as const,
-                          product: app.product,
-                          source: row.source,
-                        }}
-                        <li class:all-time={row.basis === 'arrivals'}>
-                          <button
-                            type="button"
-                            class="drill-btn store-btn"
-                            class:selected={isSelected(storeTarget)}
-                            aria-pressed={isSelected(storeTarget)}
-                            title={row.as_of
-                              ? `${m.hearth_audience_as_of({ date: row.as_of })} · ${m.hearth_trend_inspect({ name: `${app.product} ${sourceName(row.source)}` })}`
-                              : m.hearth_trend_inspect({ name: `${app.product} ${sourceName(row.source)}` })}
-                            onclick={() => toggleMetric(storeTarget)}
-                          >
-                            <span class="store-name">{sourceName(row.source)}</span>
-                            <span class="basis">{audienceBasisLabel(row.basis)}</span>
-                            <span class="count">{integer(row.count)}</span>
-                          </button>
-                        </li>
-                      {/each}
-                    </ul>
+
+                    {#if activeSources.length > 0}
+                      <ul class="stores">
+                        {#each activeSources as row (row.source)}
+                          {@const storeTarget = {
+                            metric: 'audience' as const,
+                            product: app.product,
+                            source: row.source,
+                          }}
+                          <li>
+                            <button
+                              type="button"
+                              class="drill-btn store-btn"
+                              class:selected={isSelected(storeTarget)}
+                              aria-pressed={isSelected(storeTarget)}
+                              title={row.as_of
+                                ? `${m.hearth_audience_as_of({ date: row.as_of })} · ${m.hearth_trend_inspect({ name: `${app.product} ${sourceName(row.source)}` })}`
+                                : m.hearth_trend_inspect({ name: `${app.product} ${sourceName(row.source)}` })}
+                              onclick={() => toggleMetric(storeTarget)}
+                            >
+                              <span class="store-main">
+                                <span class="store-name">{sourceName(row.source)}</span>
+                                <span class="basis">{audienceBasisLabel(row.basis)}</span>
+                                <span class="count">{integer(row.count)}</span>
+                              </span>
+                              {#if row.all_time && row.all_time > 0}
+                                <span class="store-sub">
+                                  {m.hearth_audience_all_time_sub({ count: integer(row.all_time) })}
+                                </span>
+                              {/if}
+                            </button>
+                          </li>
+                        {/each}
+                      </ul>
+                    {/if}
+
+                    {#if allTimeSources.length > 0}
+                      {#if activeSources.length > 0}
+                        <div class="group-sep">
+                          <span class="group-label">{m.hearth_audience_all_time_group()}</span>
+                          <span class="group-line" aria-hidden="true"></span>
+                          <span class="group-total">{integer(app.arrivals)}</span>
+                        </div>
+                      {/if}
+                      <ul class="stores">
+                        {#each allTimeSources as row (row.source)}
+                          {@const storeTarget = {
+                            metric: 'audience' as const,
+                            product: app.product,
+                            source: row.source,
+                          }}
+                          <li class="all-time">
+                            <button
+                              type="button"
+                              class="drill-btn store-btn"
+                              class:selected={isSelected(storeTarget)}
+                              aria-pressed={isSelected(storeTarget)}
+                              title={m.hearth_trend_inspect({ name: `${app.product} ${sourceName(row.source)}` })}
+                              onclick={() => toggleMetric(storeTarget)}
+                            >
+                              <span class="store-main">
+                                <span class="store-name">{sourceName(row.source)}</span>
+                                {#if activeSources.length === 0}
+                                  <span class="basis">{audienceBasisLabel(row.basis)}</span>
+                                {/if}
+                                <span class="count">{integer(row.count)}</span>
+                              </span>
+                            </button>
+                          </li>
+                        {/each}
+                      </ul>
+                    {/if}
+
+                    {#if sc && (sc.downloads > 0 || sc.purchases > 0 || sc.refunds > 0)}
+                      <div class="app-score">
+                        {#if sc.downloads > 0}
+                          <span>{m.hearth_audience_score_downloads({ count: sc.downloads })}</span>
+                        {/if}
+                        {#if sc.purchases > 0}
+                          {#if sc.downloads > 0}<span class="sep" aria-hidden="true">·</span>{/if}
+                          <span>{m.hearth_audience_score_purchases({ count: sc.purchases })}</span>
+                        {/if}
+                        {#if sc.refunds > 0}
+                          {#if sc.downloads > 0 || sc.purchases > 0}<span class="sep" aria-hidden="true">·</span>{/if}
+                          <span class="refunds">{m.hearth_audience_score_refunds({ count: sc.refunds })}</span>
+                        {/if}
+                      </div>
+                    {/if}
                   </li>
                 {/each}
               </ul>
@@ -883,7 +955,12 @@
   }
 
   .audience {
-    gap: 0.5rem;
+    gap: 0.6rem;
+  }
+
+  .app-block + .app-block {
+    padding-top: 0.55rem;
+    border-top: 1px solid var(--border-soft);
   }
 
   .app-line {
@@ -909,9 +986,15 @@
   }
 
   .app-total {
-    font-size: 1rem;
+    font-size: 0.82rem;
+    font-weight: 600;
     color: var(--accent);
     font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .app-total.all-time-total {
+    color: var(--text-dim);
   }
 
   .stores {
@@ -928,6 +1011,26 @@
     align-items: baseline;
     gap: 0.4rem;
     font-size: 0.76rem;
+  }
+
+  .store-btn:has(.store-main) {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.06rem;
+  }
+
+  .store-main {
+    display: flex;
+    align-items: baseline;
+    gap: 0.4rem;
+    width: 100%;
+  }
+
+  .store-sub {
+    align-self: flex-end;
+    font-size: 0.65rem;
+    color: var(--text-faint);
+    font-variant-numeric: tabular-nums;
   }
 
   .store-name {
@@ -947,10 +1050,53 @@
     font-variant-numeric: tabular-nums;
   }
 
+  .group-sep {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin: 0.32rem 0 0.12rem;
+    font-size: 0.64rem;
+    color: var(--text-faint);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .group-line {
+    flex: 1;
+    height: 1px;
+    background: var(--border-soft);
+  }
+
+  .group-total {
+    font-variant-numeric: tabular-nums;
+    color: var(--text-dim);
+    text-transform: none;
+    letter-spacing: 0;
+  }
+
   /* A running total sits beside the levels but is visibly not one of them. */
   .stores li.all-time,
   .stores li.all-time .count {
     color: var(--text-faint);
+  }
+
+  .app-score {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.25rem;
+    margin-top: 0.3rem;
+    font-size: 0.67rem;
+    color: var(--text-faint);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .app-score .sep {
+    opacity: 0.55;
+  }
+
+  .app-score .refunds {
+    color: var(--cursed);
   }
 
   .fleet {

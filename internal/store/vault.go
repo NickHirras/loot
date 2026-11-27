@@ -116,6 +116,7 @@ type VaultSummary struct {
 	ByCountry       []CountrySlice     `json:"by_country"`
 	Subscriptions   VaultSubscriptions `json:"subscriptions"`
 	Realtime        VaultRealtime      `json:"realtime"`
+	Scorecards      []AppScorecard     `json:"scorecards,omitempty"`
 }
 
 // maxCountryRows is how many countries are listed before the tail is folded
@@ -156,6 +157,9 @@ func (s *Store) VaultSummary(ctx context.Context, from, to, displayCurrency, tod
 		return out, err
 	}
 	if out.Realtime, err = s.vaultRealtime(ctx, today); err != nil {
+		return out, err
+	}
+	if out.Scorecards, err = s.AppScorecards(ctx, today); err != nil {
 		return out, err
 	}
 	return out, nil

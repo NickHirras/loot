@@ -619,9 +619,61 @@
   "hearth_arrivals_empty": "Nothing has landed with a country attached yet.",
   "hearth_audience": "Audience",
   "hearth_audience_active_devices": "active devices",
+  "hearth_audience_active_total": "{count} active",
+  "hearth_audience_all_time_group": "All-time",
+  "hearth_audience_all_time_sub": "{count} all-time",
+  "hearth_audience_all_time_total": "{count} all-time",
   "hearth_audience_arrivals": "all-time",
   "hearth_audience_as_of": "As of {date}",
-  "hearth_audience_fine": "Who has each app now, as each store counts it. All-time figures only ever grow, so they are listed but not added in.",
+  "hearth_audience_fine": "Active counts current devices (Snapcraft weekly, Google Play active). All-time counts lifetime store acquisitions separately.",
+  "hearth_audience_score_downloads": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural",
+        "local countFmt = count: number maximumFractionDigits=0"
+      ],
+      "match": {
+        "countPlural=one": "{countFmt} download",
+        "countPlural=other": "{countFmt} downloads"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "hearth_audience_score_purchases": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural",
+        "local countFmt = count: number maximumFractionDigits=0"
+      ],
+      "match": {
+        "countPlural=one": "{countFmt} purchase",
+        "countPlural=other": "{countFmt} purchases"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
+  "hearth_audience_score_refunds": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural",
+        "local countFmt = count: number maximumFractionDigits=0"
+      ],
+      "match": {
+        "countPlural=one": "{countFmt} refund",
+        "countPlural=other": "{countFmt} refunds"
+      },
+      "selectors": [
+        "countPlural"
+      ]
+    }
+  ],
   "hearth_audience_weekly_devices": "devices this week",
   "hearth_capital": "capital {flag} {name}",
   "hearth_civilization": "Civilization",
@@ -1286,6 +1338,15 @@
   "vault_no_app": "(no app)",
   "vault_other_countries": "other countries",
   "vault_range_label": "Time range",
+  "vault_scorecard_active": "Active",
+  "vault_scorecard_app": "App",
+  "vault_scorecard_downloads": "Downloads",
+  "vault_scorecard_fine": "Active counts current devices where reported (Snapcraft weekly, Google Play active). Downloads counts lifetime store installs and app acquisitions; Snapcraft has no lifetime counter and Microsoft Store does not report refunds.",
+  "vault_scorecard_hint": "active devices now · lifetime store totals",
+  "vault_scorecard_purchases": "Purchases",
+  "vault_scorecard_refunds": "Refunds",
+  "vault_scorecard_revenue": "Revenue",
+  "vault_scorecard_title": "Apps · All-time",
   "vault_sighted_note": "{count} purchases · estimate, not ledger revenue",
   "vault_subs_as_of": "as of {date}",
   "vault_subs_none": "no source reports subscriptions",
