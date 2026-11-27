@@ -144,6 +144,7 @@ var areaHints = map[string]string{
 	"quests":    "The Quests tab: the list, its filters and the form for adding one.",
 	"rarity":    "A rarity name. Use the word a game in this language would use.",
 	"recap":     "A written recap of a week or a month: headline, highlights, and how it compared.",
+	"reviews":   "The Reviews tab: store star ratings, rating distribution, rating trend over time, written user reviews, and developer replies.",
 	"scope":     "The app scope picker: which of your apps the dashboard is showing.",
 	"spark":     "A sparkline: a tiny inline chart and its accessible label.",
 	"stat":      "A stat tile: one number with a label.",
