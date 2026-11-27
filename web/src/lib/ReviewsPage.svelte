@@ -57,8 +57,16 @@
   const maxDaily = $derived(Math.max(1, ...trend.map((p) => p.rating_count)))
 
   function xAt(i: number): number {
-    if (trend.length <= 1) return PAD_L
+    if (trend.length <= 1) return (PAD_L + W - PAD_R) / 2
     return PAD_L + (i / (trend.length - 1)) * (W - PAD_L - PAD_R)
+  }
+
+  function isIsolatedPoint(i: number): boolean {
+    const cur = trend[i]?.average_rating
+    if (cur === null || cur === undefined || cur <= 0) return false
+    const prev = i > 0 ? trend[i - 1]?.average_rating : null
+    const next = i < trend.length - 1 ? trend[i + 1]?.average_rating : null
+    return (prev === null || prev === undefined || prev <= 0) && (next === null || next === undefined || next <= 0)
   }
 
   function yRating(v: number): number {
@@ -94,18 +102,34 @@
       {#if rangeLabel}<span class="range mono">{rangeLabel}</span>{/if}
     </div>
 
-    <div class="picker" role="group" aria-label={m.reviews_range_label()}>
-      {#each REVIEWS_RANGES as r (r)}
-        <button
-          type="button"
-          class="range-btn"
-          class:current={reviews.range === r}
-          aria-pressed={reviews.range === r}
-          onclick={() => reviews.setRange(r)}
-        >
-          {r === 'all' ? 'All' : r === '1y' ? '1Y' : r}
-        </button>
-      {/each}
+    <div class="bar-controls">
+      <div class="picker" role="group" aria-label={m.reviews_store_label()}>
+        {#each STORES as st (st.id)}
+          <button
+            type="button"
+            class="range-btn"
+            class:current={reviews.source === st.id}
+            aria-pressed={reviews.source === st.id}
+            onclick={() => reviews.setSource(st.id)}
+          >
+            {st.label()}
+          </button>
+        {/each}
+      </div>
+
+      <div class="picker" role="group" aria-label={m.reviews_range_label()}>
+        {#each REVIEWS_RANGES as r (r)}
+          <button
+            type="button"
+            class="range-btn"
+            class:current={reviews.range === r}
+            aria-pressed={reviews.range === r}
+            onclick={() => reviews.setRange(r)}
+          >
+            {r === 'all' ? 'All' : r === '1y' ? '1Y' : r}
+          </button>
+        {/each}
+      </div>
     </div>
   </div>
 
@@ -115,8 +139,17 @@
     <p class="note">{m.reviews_loading()}</p>
   {:else if isEmpty}
     <div class="empty">
-      <h3>{m.reviews_empty_title()}</h3>
+      <h3>
+        {reviews.source
+          ? m.reviews_empty_store_title({ store: sourceName(reviews.source) })
+          : m.reviews_empty_title()}
+      </h3>
       <p>{m.reviews_empty_body()}</p>
+      {#if reviews.source}
+        <button type="button" class="reset-btn" onclick={() => reviews.setSource('')}>
+          {m.reviews_show_all_stores()}
+        </button>
+      {/if}
     </div>
   {:else}
     <div class="tiles">
@@ -183,6 +216,8 @@
             {/if}
             {#if hoverIdx === i && pt.average_rating !== null}
               <line x1={x} x2={x} y1={PAD_T} y2={H - PAD_B} class="cursor" />
+              <circle cx={x} cy={yRating(pt.average_rating)} r="4" class="dot" />
+            {:else if isIsolatedPoint(i) && pt.average_rating !== null}
               <circle cx={x} cy={yRating(pt.average_rating)} r="3.5" class="dot" />
             {/if}
             <rect
@@ -196,7 +231,9 @@
             />
           {/each}
 
-          {#if trend.length > 0}
+          {#if trend.length === 1}
+            <text x={xAt(0)} y={H - 6} class="axis" text-anchor="middle">{dayLabel(trend[0].day)}</text>
+          {:else if trend.length > 1}
             <text x={PAD_L} y={H - 6} class="axis" text-anchor="start">{dayLabel(trend[0].day)}</text>
             {#if trend.length > 2}
               <text x={(PAD_L + W - PAD_R) / 2} y={H - 6} class="axis" text-anchor="middle">
@@ -272,23 +309,12 @@
         <h3>{m.reviews_feed_title()}</h3>
         <div class="filters">
           <div class="pill-group">
-            {#each STORES as st (st.id)}
-              <button
-                type="button"
-                class="pill"
-                class:active={reviews.source === st.id}
-                onclick={() => reviews.setSource(st.id)}
-              >
-                {st.label()}
-              </button>
-            {/each}
-          </div>
-          <div class="pill-group">
             {#each STAR_FILTERS as sf (sf.id)}
               <button
                 type="button"
                 class="pill"
                 class:active={reviews.stars === sf.id}
+                aria-pressed={reviews.stars === sf.id}
                 onclick={() => reviews.setStars(sf.id)}
               >
                 {sf.label()}
@@ -375,6 +401,13 @@
   .range {
     font-size: 0.72rem;
     color: var(--text-faint);
+  }
+
+  .bar-controls {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.45rem;
   }
 
   .picker {
@@ -786,6 +819,20 @@
     margin: 0;
     font-size: 0.85rem;
     max-width: 64ch;
+  }
+
+  .reset-btn {
+    margin-top: 0.85rem;
+    padding: 0.35rem 0.8rem;
+    border-radius: 999px;
+    border: 1px solid color-mix(in oklab, var(--accent) 42%, transparent);
+    background: color-mix(in oklab, var(--accent) 14%, var(--panel-2));
+    color: var(--text);
+    font-size: 0.78rem;
+  }
+
+  .reset-btn:hover {
+    background: color-mix(in oklab, var(--accent) 22%, var(--panel-2));
   }
 
   .empty-inline {
