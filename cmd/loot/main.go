@@ -17,6 +17,7 @@ Usage:
   loot serve  [flags]        Run the API, websocket stream, sources and dashboard (default)
   loot report [section]      Pull metrics and reports from a running server (--json for agents)
   loot mcp    [flags]        Run an MCP stdio server exposing Loot metrics to AI agents
+  loot auth   hash|token     Generate bcrypt password hashes or random API tokens
   loot tail   [flags]        Stream drops into your terminal
   loot check  [flags]        Verify every configured source and exit
   loot apps   [remap]        Show which apps map to which product, or recompute them
@@ -47,6 +48,8 @@ func main() {
 		err = runReport(args)
 	case "mcp":
 		err = runMCP(args)
+	case "auth":
+		err = runAuth(args)
 	case "tail":
 		err = runTail(args)
 	case "check":

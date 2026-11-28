@@ -79,7 +79,12 @@ func New(cfg config.Config, st *store.Store, b *bus.Bus, p *pipeline.Pipeline, s
 // matching, so Loot needs no third-party router.
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
+	authRT := s.buildAuthRuntime()
 
+	mux.HandleFunc("GET /login", s.handleLoginGet(authRT))
+	mux.HandleFunc("POST /login", s.handleLoginPost(authRT))
+	mux.HandleFunc("POST /logout", s.handleLogout(authRT))
+	mux.HandleFunc("GET /api/auth/status", s.handleAuthStatus(authRT))
 	mux.HandleFunc("GET /api/healthz", s.handleHealth)
 	mux.HandleFunc("GET /api/report", s.handleReport)
 	mux.HandleFunc("GET /api/drops", s.handleDrops)
@@ -113,7 +118,7 @@ func (s *Server) Handler() http.Handler {
 
 	mux.Handle("GET /", s.spaHandler())
 
-	return logRequests(s.Logger, s.apiAuthMiddleware(mux))
+	return logRequests(s.Logger, s.authMiddleware(authRT, mux))
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
@@ -227,6 +232,7 @@ func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {
 		// demo tells the dashboard to wear its "synthetic data" pill, so
 		// nobody mistakes a demo for their own numbers.
 		"demo":      s.Cfg.Demo.Enabled,
+		"auth":      s.Cfg.Auth.Configured(),
 		"version":   s.Version,
 		"listeners": s.Bus.Subscribers(),
 	})

@@ -4,43 +4,55 @@ Everything shown in the Loot dashboard is backed by a JSON HTTP API. External sc
 
 ---
 
-## 1. Authentication (optional read/write API tokens)
+## 1. Authentication (website login + scoped API tokens)
 
-By default, Loot keeps `/api/*` and `/ws` open (for localhost, Tailscale, or deployments behind an authenticating reverse proxy).
+By default, Loot keeps its dashboard, `/api/*`, and `/ws` open (for localhost, Tailscale, or deployments behind an authenticating reverse proxy).
 
-To let agents or scripts call Loot directly with scoped credentials, configure read-only and/or full-access tokens under `api:` in `loot.yaml`:
+When exposing Loot behind a TLS reverse proxy (like Caddy or Nginx), the recommended setup is to let **Loot own both browser login and API tokens** so your reverse proxy is just a pure TLS forwarder (`reverse_proxy 127.0.0.1:8080`):
 
 ```yaml
+auth:
+  username: "nick"                             # optional; omit for password-only
+  password_hash_path: "/etc/loot/auth-password-hash.txt"
+  session_ttl: 720h                            # 30 days (default)
+
 api:
   # Read-only tokens: allowed on GET/HEAD /api/* and GET /ws only.
   # Any POST or DELETE with a read-only token returns 403 Forbidden.
   read_tokens_path: "/etc/loot/api-read-tokens.txt"
-  # read_tokens:
-  #   - "loot_ro_..."
-
   # Full-access tokens: allowed on both read and write endpoints.
   write_tokens_path: "/etc/loot/api-write-tokens.txt"
-  # write_tokens:
-  #   - "loot_rw_..."
 ```
 
-Token files contain one token per line; blank lines and `#` comments are ignored. Environment variable equivalents (comma-separated for inline lists):
+Generate hashes and tokens with the `loot` binary itself (existing bcrypt hashes from `caddy hash-password` also work drop-in):
 
-- `LOOT_API_READ_TOKENS` / `LOOT_API_READ_TOKENS_PATH`
-- `LOOT_API_WRITE_TOKENS` / `LOOT_API_WRITE_TOKENS_PATH`
+```bash
+loot auth hash > /etc/loot/auth-password-hash.txt
+loot auth token >> /etc/loot/api-read-tokens.txt
+```
 
-### How tokens are sent
+And Caddy simplifies to three lines:
 
-Loot accepts tokens in either header:
+```caddyfile
+loot.example.com {
+	reverse_proxy 127.0.0.1:8080
+}
+```
 
-- `Authorization: Bearer <token>` — standard HTTP Bearer auth.
-- `X-API-Key: <token>` — useful when a reverse proxy in front of Loot already consumes `Authorization: Basic …`.
+### How auth works
+
+- **Browsers:** Unauthenticated visits to `/` redirect to `/login`. Signing in sets a signed `HttpOnly`, `SameSite=Lax` (`Secure` over HTTPS) cookie granting full read/write dashboard access. Sessions survive restarts and automatically invalidate if the password changes. Failed logins are rate-limited (10 attempts per IP per 10 minutes), and cookie-authenticated writes enforce same-origin `Origin` checks. Sign out via the `⎋` button in the header (`POST /logout`).
+- **Agents, CLI & scripts:** Send `Authorization: Bearer <token>` or `X-API-Key: <token>` to `/api/*` or `/ws`. API endpoints always return JSON `401`/`403` (never HTML redirects).
+- **Token files & env vars:** Token files contain one token per line (blank lines and `#` comments ignored). Environment equivalents:
+  - Website login: `LOOT_AUTH_USERNAME`, `LOOT_AUTH_PASSWORD`, `LOOT_AUTH_PASSWORD_HASH`, `LOOT_AUTH_PASSWORD_HASH_PATH`, `LOOT_AUTH_SESSION_SECRET`, `LOOT_AUTH_SESSION_TTL`
+  - API tokens: `LOOT_API_READ_TOKENS`, `LOOT_API_READ_TOKENS_PATH`, `LOOT_API_WRITE_TOKENS`, `LOOT_API_WRITE_TOKENS_PATH`
 
 ### What stays exempt
 
-- `GET /api/healthz` stays unauthenticated for container and load-balancer health checks.
+- `GET /api/healthz` and `GET /api/auth/status` stay unauthenticated for health checks.
+- `GET /login`, `POST /login`, `POST /logout` handle browser authentication.
 - `POST /hooks/{source}` keeps each source's own webhook secret/signature verification.
-- Static SPA assets (`/`, `/assets/*`, icons) remain served as usual. If you enable `api:` tokens while also using the browser dashboard behind a reverse proxy (Caddy, Nginx, Cloudflare Access), configure the proxy to inject `X-API-Key: <write_token>` on authenticated browser sessions so the browser UI can call `/api/*` seamlessly.
+- Static PWA manifest and icon assets (`/manifest.webmanifest`, `/icon-*.png`, `/favicon*`, `/sw.js`, `/offline.html`) remain accessible before login so PWA install and background updates work cleanly.
 
 ---
 

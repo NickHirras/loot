@@ -897,7 +897,12 @@ In dev mode, `POST /api/dev/fake` takes `{"rarity","kind","app","country","amoun
 
 Demo mode is the one exception worth stating plainly: it is safe to run anywhere, because it reads no credentials and writes only to `demo.db`.
 
-By default, Loot leaves its dashboard and API open (relying on localhost, Tailscale, or an authenticating reverse proxy with TLS). For programmatic and agent access, you can configure built-in read-only and read-write API tokens under `api:` (`read_tokens`, `write_tokens`, `read_tokens_path`, `write_tokens_path`, or `LOOT_API_*` env vars — see [docs/api.md](docs/api.md)). When any API token is configured, `/api/*` (except `/api/healthz`) and `/ws` require `Authorization: Bearer <token>` or `X-API-Key: <token>`. Always keep `dev.enabled` off in production and put TLS in front of any internet-facing deployment.
+By default, Loot leaves its dashboard and API open (for localhost or Tailscale). For internet-facing deployments behind a TLS reverse proxy (Caddy/Nginx), Loot includes built-in authentication for both humans and agents — see [docs/api.md](docs/api.md):
+
+- **Website login (`auth:`):** set `auth.username` + `auth.password_hash_path` (bcrypt hash via `loot auth hash` or `caddy hash-password`) to protect the dashboard with a signed `HttpOnly` session cookie at `/login` and `/logout`, letting your reverse proxy handle TLS only (`reverse_proxy 127.0.0.1:8080`).
+- **Scoped API tokens (`api:`):** set `api.read_tokens` / `api.write_tokens` (via `loot auth token`, files, or `LOOT_API_*` env vars) so agents, `loot report`, and `loot mcp` authenticate to `/api/*` and `/ws` with `Authorization: Bearer <token>` or `X-API-Key: <token>`. Read tokens are restricted to `GET`/`HEAD` and `/ws` (`403` on writes).
+
+Always keep `dev.enabled` off in production and terminate TLS in front of any public deployment.
 
 ## Roadmap
 

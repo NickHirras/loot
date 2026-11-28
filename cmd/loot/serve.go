@@ -470,8 +470,17 @@ func runServe(args []string) error {
 	go codexSvc.Run(ctx)
 	go bossSvc.Run(ctx)
 
-	// Validate API token files up front so a typo fails at startup instead of
-	// answering 503 on the first API request.
+	// Validate website login and API token files up front so a typo fails at
+	// startup instead of answering 503 on the first request.
+	if cfg.Auth.Configured() {
+		webAuth, err := cfg.Auth.Resolve()
+		if err != nil {
+			return err
+		}
+		log.Info("website login enabled",
+			"username_required", webAuth.Username != "",
+			"session_ttl", webAuth.SessionTTL.String())
+	}
 	if cfg.API.Configured() {
 		readToks, writeToks, err := cfg.API.Resolve()
 		if err != nil {

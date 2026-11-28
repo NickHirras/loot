@@ -4,6 +4,9 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
+
+	"golang.org/x/crypto/bcrypt"
 
 	"github.com/nickhirras/loot/internal/config"
 )
@@ -70,5 +73,70 @@ func TestAPITokensMissingPathFailsLoad(t *testing.T) {
 	cfgPath := writeConfig(t, "api:\n  read_tokens_path: /does/not/exist/tokens.txt\n")
 	if _, err := config.Load(cfgPath, true); err == nil {
 		t.Fatal("expected error when api.read_tokens_path does not exist")
+	}
+}
+
+func TestWebAuthConfigAndHashFile(t *testing.T) {
+	hash, err := bcrypt.GenerateFromPassword([]byte("s3cr3t"), bcrypt.MinCost)
+	if err != nil {
+		t.Fatalf("bcrypt: %v", err)
+	}
+	dir := t.TempDir()
+	hashFile := filepath.Join(dir, "password.bcrypt")
+	if err := os.WriteFile(hashFile, append([]byte("# bcrypt hash\n"), append(hash, '\n')...), 0o600); err != nil {
+		t.Fatalf("write hash file: %v", err)
+	}
+
+	cfgPath := writeConfig(t, `
+auth:
+  username: nick
+  password_hash_path: `+hashFile+`
+  session_ttl: 48h
+`)
+	cfg, err := config.Load(cfgPath, true)
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	res, err := cfg.Auth.Resolve()
+	if err != nil {
+		t.Fatalf("resolve: %v", err)
+	}
+	if !res.Enabled || res.Username != "nick" || res.PasswordHash != string(hash) {
+		t.Fatalf("resolved = %+v", res)
+	}
+	if res.SessionTTL != 48*time.Hour {
+		t.Fatalf("session_ttl = %v, want 48h", res.SessionTTL)
+	}
+	if len(res.SessionKey) != 32 {
+		t.Fatalf("session_key len = %d, want 32", len(res.SessionKey))
+	}
+}
+
+func TestWebAuthInvalidBcryptFailsResolve(t *testing.T) {
+	cfgPath := writeConfig(t, "auth:\n  password_hash: not-a-bcrypt-hash\n")
+	cfg, err := config.Load(cfgPath, true)
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if _, err := cfg.Auth.Resolve(); err == nil {
+		t.Fatal("expected error for invalid bcrypt hash")
+	}
+}
+
+func TestWebAuthEnvOverrides(t *testing.T) {
+	t.Setenv("LOOT_AUTH_USERNAME", "alice")
+	t.Setenv("LOOT_AUTH_PASSWORD", "wonderland")
+	t.Setenv("LOOT_AUTH_SESSION_TTL", "24h")
+
+	cfg, err := config.Load("missing.yaml", false)
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	res, err := cfg.Auth.Resolve()
+	if err != nil {
+		t.Fatalf("resolve: %v", err)
+	}
+	if !res.Enabled || res.Username != "alice" || res.Password != "wonderland" || res.SessionTTL != 24*time.Hour {
+		t.Fatalf("resolved = %+v", res)
 	}
 }

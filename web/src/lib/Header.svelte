@@ -121,6 +121,11 @@
         {loot.muted ? '🔇' : '🔊'}
         <span class="mute-label">{loot.muted ? m.header_muted() : m.header_sound()}</span>
       </button>
+      {#if loot.stats?.auth}
+        <form class="logout-form" method="post" action="/logout">
+          <button class="logout" type="submit" title="Sign out" aria-label="Sign out">⎋</button>
+        </form>
+      {/if}
     </div>
   </div>
 
@@ -375,6 +380,19 @@
     align-items: center;
     gap: 0.35rem;
     font-size: 0.78rem;
+  }
+
+  .logout-form {
+    display: inline-flex;
+    margin: 0;
+  }
+
+  .logout {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.85rem;
+    padding: 0.32rem 0.5rem;
   }
 
   .stats {

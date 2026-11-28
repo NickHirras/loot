@@ -3,6 +3,7 @@
 package config
 
 import (
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -12,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"golang.org/x/crypto/bcrypt"
 	"gopkg.in/yaml.v3"
 )
 
@@ -24,6 +26,9 @@ const DefaultDisplayCurrency = "USD"
 // DefaultChestAutoOpenHours is how old a chest's day must be before Loot opens
 // it without being asked.
 const DefaultChestAutoOpenHours = 36
+
+// DefaultSessionTTL is how long a built-in browser login cookie lasts.
+const DefaultSessionTTL = 30 * 24 * time.Hour
 
 // Demo mode defaults: a fixed seed so screenshots reproduce, real-time pace,
 // and four months of history.
@@ -64,6 +69,7 @@ type Config struct {
 	FX      FX      `yaml:"fx"`
 	Chest   Chest   `yaml:"chest"`
 	Funnel  Funnel  `yaml:"funnel"`
+	Auth    Auth    `yaml:"auth"`
 	API     API     `yaml:"api"`
 	Sources Sources `yaml:"sources"`
 	Dev     Dev     `yaml:"dev"`
@@ -491,6 +497,102 @@ type Dev struct {
 	Enabled bool `yaml:"enabled"`
 }
 
+// Auth configures optional built-in website login for the browser dashboard
+// using a signed HttpOnly session cookie. Leave password, password_hash and
+// password_hash_path empty to keep the dashboard open (e.g. localhost or
+// Tailscale).
+type Auth struct {
+	// Username required at /login. Optional: when empty, only the password is
+	// checked.
+	Username string `yaml:"username"`
+	// PasswordHash is a bcrypt hash (compatible with `loot auth hash` and
+	// `caddy hash-password`). Prefer PasswordHashPath to keep hashes out of
+	// loot.yaml.
+	PasswordHash string `yaml:"password_hash"`
+	// PasswordHashPath points at a file holding a bcrypt hash (one line;
+	// blank lines and '#' comments ignored). Wins over PasswordHash.
+	PasswordHashPath string `yaml:"password_hash_path"`
+	// Password is a plaintext password for quick setups or LOOT_AUTH_PASSWORD.
+	// Ignored when a bcrypt hash is configured.
+	Password string `yaml:"password"`
+	// SessionSecret optionally pins the HMAC-SHA256 key used to sign session
+	// cookies. When omitted, a deterministic key is derived from the configured
+	// credentials so sessions survive container restarts and automatically
+	// invalidate when the password changes.
+	SessionSecret string `yaml:"session_secret"`
+	// SessionTTL is how long a browser login cookie stays valid. Defaults to
+	// 720h (30 days).
+	SessionTTL time.Duration `yaml:"session_ttl"`
+}
+
+// ResolvedAuth holds validated website login settings ready for the HTTP layer.
+type ResolvedAuth struct {
+	Enabled      bool
+	Username     string
+	PasswordHash string
+	Password     string
+	SessionKey   []byte
+	SessionTTL   time.Duration
+}
+
+// Configured reports whether website login is configured.
+func (a Auth) Configured() bool {
+	return strings.TrimSpace(a.PasswordHash) != "" ||
+		strings.TrimSpace(a.PasswordHashPath) != "" ||
+		strings.TrimSpace(a.Password) != ""
+}
+
+// Resolve loads and validates website login credentials and derives the session
+// signing key.
+func (a Auth) Resolve() (ResolvedAuth, error) {
+	if !a.Configured() {
+		return ResolvedAuth{}, nil
+	}
+	res := ResolvedAuth{
+		Enabled:    true,
+		Username:   strings.TrimSpace(a.Username),
+		SessionTTL: a.SessionTTL,
+	}
+	if res.SessionTTL <= 0 {
+		res.SessionTTL = DefaultSessionTTL
+	}
+
+	if p := strings.TrimSpace(a.PasswordHashPath); p != "" {
+		lines, err := loadTokenList(nil, p)
+		if err != nil {
+			return ResolvedAuth{}, fmt.Errorf("auth.password_hash_path: %w", err)
+		}
+		if len(lines) == 0 {
+			return ResolvedAuth{}, fmt.Errorf("auth.password_hash_path %s is empty", p)
+		}
+		res.PasswordHash = lines[0]
+	} else if h := strings.TrimSpace(a.PasswordHash); h != "" {
+		res.PasswordHash = h
+	} else {
+		res.Password = strings.TrimSpace(a.Password)
+	}
+
+	if res.PasswordHash != "" {
+		if _, err := bcrypt.Cost([]byte(res.PasswordHash)); err != nil {
+			return ResolvedAuth{}, fmt.Errorf("auth.password_hash is not a valid bcrypt hash: %w", err)
+		}
+	}
+
+	var keySeed string
+	if s := strings.TrimSpace(a.SessionSecret); s != "" {
+		keySeed = "loot-session-secret-v1:" + s
+	} else {
+		cred := res.PasswordHash
+		if cred == "" {
+			cred = res.Password
+		}
+		keySeed = "loot-session-v1:" + res.Username + "\x00" + cred
+	}
+	sum := sha256.Sum256([]byte(keySeed))
+	res.SessionKey = sum[:]
+	return res, nil
+}
+
 // API configures optional bearer / API-key authentication for /api/* and /ws.
 // Leave every field empty to keep the API open (the default, for localhost or
 // deployments behind an authenticating reverse proxy or Tailscale).
@@ -694,6 +796,11 @@ func Load(path string, explicit bool) (Config, error) {
 			return cfg, fmt.Errorf("rules_path %s: %w", cfg.RulesPath, err)
 		}
 	}
+	if p := strings.TrimSpace(cfg.Auth.PasswordHashPath); p != "" {
+		if _, err := os.Stat(p); err != nil {
+			return cfg, fmt.Errorf("auth.password_hash_path %s: %w", p, err)
+		}
+	}
 	if p := strings.TrimSpace(cfg.API.ReadTokensPath); p != "" {
 		if _, err := os.Stat(p); err != nil {
 			return cfg, fmt.Errorf("api.read_tokens_path %s: %w", p, err)
@@ -894,6 +1001,26 @@ func applyEnv(cfg *Config) {
 	}
 	if v := os.Getenv("LOOT_CRASH_SECRET"); v != "" {
 		cfg.Sources.Crash.Secret = v
+	}
+	if v := os.Getenv("LOOT_AUTH_USERNAME"); v != "" {
+		cfg.Auth.Username = v
+	}
+	if v := os.Getenv("LOOT_AUTH_PASSWORD"); v != "" {
+		cfg.Auth.Password = v
+	}
+	if v := os.Getenv("LOOT_AUTH_PASSWORD_HASH"); v != "" {
+		cfg.Auth.PasswordHash = v
+	}
+	if v := os.Getenv("LOOT_AUTH_PASSWORD_HASH_PATH"); v != "" {
+		cfg.Auth.PasswordHashPath = v
+	}
+	if v := os.Getenv("LOOT_AUTH_SESSION_SECRET"); v != "" {
+		cfg.Auth.SessionSecret = v
+	}
+	if v := os.Getenv("LOOT_AUTH_SESSION_TTL"); v != "" {
+		if d, err := time.ParseDuration(v); err == nil {
+			cfg.Auth.SessionTTL = d
+		}
 	}
 	if v := os.Getenv("LOOT_API_READ_TOKENS"); v != "" {
 		cfg.API.ReadTokens = splitList(v)

@@ -7,6 +7,8 @@
 #   LOOT_LISTEN, LOOT_DATA_DIR, LOOT_RULES_PATH, LOOT_DEV_ENABLED,
 #   LOOT_DISPLAY_CURRENCY, LOOT_HOME_COUNTRY, LOOT_FX_ENABLED,
 #   LOOT_CHEST_ENABLED, LOOT_CHEST_AUTO_OPEN_AFTER_HOURS,
+#   LOOT_AUTH_USERNAME, LOOT_AUTH_PASSWORD, LOOT_AUTH_PASSWORD_HASH,
+#   LOOT_AUTH_PASSWORD_HASH_PATH, LOOT_AUTH_SESSION_SECRET, LOOT_AUTH_SESSION_TTL,
 #   LOOT_API_READ_TOKENS, LOOT_API_WRITE_TOKENS,
 #   LOOT_API_READ_TOKENS_PATH, LOOT_API_WRITE_TOKENS_PATH,
 #   LOOT_REVENUECAT_SECRET, LOOT_REVENUECAT_ENABLED,
@@ -43,10 +45,21 @@ display_currency: "USD"
 # biggest settlement instead, which is right for most people.
 home_country: ""
 
+# Optional built-in website login (signed HttpOnly cookie) so Loot protects its
+# own dashboard and your reverse proxy (Caddy/Nginx) only needs to handle TLS.
+# Generate a bcrypt hash with `loot auth hash` (Caddy's `caddy hash-password`
+# hashes also work drop-in). Leave empty to keep the dashboard open.
+# auth:
+#   username: "nick"              # optional; omit to require password only
+#   password_hash_path: ""        # e.g. /etc/loot/auth-password-hash.txt
+#   # password_hash: ""           # inline bcrypt hash
+#   # password: ""                # plaintext (prefer password_hash_path)
+#   # session_secret: ""          # optional; derived from credentials if omitted
+#   session_ttl: 720h             # cookie lifetime (default: 30 days)
+
 # Optional bearer / X-API-Key authentication for /api/* and /ws so scripts and
-# AI agents can query Loot with read-only or full-access tokens. Leave empty to
-# keep the API open (e.g. localhost, Tailscale, or behind an authenticating
-# reverse proxy). See docs/api.md.
+# AI agents can query Loot with read-only or full-access tokens. Generate a
+# token with `loot auth token`. See docs/api.md.
 # api:
 #   read_tokens: []               # GET/HEAD /api/* and GET /ws only (POST/DELETE -> 403)
 #   write_tokens: []              # full read and write access to /api/* and /ws

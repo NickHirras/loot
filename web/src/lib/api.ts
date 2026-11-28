@@ -83,8 +83,8 @@ function scopeQuery(): string {
  * English — but the header is what a later release will translate against, and
  * a header added in one of three places is a header that is wrong in two.
  */
-function request(path: string, init: RequestInit = {}): Promise<Response> {
-  return fetch(path, {
+async function request(path: string, init: RequestInit = {}): Promise<Response> {
+  const res = await fetch(path, {
     ...init,
     headers: {
       Accept: 'application/json',
@@ -92,6 +92,12 @@ function request(path: string, init: RequestInit = {}): Promise<Response> {
       ...init.headers,
     },
   })
+  // If a browser session cookie expired while the tab was open, bounce cleanly
+  // to the built-in login screen rather than leaving the UI stuck on 401s.
+  if (res.status === 401 && typeof window !== 'undefined' && window.location.pathname !== '/login') {
+    window.location.assign('/login')
+  }
+  return res
 }
 
 async function getJSON<T>(path: string): Promise<T> {
