@@ -309,6 +309,23 @@ func TestWebLoginCookieAndCoexistenceWithAPITokens(t *testing.T) {
 	if rec.Code != http.StatusSeeOther || rec.Header().Get("Location") != "/login" {
 		t.Fatalf("POST /logout = %d loc=%q", rec.Code, rec.Header().Get("Location"))
 	}
+
+	// Stale browser Authorization: Basic header from a former reverse proxy
+	// must NOT bypass /login or keep authenticating after logout.
+	req = httptest.NewRequest(http.MethodGet, "/login", nil)
+	req.SetBasicAuth("nick", "hunter2")
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "Sign in") {
+		t.Fatalf("GET /login with stale Basic Auth = %d loc=%q, want 200 login page", rec.Code, rec.Header().Get("Location"))
+	}
+	req = httptest.NewRequest(http.MethodGet, "/api/report", nil)
+	req.SetBasicAuth("nick", "hunter2")
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("GET /api/report with Basic Auth = %d, want 401", rec.Code)
+	}
 }
 
 func TestWebLoginRateLimit(t *testing.T) {

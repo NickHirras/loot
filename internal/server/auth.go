@@ -32,6 +32,7 @@ type authRuntime struct {
 	readTokens  []string
 	writeTokens []string
 	limiter     *loginLimiter
+	passCache   *verifiedPassCache
 	loadErr     error
 }
 
@@ -40,7 +41,10 @@ func (a *authRuntime) enabled() bool {
 }
 
 func (s *Server) buildAuthRuntime() *authRuntime {
-	rt := &authRuntime{limiter: newLoginLimiter()}
+	rt := &authRuntime{
+		limiter:   newLoginLimiter(),
+		passCache: newVerifiedPassCache(),
+	}
 	if s.Cfg.Auth.Configured() {
 		web, err := s.Cfg.Auth.Resolve()
 		if err != nil {
@@ -117,7 +121,7 @@ func (s *Server) authMiddleware(rt *authRuntime, next http.Handler) http.Handler
 			return
 		}
 
-		if _, _, ok := rt.authenticate(r); ok {
+		if rt.hasValidSession(r) {
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -134,10 +138,26 @@ func (s *Server) authMiddleware(rt *authRuntime, next http.Handler) http.Handler
 	})
 }
 
-// authenticate checks credentials in strict precedence:
+// hasValidSession reports whether r carries a valid signed loot_session cookie.
+func (rt *authRuntime) hasValidSession(r *http.Request) bool {
+	if !rt.web.Enabled {
+		return false
+	}
+	c, err := r.Cookie(sessionCookieName)
+	if err != nil || c.Value == "" {
+		return false
+	}
+	_, valid := verifySession(rt.web.SessionKey, c.Value, time.Now())
+	return valid
+}
+
+// authenticate checks API and WebSocket credentials in strict precedence:
 //  1. Explicit Bearer / X-API-Key token (if presented, never falls back)
 //  2. Signed browser session cookie (`loot_session`)
-//  3. HTTP Basic Auth matching `auth:` credentials (convenience for scripts)
+//
+// HTTP Basic Auth is intentionally NOT accepted here: bcrypt verification only
+// runs on POST /login so stale browser Basic Auth headers from a former reverse
+// proxy cannot burn CPU on every request or defeat /logout.
 func (rt *authRuntime) authenticate(r *http.Request) (role string, presentedToken bool, ok bool) {
 	if tok := extractAPIToken(r); tok != "" {
 		if matchAnyToken(tok, rt.writeTokens) {
@@ -149,17 +169,8 @@ func (rt *authRuntime) authenticate(r *http.Request) (role string, presentedToke
 		return "", true, false
 	}
 
-	if rt.web.Enabled {
-		if c, err := r.Cookie(sessionCookieName); err == nil && c.Value != "" {
-			if _, valid := verifySession(rt.web.SessionKey, c.Value, time.Now()); valid {
-				return "session", false, true
-			}
-		}
-		if user, pass, hasBasic := r.BasicAuth(); hasBasic {
-			if rt.verifyPassword(user, pass) {
-				return "write", false, true
-			}
-		}
+	if rt.hasValidSession(r) {
+		return "session", false, true
 	}
 	return "", false, false
 }
@@ -168,9 +179,15 @@ func (rt *authRuntime) verifyPassword(username, password string) bool {
 	if !rt.web.Enabled {
 		return false
 	}
+	normUser := strings.TrimSpace(username)
+	cacheKey := rt.passCache.key(rt.web.SessionKey, normUser, password)
+	if rt.passCache.Has(cacheKey) {
+		return true
+	}
+
 	userOK := true
 	if rt.web.Username != "" {
-		u1 := sha256.Sum256([]byte(strings.TrimSpace(username)))
+		u1 := sha256.Sum256([]byte(normUser))
 		u2 := sha256.Sum256([]byte(rt.web.Username))
 		userOK = subtle.ConstantTimeCompare(u1[:], u2[:]) == 1
 	}
@@ -183,7 +200,11 @@ func (rt *authRuntime) verifyPassword(username, password string) bool {
 		p2 := sha256.Sum256([]byte(rt.web.Password))
 		passOK = subtle.ConstantTimeCompare(p1[:], p2[:]) == 1
 	}
-	return userOK && passOK
+	if userOK && passOK {
+		rt.passCache.Add(cacheKey)
+		return true
+	}
+	return false
 }
 
 func (s *Server) handleAuthStatus(rt *authRuntime) http.HandlerFunc {
@@ -222,7 +243,7 @@ func (s *Server) handleLoginGet(rt *authRuntime) http.HandlerFunc {
 			return
 		}
 		nextPath := sanitizeNextPath(r.URL.Query().Get("next"))
-		if _, _, ok := rt.authenticate(r); ok {
+		if rt.hasValidSession(r) {
 			http.Redirect(w, r, nextPath, http.StatusSeeOther)
 			return
 		}
@@ -488,6 +509,45 @@ func clientIP(r *http.Request) string {
 		}
 	}
 	return host
+}
+
+// verifiedPassCache memoizes successful bcrypt password checks using an
+// HMAC-SHA256 digest of (username, password) keyed by the server's session key
+// so raw passwords are never retained in memory and repeat logins do not burn
+// CPU on high-cost bcrypt hashes (such as Caddy's default cost 14).
+type verifiedPassCache struct {
+	mu      sync.RWMutex
+	entries map[[32]byte]struct{}
+}
+
+func newVerifiedPassCache() *verifiedPassCache {
+	return &verifiedPassCache{entries: map[[32]byte]struct{}{}}
+}
+
+func (c *verifiedPassCache) key(secret []byte, username, password string) [32]byte {
+	mac := hmac.New(sha256.New, secret)
+	_, _ = mac.Write([]byte(username))
+	_, _ = mac.Write([]byte{0})
+	_, _ = mac.Write([]byte(password))
+	var out [32]byte
+	copy(out[:], mac.Sum(nil))
+	return out
+}
+
+func (c *verifiedPassCache) Has(k [32]byte) bool {
+	c.mu.RLock()
+	_, ok := c.entries[k]
+	c.mu.RUnlock()
+	return ok
+}
+
+func (c *verifiedPassCache) Add(k [32]byte) {
+	c.mu.Lock()
+	if len(c.entries) >= 16 {
+		clear(c.entries)
+	}
+	c.entries[k] = struct{}{}
+	c.mu.Unlock()
 }
 
 // loginLimiter tracks recent failed login attempts per IP.

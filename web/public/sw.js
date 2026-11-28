@@ -25,7 +25,7 @@ const OFFLINE_URL = '/offline.html'
 const SHELL_URL = '/'
 
 /** Paths that belong to the server, not to the app. Never cached, never intercepted. */
-const PASSTHROUGH = ['/api/', '/hooks/', '/ws']
+const PASSTHROUGH = ['/api/', '/hooks/', '/ws', '/login', '/logout']
 
 function isPassthrough(url) {
   return PASSTHROUGH.some((prefix) => url.pathname === prefix || url.pathname.startsWith(prefix))
@@ -92,12 +92,15 @@ self.addEventListener('fetch', (event) => {
 async function handleNavigation(request) {
   try {
     const response = await fetch(request)
-    if (response && response.ok) {
-      const copy = response.clone()
-      const cache = await caches.open(SHELL_CACHE)
-      // Store under a stable key so any route can be recovered offline; the
-      // SPA reads the path from the URL bar once it boots.
-      await cache.put(SHELL_URL, copy)
+    if (response && response.ok && !response.redirected) {
+      const dest = response.url ? new URL(response.url) : null
+      if (!dest || (dest.pathname !== '/login' && dest.pathname !== '/logout')) {
+        const copy = response.clone()
+        const cache = await caches.open(SHELL_CACHE)
+        // Store under a stable key so any route can be recovered offline; the
+        // SPA reads the path from the URL bar once it boots.
+        await cache.put(SHELL_URL, copy)
+      }
     }
     return response
   } catch {
@@ -120,7 +123,7 @@ async function handleImmutableAsset(request) {
   if (hit) return hit
 
   const response = await fetch(request)
-  if (response && response.ok && response.type === 'basic') {
+  if (response && response.ok && !response.redirected && response.type === 'basic') {
     await cache.put(request, response.clone())
   }
   return response
